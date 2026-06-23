@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Train your own wake word for Lashon</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Train a custom 'Hey Lashon' (or any phrase) wake-word classifier for Lashon using a free Google Colab notebook. ~30–60 minutes." />
+<meta name="theme-color" content="#22272f" />
+<link rel="stylesheet" href="../styles.css" />
+<link rel="icon" type="image/svg+xml" href="../lashon-mark.svg" />
+<style>
+/* Override the marketing page's single-screen layout for a scrollable article. */
+html, body {
+  height: auto;
+  overflow: visible;
+}
+body {
+  direction: ltr;
+  display: block;
+  padding: 0;
+}
+
+.article {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 56px 28px 96px;
+  font-family: var(--font-sans);
+  line-height: 1.65;
+  color: var(--text-soft);
+}
+
+.article-nav {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 32px;
+}
+.article-nav a {
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px dashed transparent;
+  transition: color .15s ease, border-color .15s ease;
+}
+.article-nav a:hover {
+  color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 60%, transparent);
+}
+
+.article h1 {
+  font-size: clamp(28px, 4vw, 38px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  margin: 0 0 16px;
+  line-height: 1.2;
+}
+.article .lede {
+  font-size: 17px;
+  color: var(--text-soft);
+  margin: 0 0 32px;
+}
+.article h2 {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 44px 0 14px;
+  letter-spacing: -0.005em;
+}
+.article p { margin: 0 0 14px; }
+
+/* Default article-link style — explicitly skip the CTA, which is its own button. */
+.article a:not(.cta) {
+  color: var(--accent);
+  border-bottom: 1px solid color-mix(in oklab, var(--accent) 40%, transparent);
+  transition: border-color .15s ease;
+}
+.article a:not(.cta):hover { border-color: var(--accent); }
+
+.article ol, .article ul {
+  margin: 0 0 18px;
+  padding-inline-start: 22px;
+}
+.article ol li, .article ul li { margin: 10px 0; }
+.article li::marker { color: var(--muted); }
+.article li strong { color: var(--text); font-weight: 600; }
+
+.article code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+
+.article table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0 16px;
+  font-size: 14px;
+}
+.article th, .article td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.article th {
+  color: var(--muted);
+  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* The primary CTA button — its own peach-on-dark style. Higher specificity
+   than `.article a:not(.cta)` so the link color doesn't override it. */
+.article a.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  margin: 6px 0 10px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 1px solid var(--accent);
+  font-weight: 600;
+  font-size: 15px;
+  text-decoration: none;
+  transition: transform .15s ease, background .15s ease;
+}
+.article a.cta:hover {
+  transform: translateY(-2px);
+  background: #ffd9b6;
+}
+.article a.cta svg { width: 18px; height: 18px; }
+
+.callout {
+  margin: 18px 0 22px;
+  padding: 14px 18px;
+  background: color-mix(in oklab, var(--accent) 8%, var(--surface));
+  border: 1px solid color-mix(in oklab, var(--accent) 30%, var(--line));
+  border-radius: 12px;
+  color: var(--text-soft);
+}
+.callout strong { color: var(--text); }
+.callout p { margin: 0; }
+.callout p + p { margin-top: 8px; }
+
+.foot {
+  margin-top: 56px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+.foot a { color: var(--muted); border: none; }
+.foot a:hover { color: var(--accent); }
+
+@media (max-width: 720px) {
+  .article { padding: 40px 20px 64px; }
+  .article h1 { font-size: 26px; }
+  .article h2 { font-size: 19px; }
+}
+</style>
+</head>
+<body>
+
+<article class="article">
+
+  <nav class="article-nav" aria-label="Site navigation">
+    <a href="../">← Lashon home</a>
+  </nav>
+
+  <h1>Train your own wake word for Lashon</h1>
+  <p class="lede">
+    Want Lashon to listen for a custom phrase — "Hey Lashon", your own name,
+    anything? Train a small classifier in Google Colab. About 30–60 minutes,
+    free, all in your browser. The result runs locally on your machine.
+  </p>
+
+  <div class="callout">
+    <p>
+      <strong>Don't want to train one?</strong> Lashon's Settings Hub
+      → <strong>Wake word</strong> → <strong>More wake words</strong> offers
+      one-click installs of "Hey Jarvis", "Alexa", "Hey Mycroft", and
+      "Hey Rhasspy". They're released under
+      <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC-BY-NC-4.0</a>
+      (non-commercial use only) and Lashon shows the licence before installing.
+      Models you train yourself have no such restriction.
+    </p>
+  </div>
+
+  <h2>Step by step</h2>
+
+  <ol>
+    <li>
+      <strong>Open the training notebook.</strong>
+      <p>
+        <a class="cta" href="https://colab.research.google.com/drive/1zzKpSnqVkUDD3FyZ-Yxw3grF7L0R1rlk#scrollTo=step1_preview" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M15 3h6v6"/><path d="M10 14L21 3"/><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/>
+          </svg>
+          Open in Google Colab
+        </a>
+      </p>
+      <p>
+        The notebook is still being polished — if a cell errors, the message
+        usually points at the line to tweak.
+      </p>
+    </li>
+
+    <li>
+      <strong>Switch to a GPU runtime.</strong> Colab menu →
+      <em>Runtime → Change runtime type → T4 GPU → Save</em>. Without a GPU
+      this takes hours; with the free T4 it's ~30–60 minutes.
+    </li>
+
+    <li>
+      <strong>Set your phrase.</strong> Near the top of the notebook,
+      change <code>target_word = "hey lashon"</code> to whatever you want.
+      Hebrew works too. Pick something distinctive and 2–3 syllables —
+      single common words like "hello" or "yes" will fire constantly.
+    </li>
+
+    <li>
+      <strong>Run all cells.</strong> <em>Runtime → Run all</em>, then wait.
+      The notebook synthesises hundreds of recordings of your phrase, mixes
+      in background noise, downloads a precomputed set of "not your phrase"
+      audio (~30 GB on Colab's disk), trains a small classifier, and exports
+      it as ONNX. The dataset download is the slowest cell.
+    </li>
+
+    <li>
+      <strong>Download the <code>.onnx</code> file.</strong> When training
+      finishes the notebook produces a file named after your phrase, e.g.
+      <code>hey_lashon.onnx</code>. In Colab's left <em>Files</em> panel,
+      right-click and choose <em>Download</em>.
+    </li>
+
+    <li>
+      <strong>Drop it into Lashon's wake-words folder:</strong>
+      <table>
+        <thead><tr><th>OS</th><th>Path</th></tr></thead>
+        <tbody>
+          <tr><td>Windows</td><td><code>%LOCALAPPDATA%\dev.lashon.desktop\models\wakewords\</code></td></tr>
+          <tr><td>macOS</td><td><code>~/Library/Application Support/dev.lashon.desktop/models/wakewords/</code></td></tr>
+          <tr><td>Linux</td><td><code>~/.local/share/dev.lashon.desktop/models/wakewords/</code></td></tr>
+        </tbody>
+      </table>
+    </li>
+
+    <li>
+      <strong>Pick it in the Hub.</strong> Double-click the tongue →
+      <em>Settings</em> → <em>Wake word</em> → toggle <strong>Enable</strong>
+      on, then select your phrase from the picker. The wake worker
+      live-reloads in under a second. Say your phrase — dictation opens.
+    </li>
+  </ol>
+
+  <div class="callout">
+    <p>
+      <strong>If the picker doesn't show your model</strong> — the file
+      must be directly in <code>wakewords/</code> (not a subfolder) and end
+      in <code>.onnx</code>. The picker turns the filename stem into a
+      friendly name automatically: <code>my_dragon.onnx</code> →
+      <em>My Dragon</em>.
+    </p>
+    <p>
+      <strong>If it shows but never fires</strong> — confirm <em>Enable</em>
+      is on and you're saying the exact phrase you trained. Slide
+      sensitivity up if needed.
+    </p>
+  </div>
+
+  <footer class="foot">
+    <p>
+      <a href="../">← Lashon · לשון</a>  ·  <a href="https://github.com/bustrama/lashon">Source on GitHub</a>
+    </p>
+  </footer>
+
+</article>
+
+</body>
+</html>

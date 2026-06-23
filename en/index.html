@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Lashon — local voice assistant for Hebrew & English</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Lashon — local voice dictation for Hebrew and English, specially tuned and corrected for Hebrew. Injects text into any app, all on your computer — no cloud." />
+<meta name="theme-color" content="#22272f" />
+<link rel="stylesheet" href="../styles.css" />
+<link rel="icon" type="image/svg+xml" href="../lashon-mark.svg" />
+</head>
+<body>
+
+<a class="lang-toggle" href="../" hreflang="he" aria-label="עבור לעברית" dir="rtl">עברית</a>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="dropGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#fbe2cc"/>
+      <stop offset="55%" stop-color="#f7c8a3"/>
+      <stop offset="100%" stop-color="#d99a6c"/>
+    </linearGradient>
+    <symbol id="tongue" viewBox="0 0 500 500">
+      <path fill="url(#dropGrad)" d="m295.46,264.96c-18.05,58.79-35.87,116.82-53.87,175.44,5.39,0,10.04.27,14.64-.04,28.15-1.9,51.5-13.4,69.23-35.51,16.45-20.52,24.31-44.6,26.59-70.35,1.74-19.65,1.95-39.45,2.49-59.19.52-19.06,1.27-38.08,5.03-56.83,1.97-9.83,4.71-19.51,6.3-29.39,2.5-15.51-.34-29.9-12.32-41-14.36-13.32-31.67-17.08-50.56-13.31-14.78,2.95-27.07,10.11-35.03,23.45-4.55,7.63-6.25,16.24-8,24.75-5.38,26.29-10.54,52.62-15.77,78.94-1.49,7.52-2.91,15.06-4.47,23.15,18.61-6.71,36.75-13.25,55.73-20.1Zm-56.85,175.02c6.9-46.12,13.75-91.84,20.69-138.23-17.08,6.24-33.42,12.21-50.22,18.34.31-1.67.46-2.65.67-3.63,8.87-41.29,17.71-82.58,26.64-123.86,4.86-22.43-3.96-42.29-23.86-52.38-18.66-9.46-37.5-9.24-56.04.37-12.42,6.44-20.22,16.61-22.77,30.52-1.58,8.63-.83,17.17,1.36,25.59,5.73,22.05,9.05,44.43,9.46,67.24.31,17.42.77,34.85,1.32,52.27.67,21.52,3.89,42.56,12.51,62.5,10.46,24.17,26.73,42.82,51.19,53.62,9.13,4.03,18.66,6.59,29.05,7.64ZM437.28,125.13c-7.93.1-14.77-1.43-20.86-4.92-12.46-7.15-24.82-14.5-36.99-22.13-16.03-10.06-31.58-20.92-47.84-30.59-13.68-8.13-28.74-10-44.31-5.89-10.06,2.65-18.84,7.88-27.16,13.91-6.75,4.88-13.27,5.15-20.19.33-4.64-3.24-9.44-6.34-14.45-8.95-16.88-8.81-34.22-9.8-51.84-2.21-12.92,5.57-24.26,13.79-35.97,21.43-16.45,10.73-32.96,21.38-49.7,31.65-7.37,4.52-15.5,7.55-24.43,7.41-.22,0-.45.23-.82.44,8.3,7.15,17.89,9.45,28.38,8.86,11.2-.63,21.57-4.36,31.87-8.43,11.11-4.4,22.14-9.04,33.41-13,20.29-7.13,40.59-6.7,60.62,1.3,6.3,2.52,12.46,5.37,18.73,7.98,7.34,3.05,14.99,3.89,22.61,1.67,5.31-1.55,10.48-3.76,15.49-6.16,24.22-11.6,48.84-13.05,73.96-3.24,11.23,4.38,22.37,8.98,33.61,13.33,11.13,4.31,22.53,7.47,34.65,6.42,7.73-.67,14.64-3.4,21.24-9.19Z"/>
+    </symbol>
+    <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3v12M7 11l5 5 5-5M5 21h14"/>
+    </symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 20s-7-4.5-9.5-9A5 5 0 0 1 12 6a5 5 0 0 1 9.5 5c-2.5 4.5-9.5 9-9.5 9z"/>
+    </symbol>
+    <symbol id="i-github" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.8c-2.8.6-3.4-1.3-3.4-1.3-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.6-1.4-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.5-1.3.1-2.7 0 0 .9-.3 2.8 1a9.6 9.6 0 0 1 5 0c1.9-1.3 2.8-1 2.8-1 .6 1.4.2 2.4.1 2.7.7.7 1 1.6 1 2.7 0 3.9-2.4 4.7-4.6 5 .4.3.7.9.7 1.8v2.7c0 .3.2.6.7.5A10 10 0 0 0 12 2z"/>
+    </symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>
+    </symbol>
+    <symbol id="i-keys" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"/>
+    </symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>
+    </symbol>
+    <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M8 5v14l11-7z"/>
+    </symbol>
+  </defs>
+</svg>
+
+<main class="page">
+
+  <section class="intro">
+    <span class="mark"><svg viewBox="0 0 500 500"><use href="#tongue"/></svg></span>
+
+    <h1>Lashon</h1>
+    <p class="he-name" dir="rtl">לשון</p>
+
+    <p class="tagline">
+      A local voice assistant for dictation in Hebrew and English — specially tuned
+      and corrected for Hebrew. Injects text into any app, all on your computer, no cloud.
+    </p>
+
+    <div class="actions">
+      <a class="btn primary" href="https://github.com/bustrama/lashon/releases">
+        <svg aria-hidden="true"><use href="#i-download"/></svg>
+        <span>Download</span>
+      </a>
+      <a class="btn" href="https://ko-fi.com/bustrama" target="_blank" rel="noopener">
+        <svg aria-hidden="true"><use href="#i-heart"/></svg>
+        <span>Support on Ko-fi</span>
+      </a>
+      <a class="btn" href="https://github.com/bustrama/lashon" target="_blank" rel="noopener">
+        <svg aria-hidden="true"><use href="#i-github"/></svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <p class="foot-note en">v0.4 · Windows &amp; macOS · MIT License · 100% on-device</p>
+  </section>
+
+  <aside class="showcase">
+    <!-- Replace this placeholder with a <video> once the clip is ready. -->
+    <div class="video" role="img" aria-label="Demo video — coming soon">
+      <span class="play"><svg aria-hidden="true"><use href="#i-play"/></svg></span>
+      <span class="video-label">Short demo video — coming soon</span>
+    </div>
+
+    <ul class="highlights">
+      <li>
+        <span class="h-icon"><svg aria-hidden="true"><use href="#i-mic"/></svg></span>
+        <span><b>Hebrew &amp; English</b> — real-time dictation, with punctuation and corrections specially tuned for Hebrew.</span>
+      </li>
+      <li>
+        <span class="h-icon"><svg aria-hidden="true"><use href="#i-keys"/></svg></span>
+        <span><b>Global shortcut</b> — text is injected into any app, right at the cursor.</span>
+      </li>
+      <li>
+        <span class="h-icon"><svg aria-hidden="true"><use href="#i-lock"/></svg></span>
+        <span><b>100% local</b> — no audio leaves your machine. Zero telemetry.</span>
+      </li>
+    </ul>
+  </aside>
+
+</main>
+
+</body>
+</html>
