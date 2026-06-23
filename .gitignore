@@ -51,6 +51,10 @@ apps/desktop/src-tauri/binaries/lashon-stt/*
 apps/desktop/src-tauri/binaries/llama-server/*
 !apps/desktop/src-tauri/binaries/llama-server/.gitkeep
 !apps/desktop/src-tauri/binaries/llama-server/README.md
+# A standalone run of the frozen sidecar (e.g. a packaging smoke-test) caches
+# the downloaded STT model under src-tauri/models/; the installed app uses the
+# user data dir instead. Never commit those weights.
+apps/desktop/src-tauri/models/
 
 # ─────────────────────────────────────────────────────────────────────────
 # Model weights — never committed; see models/manifests/*.json for SHA-256+URL
