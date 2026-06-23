@@ -1,0 +1,33 @@
+version: 1
+id: browser-search
+name: Search the web
+description: Open the user's default browser at a web-search results page for {query}.
+long_description: |
+  One-step recipe — composes a search URL and hands it to the OS default
+  browser via `open_url`. The browser handles the rest.
+
+  Note: `{{ query }}` is substituted into the URL verbatim. Phase 1
+  recipes don't ship URL encoding; queries with reserved characters
+  (#, &, ?) may break in unusual ways. A Phase 2 step type could add
+  encoding. For the common case (plain words, Hebrew text, spaces) the
+  browser tolerates the input.
+author: Lashon contributors
+recipe_version: 1.0.0
+tags:
+  - browser
+  - search
+intents:
+  - "search the web for {query}"
+  - "google {query}"
+  - "חפש את {query}"
+parameters:
+  - key: query
+    input_type: string
+    requirement: required
+    description: Web search query.
+permissions:
+  - app.open
+os_steps:
+  windows:
+    - type: open_url
+      url: "https://duckduckgo.com/?q={{ query }}"

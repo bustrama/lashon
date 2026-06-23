@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "hub",
+  "description": "Permissions for the Settings Hub window (Milestone M4).",
+  "windows": ["hub"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-hide",
+    "core:window:allow-start-dragging",
+    "store:default",
+    "opener:default"
+  ]
+}

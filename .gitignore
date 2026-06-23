@@ -1,0 +1,115 @@
+# ─────────────────────────────────────────────────────────────────────────
+# Rust / Cargo
+# ─────────────────────────────────────────────────────────────────────────
+target/
+**/*.rs.bk
+*.pdb
+
+# ─────────────────────────────────────────────────────────────────────────
+# Node / SvelteKit / Vite
+# ─────────────────────────────────────────────────────────────────────────
+node_modules/
+.svelte-kit/
+build/
+dist/
+.vite/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ─────────────────────────────────────────────────────────────────────────
+# Python (STT / TTS sidecars)
+# ─────────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Generated gRPC stubs — regenerated from packages/proto at build time
+services/stt-sidecar/src/lashon_stt/_generated/*
+!services/stt-sidecar/src/lashon_stt/_generated/.gitkeep
+
+# ─────────────────────────────────────────────────────────────────────────
+# Tauri
+# ─────────────────────────────────────────────────────────────────────────
+apps/desktop/src-tauri/gen/
+# PyInstaller-frozen sidecars are produced at build time, never committed.
+# The lashon-stt/ folder is kept (via .gitkeep) so tauri.conf.json's resource
+# glob resolves on a clean checkout — see docs/adr/0006.
+apps/desktop/src-tauri/binaries/lashon-stt/*
+!apps/desktop/src-tauri/binaries/lashon-stt/.gitkeep
+# Bundled llama-server binary set (docs/adr/0025) — mirrored from
+# ggml.llamacpp on every release build, ~80 MB total. README + .gitkeep
+# stay so the resource glob resolves and the provenance is documented.
+apps/desktop/src-tauri/binaries/llama-server/*
+!apps/desktop/src-tauri/binaries/llama-server/.gitkeep
+!apps/desktop/src-tauri/binaries/llama-server/README.md
+
+# ─────────────────────────────────────────────────────────────────────────
+# Model weights — never committed; see models/manifests/*.json for SHA-256+URL
+# ─────────────────────────────────────────────────────────────────────────
+/models/**
+!/models/manifests/
+!/models/manifests/**
+!/models/README.md
+# The "Hey Lashon" wake-word classifier is the project's own MIT-licensed
+# training output (see docs/wake-word-training.md, NOTICE), so it ships with
+# the source. Other wake-word ONNX files in this directory remain ignored —
+# the openWakeWord pretrained classifiers are CC-BY-NC and cannot be bundled.
+!/models/wake/
+!/models/wake/wakewords/
+/models/wake/wakewords/*
+!/models/wake/wakewords/hey_lashon.onnx
+# openWakeWord's shared melspectrogram + audio-embedding models are
+# Apache-2.0 (docs/adr/0016) — committed so they ship in the installer.
+!/models/wake/openwakeword/
+!/models/wake/openwakeword/embedding_model.onnx
+!/models/wake/openwakeword/melspectrogram.onnx
+# Silero VAD v5 is MIT (docs/adr/0015) — same story.
+!/models/vad/
+!/models/vad/silero-vad-v5/
+!/models/vad/silero-vad-v5/silero_vad.onnx
+
+# ─────────────────────────────────────────────────────────────────────────
+# Secrets — API keys live in the OS keychain, never on disk in the repo
+# ─────────────────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─────────────────────────────────────────────────────────────────────────
+# Logs
+# ─────────────────────────────────────────────────────────────────────────
+*.log
+
+# ─────────────────────────────────────────────────────────────────────────
+# IDE / Editor
+# ─────────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.iml
+*.swp
+*~
+
+# ─────────────────────────────────────────────────────────────────────────
+# Claude Code — committed project config (settings.json, hooks/, rules/);
+# local and generated state is not tracked
+# ─────────────────────────────────────────────────────────────────────────
+.claude/worktrees/
+.claude/settings.local.json
+.claude/launch.json
+.claude/scheduled_tasks.lock
+
+# ─────────────────────────────────────────────────────────────────────────
+# OS
+# ─────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini

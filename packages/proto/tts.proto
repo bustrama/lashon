@@ -1,0 +1,65 @@
+// Lashon — text-to-speech sidecar contract.
+//
+// This file is the single source of truth for the TTS gRPC interface. The TTS
+// sidecar itself is a Phase 3 deliverable (Milestones M10–M11); the contract is
+// defined now so the proto is stable and CI validates it from M0 onward.
+
+syntax = "proto3";
+
+package lashon.tts.v1;
+
+// The text-to-speech sidecar service (used for the optional local MMS/XTTS
+// engines; Piper and cloud providers do not go through this sidecar).
+service Tts {
+  // Liveness/readiness probe.
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+
+  // One-shot synthesis: text in, a complete PCM buffer out.
+  rpc Synthesize(SynthesizeRequest) returns (SynthesizeResponse);
+
+  // Streaming synthesis: text in, PCM audio chunks streamed out as each is
+  // ready (sentence by sentence), minimising first-audio latency.
+  rpc SynthesizeStream(SynthesizeRequest) returns (stream AudioChunk);
+}
+
+enum ServingStatus {
+  SERVING_STATUS_UNSPECIFIED = 0;
+  SERVING_STATUS_SERVING = 1;      // process up, gRPC reachable
+  SERVING_STATUS_NOT_SERVING = 2;
+}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  ServingStatus status = 1;
+  string detail = 2;
+  string version = 3;
+  // True once a TTS voice model is warm and ready for synthesis.
+  bool model_ready = 4;
+}
+
+message SynthesizeRequest {
+  string text = 1;
+  // Provider-specific voice id, e.g. a Piper or MMS voice name.
+  string voice = 2;
+  // BCP-47-style language hint, e.g. "he", "en".
+  string language = 3;
+  // Desired output sample rate in Hz; 0 means the provider's default.
+  uint32 sample_rate_hz = 4;
+}
+
+// 16-bit signed PCM, little-endian, mono.
+message SynthesizeResponse {
+  bytes pcm_s16 = 1;
+  uint32 sample_rate_hz = 2;
+  // Wall-clock synthesis time on the sidecar, milliseconds.
+  uint32 synthesis_ms = 3;
+}
+
+// One slice of streamed audio, same PCM format as SynthesizeResponse.
+message AudioChunk {
+  bytes pcm_s16 = 1;
+  uint32 sample_rate_hz = 2;
+  // Set true on the final chunk of the stream.
+  bool end_of_stream = 3;
+}

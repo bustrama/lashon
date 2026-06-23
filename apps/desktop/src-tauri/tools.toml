@@ -1,0 +1,235 @@
+# Lashon native tool registry — skeleton.
+#
+# Enumerates the v1 native tool set from docs/roadmap.md §2.2. This is a
+# SKELETON: every tool's `parameters` JSON Schema is authored in Phase 2
+# (Milestone M8) and is marked "TODO" until then.
+#
+# `requires_confirmation` follows the confirmation policy in
+# docs/roadmap.md §2.6:
+#   true  -> the tool always prompts before it executes.
+#   false -> no prompt by default; many of these are user-configurable.
+# Conditional cases are noted inline and resolved when the tool is implemented.
+
+# ── Applications & windows ────────────────────────────────────────────────
+[[tool]]
+name = "open_app"
+description = "Launch an application by name."
+requires_confirmation = false
+parameters = "TODO"
+
+[[tool]]
+name = "focus_window"
+description = "Bring a window to the front by a title substring."
+requires_confirmation = false
+parameters = "TODO"
+
+[[tool]]
+name = "close_window"
+description = "Close the active window or a named window."
+requires_confirmation = false
+parameters = "TODO"
+
+# ── Input synthesis ───────────────────────────────────────────────────────
+[[tool]]
+name = "type_text"
+description = "Type text into the focused field; Hebrew-aware (clipboard path)."
+requires_confirmation = false
+parameters = "TODO"
+
+[[tool]]
+name = "press_keys"
+description = "Press a keyboard shortcut combination."
+requires_confirmation = false
+parameters = "TODO"
+
+[[tool]]
+name = "click_at"
+description = "Click the mouse at a screen position."
+requires_confirmation = false
+parameters = "TODO"
+
+[[tool]]
+name = "move_to"
+description = "Move the mouse pointer to a screen position."
+requires_confirmation = false
+parameters = "TODO"
+
+[[tool]]
+name = "screenshot"
+description = "Capture a screenshot to a file and return its path."
+requires_confirmation = false
+parameters = "TODO"
+
+# ── System controls ───────────────────────────────────────────────────────
+[[tool]]
+name = "volume"
+description = "Get or set the system output volume."
+requires_confirmation = false
+parameters = "TODO"
+
+[[tool]]
+name = "brightness"
+description = "Get or set the display brightness."
+requires_confirmation = false
+parameters = "TODO"
+
+[[tool]]
+name = "wifi_toggle"
+description = "Enable or disable Wi-Fi."
+requires_confirmation = false
+parameters = "TODO"
+
+[[tool]]
+name = "bluetooth_toggle"
+description = "Enable or disable Bluetooth."
+requires_confirmation = false
+parameters = "TODO"
+
+# ── Power — always confirmed ──────────────────────────────────────────────
+[[tool]]
+name = "lock_screen"
+description = "Lock the screen."
+requires_confirmation = true
+parameters = "TODO"
+
+[[tool]]
+name = "sleep"
+description = "Put the computer to sleep."
+requires_confirmation = true
+parameters = "TODO"
+
+[[tool]]
+name = "restart"
+description = "Restart the computer."
+requires_confirmation = true
+parameters = "TODO"
+
+[[tool]]
+name = "shutdown"
+description = "Shut the computer down."
+requires_confirmation = true
+parameters = "TODO"
+
+# ── Clipboard ─────────────────────────────────────────────────────────────
+[[tool]]
+name = "clipboard_get"
+description = "Read the current clipboard contents."
+requires_confirmation = false
+parameters = "TODO"
+
+[[tool]]
+name = "clipboard_set"
+description = "Write text to the clipboard."
+requires_confirmation = false
+parameters = "TODO"
+
+# ── Files ─────────────────────────────────────────────────────────────────
+[[tool]]
+name = "file_list"
+description = "List the entries of a directory."
+requires_confirmation = false
+parameters = "TODO"
+
+[[tool]]
+name = "file_create"
+description = "Create a new, empty file."
+requires_confirmation = false
+parameters = "TODO"
+
+[[tool]]
+name = "file_read"
+description = "Read a file's contents."
+requires_confirmation = false
+parameters = "TODO"
+
+[[tool]]
+name = "file_write"
+description = "Write contents to a file."
+# Conditional: confirm when writing to a system directory
+# (docs/roadmap.md §2.6).
+requires_confirmation = false
+parameters = "TODO"
+
+[[tool]]
+name = "file_move"
+description = "Move or rename a file."
+requires_confirmation = false
+parameters = "TODO"
+
+[[tool]]
+name = "file_copy"
+description = "Copy a file."
+requires_confirmation = false
+parameters = "TODO"
+
+[[tool]]
+name = "file_delete"
+description = "Delete a file or directory."
+requires_confirmation = true
+parameters = "TODO"
+
+[[tool]]
+name = "file_search"
+description = "Find files by name or extension beneath a root directory."
+requires_confirmation = false
+parameters = "TODO"
+
+# ── Web ───────────────────────────────────────────────────────────────────
+[[tool]]
+name = "open_url"
+description = "Open a URL in the default browser."
+requires_confirmation = false
+parameters = "TODO"
+
+[[tool]]
+name = "browser_action"
+description = "Drive a Chromium browser: navigate, click, read page content."
+requires_confirmation = false
+parameters = "TODO"
+
+[[tool]]
+name = "web_search"
+description = "Search the web (SearXNG by default; cloud APIs opt-in)."
+requires_confirmation = false
+parameters = "TODO"
+
+# ── Productivity & messaging ──────────────────────────────────────────────
+[[tool]]
+name = "set_reminder"
+description = "Schedule a notification at a given time."
+requires_confirmation = false
+parameters = "TODO"
+
+[[tool]]
+name = "send_message"
+description = "Send a chat message via WhatsApp, Telegram, or Slack."
+requires_confirmation = true
+parameters = "TODO"
+
+# ── Delegation & perception ───────────────────────────────────────────────
+[[tool]]
+name = "delegate_agent"
+description = "Hand a task to an external coding agent in a PTY session."
+requires_confirmation = false
+parameters = "TODO"
+
+[[tool]]
+name = "read_screen"
+description = "OCR the active window and return its text."
+requires_confirmation = false
+parameters = "TODO"
+
+# ── Lashon itself ─────────────────────────────────────────────────────────
+[[tool]]
+name = "remember"
+description = "Save a fact to Lashon's long-term local memory."
+requires_confirmation = false
+parameters = "TODO"
+
+[[tool]]
+name = "lashon_settings"
+description = "Adjust Lashon's own settings (active providers, volume, and so on)."
+# Conditional: confirm when switching the active provider to a cloud one
+# (docs/roadmap.md §2.6).
+requires_confirmation = false
+parameters = "TODO"

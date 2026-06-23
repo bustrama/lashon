@@ -1,0 +1,37 @@
+{
+  "_comment": "In-process local LLM models (docs/adr/0025). Loaded by `lashon-core::llm::local::LocalLlmProvider` via mistralrs. Apache-2.0 / MIT only — anything else is opt-in with a non-commercial badge, per the wake-classifier precedent (docs/adr/0016). Files are downloaded on first use; the SHA-256 is verified on every load (docs/adr/0010). The `sha256` and `bytes` fields are mirrored from the upstream Hugging Face LFS pointer (the `oid sha256:…` and `size` lines of the .gguf's LFS metadata); whoever bumps the manifest entry refreshes both in the same commit.",
+  "models": [
+    {
+      "id": "qwen3-4b-q4_k_m",
+      "display_name": "Qwen3 4B (Q4_K_M)",
+      "description": "Default pick. ~2.5 GB on disk, ~3.5 GB warm RAM. Reliably completes multi-step interactive tool chains (open app → quick switcher → type recipient → enter → type message → enter) that the smaller 1.7B variant kept dropping mid-flow. Runs on any modern GPU via Vulkan; CPU fallback works on 8 GB systems but is slow.",
+      "license": "Apache-2.0",
+      "source": "https://huggingface.co/Qwen/Qwen3-4B-GGUF",
+      "context_window": 40960,
+      "files": [
+        {
+          "path": "Qwen3-4B-Q4_K_M.gguf",
+          "url": "https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf",
+          "bytes": 2497280256,
+          "sha256": "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5"
+        }
+      ]
+    },
+    {
+      "id": "qwen3-1.7b-q8_0",
+      "display_name": "Qwen3 1.7B (Q8_0)",
+      "description": "Faster, lighter — ~1.83 GB on disk, ~2 GB warm RAM. Use on very weak hardware where the 4B variant is too slow. Not recommended for messaging-app or other multi-step tool chains; the smaller model regularly stops mid-flow.",
+      "license": "Apache-2.0",
+      "source": "https://huggingface.co/Qwen/Qwen3-1.7B-GGUF",
+      "context_window": 40960,
+      "files": [
+        {
+          "path": "Qwen3-1.7B-Q8_0.gguf",
+          "url": "https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf",
+          "bytes": 1834426016,
+          "sha256": "061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a"
+        }
+      ]
+    }
+  ]
+}

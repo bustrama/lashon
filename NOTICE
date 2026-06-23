@@ -1,0 +1,93 @@
+Lashon — third-party notices
+============================
+
+This file lists third-party material redistributed within the Lashon source
+tree or the release installer. Build-time dependencies (Cargo crates, npm
+packages, Python packages) retain their own licenses and are not reproduced
+here; the CI license-scan job (cargo-deny, pip-licenses) enforces that none
+carry an AGPL or CC-BY-NC license. (Lashon's own code is GPL-3.0-only as of
+docs/adr/0032; permissively-licensed dependencies remain GPLv3-compatible.)
+
+--------------------------------------------------------------------------------
+Heebo (font family)
+--------------------------------------------------------------------------------
+The Heebo Project Authors (https://github.com/OdedEzer/heebo).
+Licensed under the SIL Open Font License, Version 1.1.
+Vendored at:    apps/desktop/static/fonts/
+License text:   apps/desktop/static/fonts/OFL.txt
+
+--------------------------------------------------------------------------------
+Model weights
+--------------------------------------------------------------------------------
+With one exception (the "Hey Lashon" wake-word classifier, below), no model
+weights are committed to this repository or bundled in the installer. The
+Hebrew speech-to-text model (ivrit-ai/whisper-large-v3-turbo-ct2, Apache-2.0)
+is downloaded on first run and verified against models/manifests/stt.json. The
+Silero VAD model (MIT) and the openWakeWord shared melspectrogram + embedding
+models (Apache-2.0) are likewise downloaded on first run and verified against
+models/manifests/m6-audio.json. Only MIT/Apache-licensed models are eligible
+to bundle; CC-BY-NC and CPML models are offered as opt-in downloads with a
+non-commercial badge, never bundled. See docs/providers.md (bundle policy).
+
+--------------------------------------------------------------------------------
+"Hey Lashon" wake-word classifier
+--------------------------------------------------------------------------------
+File:    models/wake/wakewords/hey_lashon.onnx
+License: MIT
+Origin:  Trained by the Lashon project using the openWakeWord training
+         pipeline on speech synthesised by Piper TTS (MIT). The procedure
+         is documented at docs/wake-word-training.md so users can train
+         alternative wake words; the training script and synthesised
+         speech are MIT-compatible, so this output is MIT-licensed.
+The openWakeWord pretrained classifiers ("hey_jarvis", "alexa",
+"hey_mycroft", "hey_rhasspy") are CC-BY-NC-4.0 and are NOT bundled; users
+may install them at their own discretion as a non-commercial opt-in.
+
+--------------------------------------------------------------------------------
+Bundled llama-server (local LLM runtime)
+--------------------------------------------------------------------------------
+Lashon bundles a prebuilt llama-server from llama.cpp / ggml as a Tauri resource
+(apps/desktop/src-tauri/binaries/llama-server/, see docs/adr/0025), mirrored from
+the ggml.llamacpp release.
+License: MIT
+Origin:  https://github.com/ggml-org/llama.cpp
+
+  Copyright (c) 2023-2024 The ggml authors
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
+--------------------------------------------------------------------------------
+Release installer — bundled STT runtime
+--------------------------------------------------------------------------------
+The release installer ships the speech-to-text sidecar frozen with PyInstaller
+(see docs/adr/0006). It redistributes a CPython runtime (Python Software
+Foundation License) and these third-party libraries, each under a permissive
+license:
+
+  faster-whisper                        MIT
+  CTranslate2                           MIT
+  ONNX Runtime                          MIT
+  grpcio                                Apache-2.0
+  NumPy / tokenizers / huggingface-hub  BSD-3-Clause / Apache-2.0
+  PyAV                                  BSD-3-Clause (bundles FFmpeg shared
+                                        libraries, LGPL-2.1-or-later)
+
+The NVIDIA cuBLAS and cuDNN runtime libraries are NOT bundled. On a machine with
+an NVIDIA GPU, Lashon downloads them from PyPI on first run, under NVIDIA's own
+license terms — the same wheels `pip install` would fetch.

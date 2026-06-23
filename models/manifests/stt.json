@@ -1,0 +1,94 @@
+{
+  "_comment": "STT model registry. Weights are downloaded at runtime (scripts/download-models) and never committed. The `files` array is the SHA-256 verification set, populated by `python scripts/verify-models.py --record`.",
+  "models": [
+    {
+      "id": "ivrit-ai-whisper-large-v3-turbo-ct2",
+      "engine": "faster-whisper",
+      "repo": "ivrit-ai/whisper-large-v3-turbo-ct2",
+      "revision": "main",
+      "license": "Apache-2.0",
+      "bundle": "installer",
+      "local_dir": "models/stt/whisper-large-v3-turbo-ct2",
+      "files": [
+        {
+          "path": ".gitattributes",
+          "bytes": 1519,
+          "sha256": "11ad7efa24975ee4b0c3c3a38ed18737f0658a5f75a0a96787b576a78a023361"
+        },
+        {
+          "path": "config.json",
+          "bytes": 1405,
+          "sha256": "c805eff43fc2a1d00d5cfa315e4b2230895f34994257c185959808a116e7c4f0"
+        },
+        {
+          "path": "model.bin",
+          "bytes": 1617884968,
+          "sha256": "db2a2265aa012c16c7db9edda3d699c99f984efdd3f2e22a72a8ce7e9720f3a2"
+        },
+        {
+          "path": "preprocessor_config.json",
+          "bytes": 357,
+          "sha256": "654cf18d3e163b948ceaf9766da56ce0b52de265d58673cf61c9376f126bd499"
+        },
+        {
+          "path": "README.md",
+          "bytes": 840,
+          "sha256": "4170dc6da8a13f8dbf648e5956e571717796141353b191242e665629e14e8bd9"
+        },
+        {
+          "path": "tokenizer.json",
+          "bytes": 2710337,
+          "sha256": "297b13372ac43916285644fb9687add3cc62ee2a1adb60da3dc25cc94c1871fd"
+        },
+        {
+          "path": "vocabulary.json",
+          "bytes": 1068114,
+          "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1"
+        }
+      ]
+    },
+    {
+      "id": "faster-whisper-tiny",
+      "role": "language-detector",
+      "_comment": "Vanilla Whisper tiny — used ONLY for language identification. The ivrit-ai Hebrew fine-tune's own detector is collapsed (reports 'he' for all audio); see docs/adr/0009. This model never transcribes.",
+      "engine": "faster-whisper",
+      "repo": "Systran/faster-whisper-tiny",
+      "revision": "main",
+      "license": "MIT",
+      "bundle": "installer",
+      "local_dir": "models/stt/faster-whisper-tiny",
+      "files": [
+        {
+          "path": ".gitattributes",
+          "bytes": 1477,
+          "sha256": "db7c0371f46f0840b8f25794c1e3321c9b5820a8cb6ba9694a46fc64b8fae5a6"
+        },
+        {
+          "path": "README.md",
+          "bytes": 1991,
+          "sha256": "29fb8444a02c1f133ab7e538525aa478ff68845964f21cf42500842b0e4a7b20"
+        },
+        {
+          "path": "config.json",
+          "bytes": 2249,
+          "sha256": "a73a28cdfe1c43ccc7202fa333d1f89c202477271407ae9a7f19afa52039cac8"
+        },
+        {
+          "path": "model.bin",
+          "bytes": 75538270,
+          "sha256": "dcb76c6586fc06cbdac6dd21f14cfd129cc4cdd9dce19bf4ffa62e59cbe6e6d1"
+        },
+        {
+          "path": "tokenizer.json",
+          "bytes": 2203239,
+          "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab"
+        },
+        {
+          "path": "vocabulary.txt",
+          "bytes": 459861,
+          "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913"
+        }
+      ]
+    }
+  ]
+}

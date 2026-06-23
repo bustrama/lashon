@@ -1,0 +1,68 @@
+version: 1
+id: send-telegram-message
+name: Send Telegram message
+description: Send a text message to a contact in the Telegram desktop client.
+long_description: |
+  Focuses Telegram Desktop, opens search (Ctrl+F), types the contact name,
+  selects the first hit with Enter, types the body, and sends.
+author: Lashon contributors
+recipe_version: 1.0.0
+tags:
+  - messaging
+  - telegram
+intents:
+  - "send {body} to {recipient} in telegram"
+  - "send {recipient} {body} on telegram"
+  - "telegram: send {body} to {recipient}"
+  - "dm {recipient} on telegram {body}"
+  - "tell {recipient} on telegram {body}"
+  - "message {recipient} on telegram {body}"
+  - "שלח לטלגרם ל{recipient} {body}"
+  - "תשלח לטלגרם ל{recipient} {body}"
+  - "שלח בטלגרם ל{recipient} {body}"
+  - "תשלח בטלגרם ל{recipient} {body}"
+  - "שלח הודעה לטלגרם ל{recipient} {body}"
+  - "שלח הודעה בטלגרם ל{recipient} {body}"
+  - "תשלח הודעה לטלגרם ל{recipient} {body}"
+  - "תשלח הודעה בטלגרם ל{recipient} {body}"
+parameters:
+  - key: recipient
+    input_type: string
+    requirement: required
+    description: Telegram contact or chat name.
+  - key: body
+    input_type: string
+    requirement: required
+    description: Message body to send.
+permissions:
+  - app.focus
+  - keyboard.type
+  - clipboard
+os_steps:
+  windows:
+    - type: focus_window
+      title_contains: Telegram
+      process: Telegram.exe
+    - type: wait_for_window
+      title_contains: Telegram
+      timeout_ms: 8000
+    - type: key_chord
+      keys: [Control, F]
+      comment: Open contact / chat search.
+    - type: wait_ms
+      ms: 200
+    - type: type_unicode
+      text: "{{ recipient }}"
+      rtl_safe: false
+    - type: wait_ms
+      ms: 450
+    - type: key_chord
+      keys: [Enter]
+      comment: Open the first hit.
+    - type: wait_ms
+      ms: 300
+    - type: type_unicode
+      text: "{{ body }}"
+      rtl_safe: true
+    - type: key_chord
+      keys: [Enter]

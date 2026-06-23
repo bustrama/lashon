@@ -1,0 +1,437 @@
+{
+	"tongue": {
+		"idle": "Lashon ready",
+		"preparing": "Lashon getting ready",
+		"capturing": "Listening",
+		"transcribing": "Transcribing",
+		"error": "Something went wrong"
+	},
+	"debug": {
+		"title": "Debug",
+		"checking": "STT sidecar: checking…",
+		"ok": "STT sidecar: OK",
+		"error": "STT sidecar: error"
+	},
+	"tutorial": {
+		"steps": {
+			"welcome": {
+				"kicker": "Welcome",
+				"title": "Lashon listens in Hebrew",
+				"lead": "Lashon turns your speech into text — in any app, locally on your machine, with nothing uploaded to the cloud."
+			},
+			"microphone": {
+				"kicker": "Microphone",
+				"title": "So Lashon can hear you",
+				"lead": "Lashon needs microphone access to transcribe your speech. Let's check it works."
+			},
+			"hardware": {
+				"kicker": "Your hardware",
+				"title": "Lashon tunes itself to your machine",
+				"lead": "Lashon checks how powerful your machine is and picks models that will run well on it. You can change the choice any time."
+			},
+			"tongue": {
+				"kicker": "The tongue",
+				"title": "The small mark floating on your screen",
+				"lead": "This is the tongue. It breathes quietly at rest, blooms into sound waves as it listens, and settles to dots while transcribing. Drag it to any corner."
+			},
+			"hotkey": {
+				"kicker": "How to dictate",
+				"title": "One key opens dictation",
+				"lead": "A single press of Ctrl+Space opens listening. Speak Hebrew — and when you finish, the text appears wherever the cursor is."
+			},
+			"practice": {
+				"kicker": "Practice",
+				"title": "Try it now",
+				"lead": "Press Ctrl+Space and say a short sentence in Hebrew — I'll show you here exactly what Lashon heard."
+			},
+			"done": {
+				"kicker": "Ready",
+				"title": "That's it — you know how to use Lashon",
+				"lead": "You can always reopen this tutorial from the tray menu, next to the clock."
+			}
+		},
+		"warmup": {
+			"label": "Lashon is getting ready for first use",
+			"hint": "A one-time download — the next launch is instant."
+		},
+		"mic": {
+			"checking": "Checking the microphone…",
+			"ready": "Excellent — Lashon can hear your microphone.",
+			"noDevice": "No microphone found. Connect one and check again.",
+			"blocked": "Lashon couldn't open the microphone. Grant microphone access in your system settings, then check again.",
+			"recheck": "Check again",
+			"hint": "Recording stays on your machine — no audio is sent anywhere."
+		},
+		"hardware": {
+			"detecting": "Checking your hardware…",
+			"redetect": "Detect again",
+			"override": "Lashon picked the marked tier. You can choose a different one:"
+		},
+		"window": {
+			"title": "first run"
+		},
+		"states": {
+			"idle": "At rest — the mark breathes gently",
+			"listening": "Listening — the mark blooms into sound waves",
+			"transcribing": "Transcribing — the mark settles to dots",
+			"hint": "The colour stays constant — only the shape changes with what Lashon is doing.",
+			"dictate": "dictate",
+			"dictateBlurb": "What you say is typed wherever the cursor is.",
+			"command": "command",
+			"commandBlurb": "A single sentence that gets done — \"open Slack\", \"mute everything\".",
+			"chat": "chat",
+			"chatBlurb": "Free-form voice conversation. Memory stays with you."
+		},
+		"howto": {
+			"combo": "Control plus Space",
+			"step1": "Press once — the tongue starts listening.",
+			"step2": "Speak Hebrew in a normal voice.",
+			"step3": "Stop speaking, or press again — and the text is dictated.",
+			"fineprint": "These are the three chords. We'll only practise the first one for now."
+		},
+		"practice": {
+			"tryToSay": "Try saying:",
+			"phrase": "Hello Lashon, it's cold outside",
+			"or": "Or anything else you like — Lashon listens to it all.",
+			"heard": "What Lashon heard:",
+			"hint": "You don't have to practise to continue — but it's much more fun to see it work.",
+			"holdPrefix": "Hold",
+			"holdSuffix": "say something, release.",
+			"holdHint": "Hold until you're done",
+			"heardHint": "This is what Lashon heard. In real use it would be typed wherever your cursor is."
+		},
+		"done": {
+			"chordLabel": "dictation chord"
+		},
+		"live": {
+			"preparing": "Lashon is still getting ready. One moment…",
+			"error": "Something went wrong. Try again — press Ctrl+Space.",
+			"done": "Excellent — your text was dictated. You can continue.",
+			"capturing": "Listening… speak Hebrew now.",
+			"transcribing": "Transcribing what you said…",
+			"waiting": "Waiting. Press Ctrl+Space and say a sentence."
+		},
+		"tips": {
+			"drag": "Drag the tongue to a screen corner — it snaps to the edge.",
+			"debug": "Ctrl+Shift+D opens the debug surface.",
+			"reopen": "This tutorial is always available from the tray menu."
+		},
+		"nav": {
+			"skip": "Skip the tutorial",
+			"back": "Back",
+			"continue": "Continue",
+			"continuePractice": "Nice — let's continue",
+			"finish": "Finish"
+		},
+		"toast": "Just a moment — starting shortly"
+	},
+	"hub": {
+		"title": "Settings",
+		"close": "Close",
+		"nav": {
+			"general": "General",
+			"shortcuts": "Shortcuts",
+			"wakeword": "Wake word",
+			"hardware": "Hardware",
+			"llm": "Language models",
+			"recipes": "Recipes",
+			"about": "About",
+			"voice": "Voice corrections"
+		},
+		"general": {
+			"title": "General",
+			"language": "Interface language",
+			"languageHint": "Choose the language Lashon's interface is shown in. The change applies to every window immediately.",
+			"langHe": "עברית",
+			"langEn": "English"
+		},
+		"hardware": {
+			"title": "Hardware",
+			"intro": "The hardware tier sets how Lashon runs speech recognition — probing the GPU, or staying on the CPU. Lashon never changes it silently; the choice is yours.",
+			"detecting": "Checking your hardware…",
+			"detect": "Detect again",
+			"sttDeviceGpu": "On this tier, speech recognition uses the GPU when one is available.",
+			"sttDeviceCpu": "On this tier, speech recognition runs on the CPU.",
+			"restartToApply": "Restart Lashon for this change to take effect.",
+			"restartButton": "Restart now"
+		},
+		"shortcuts": {
+			"title": "Shortcuts",
+			"dictation": "Dictation hotkey",
+			"dictationHint": "The key combination that opens and closes listening from any app.",
+			"command": "Command mode hotkey",
+			"commandHint": "Press, speak a command — the LLM picks tools to run it on your PC.",
+			"rebind": "Change",
+			"capturing": "Press a new key combination…",
+			"cancel": "Cancel",
+			"invalid": {
+				"empty": "No combination captured. Try again.",
+				"no-modifier": "A shortcut must include a modifier key — Ctrl, Alt or Shift.",
+				"no-key": "A shortcut must include one key besides the modifiers.",
+				"malformed": "That combination isn't valid. Try another.",
+				"reserved": "That combination is reserved by the operating system. Choose another."
+			}
+		},
+		"wakeword": {
+			"title": "Wake words",
+			"intro": "Lashon listens for two independent wake words — one starts hands-free dictation, the other runs a Command-mode tool chain. Pick a different classifier for each slot.",
+			"enable": "Enable",
+			"enableHint": "When on, Lashon listens in the background for this wake word.",
+			"off": "Off",
+			"on": "On",
+			"model": "Wake-word model",
+			"modelHint": "Pick which classifier this slot listens for. The other slot's model is hidden so each word maps to one mode.",
+			"pickModel": "— pick a model —",
+			"noModels": "No wake-word models installed yet.",
+			"moreOptions": "More wake words",
+			"moreOptionsHint": "These openWakeWord classifiers are released under a non-commercial licence (CC-BY-NC-4.0). Installing one limits your use of it to non-commercial purposes.",
+			"ncBadge": "Non-commercial",
+			"ncTooltip": "Licensed under CC-BY-NC-4.0 — non-commercial use only.",
+			"install": "Install",
+			"installing": "Installing…",
+			"installConfirm": "Install {name}?\n\nThis model is licensed {license}. By installing it, you agree to use it for non-commercial purposes only.",
+			"installFailed": "Install failed",
+			"libraryHint": "Looking for other wake words? Browse",
+			"sensitivity": "Sensitivity",
+			"sensitivityHint": "Higher sensitivity detects the wake word more readily, but may respond to false activations.",
+			"trainGuide": "How to train your own",
+			"dictation": {
+				"title": "Dictation slot",
+				"hint": "When this wake word fires, the next thing you say is typed into the focused field — like the dictation hotkey."
+			},
+			"command": {
+				"title": "Command slot",
+				"hint": "When this wake word fires, the next thing you say runs as a Command-mode tool chain (open apps, click buttons, send messages…)."
+			}
+		},
+		"llm": {
+			"title": "Language models",
+			"intro": "Lashon can call a language model for two different modes — Command mode (M8) and Chat mode (M8). The cloud is always opt-in and badged, and your API keys never touch settings.json.",
+			"command": "Command mode",
+			"commandHint": "The model that turns voice commands into PC actions.",
+			"chat": "Chat mode",
+			"chatHint": "The model that answers free-form questions in conversation.",
+			"pickProvider": "Pick a provider",
+			"none": "None",
+			"cloudBadge": "Cloud",
+			"cloudBadgeTooltip": "Cloud provider — your text is sent to a remote server.",
+			"hebrewOk": "Hebrew",
+			"hebrewOkTooltip": "Provider verified to handle Hebrew well.",
+			"hebrewBasic": "Hebrew?",
+			"hebrewBasicTooltip": "Provider accepts Hebrew but quality is unverified.",
+			"apiKey": "API key",
+			"apiKeyPlaceholder": "Paste your API key…",
+			"apiKeySaved": "Key saved to your OS keychain",
+			"apiKeySave": "Save",
+			"apiKeyClear": "Clear",
+			"model": "Model",
+			"recommended": "recommended",
+			"recommendedHint": "Fastest and most accurate model for Command mode — Lashon picks {model} by default.",
+			"refreshModels": "Refresh model list",
+			"refreshing": "Refreshing…",
+			"modelsFromProvider": "{count} models from provider",
+			"modelsShowingOf": "Showing {shown} of {total} models from provider (filtered to chat models, newest first)",
+			"modelsFallback": "Using built-in list",
+			"baseUrl": "Base URL",
+			"baseUrlSummary": "Custom endpoint (optional)",
+			"baseUrlHint": "Leave blank to use the vendor's default endpoint.",
+			"testPrompt": "Test prompt",
+			"testPromptPlaceholder": "שלום",
+			"testPromptSend": "Send",
+			"testPromptSending": "Sending…",
+			"testPromptResult": "Response:",
+			"testPromptError": "Test prompt failed",
+			"ollamaConnect": "Connect",
+			"ollamaNotRunning": "Ollama isn't running on this machine. Install and start it first.",
+			"ollamaModels": "Installed models",
+			"noProvider": "Pick a provider to test the connection.",
+			"noKeyForCloud": "Cloud providers need an API key. Enter one to activate.",
+			"context": "Context window",
+			"contextTokens": "{count} tokens",
+			"localLlm": {
+				"runtimeMissing": "This build was compiled without the local LLM runtime. Use a different provider or rebuild with `--features local-llm`.",
+				"downloadRequired": "Model not on disk. Download once — it stays for next time.",
+				"download": "Download {bytes}",
+				"downloadIndeterminate": "Download",
+				"downloading": "Downloading {percent}%",
+				"installing": "Installing…",
+				"ready": "Ready · {size}",
+				"sizeUnknown": "Ready",
+				"delete": "Delete model",
+				"deleting": "Deleting…",
+				"license": "License {license}",
+				"source": "Source"
+			}
+		},
+		"recipes": {
+			"title": "Recipes",
+			"intro": "Stored desktop workflows. Say the trigger and Lashon runs the recipe deterministically — no LLM in the loop.",
+			"searchPlaceholder": "Search recipes…",
+			"filterAll": "All",
+			"filterBundled": "Bundled",
+			"filterUser": "Mine",
+			"filterDestructive": "Destructive",
+			"create": "New recipe",
+			"tagsLabel": "Tags:",
+			"colName": "Name",
+			"colDesc": "Description · permissions · tags",
+			"colSourceAction": "Source · action",
+			"loading": "Loading recipes…",
+			"noMatch": "No recipes match the current filters.",
+			"footer": {
+				"count": "{n} recipes",
+				"user": "{n} mine",
+				"bundled": "{n} bundled"
+			},
+			"errorList": "Loading the recipe list failed",
+			"errorLoad": "Loading the recipe failed",
+			"errorRun": "The run failed",
+			"errorOpen": "Could not open the file",
+			"errorDelete": "Delete failed",
+			"errorDuplicate": "Duplicate failed",
+			"deletedToast": "Recipe {name} deleted.",
+			"duplicatedToast": "Duplicated as {id}.",
+			"deleteTitle": "Delete this recipe?",
+			"deleteBody": "The recipe {name} will be removed from disk. This can't be undone.",
+			"deleteConfirm": "Delete",
+			"deleteCancel": "Cancel",
+			"steps": {
+				"close": "Close",
+				"closeAriaEsc": "Close (Esc)",
+				"run": "Run",
+				"editYaml": "Edit YAML",
+				"duplicate": "Duplicate",
+				"slotLegend": "Pills are filled in when you press Run.",
+				"stepCount": "{n} steps",
+				"durationApprox": "≈ {seconds} s",
+				"escClose": "Esc · close",
+				"saveRevertHint": "↵ save  ·  Esc revert",
+				"addComment": "Add comment",
+				"commentPlaceholder": "Add a comment for this step…",
+				"notYetRunnable": "v1.1 · not yet runnable",
+				"notYetRunnableTitle": "Not supported by the v1 runtime — coming in v1.1",
+				"errorParseTitle": "Recipe failed to load",
+				"errorParseBody": "The YAML is invalid. Open the file to fix it.",
+				"errorEmptyTitle": "Empty recipe",
+				"errorEmptyBody": "The recipe parsed but has no steps. Edit the file to add some.",
+				"openFile": "Open file",
+				"errorComment": "Comment save failed",
+				"stepAria": "step {index} of {total}",
+				"variants": {
+					"key_chord": "key chord",
+					"type_unicode": "type text",
+					"click_label": "click label",
+					"focus_window": "focus window",
+					"wait_for_window": "wait for window",
+					"wait_ms": "wait",
+					"screenshot_to_clipboard": "screenshot to clipboard",
+					"clipboard_set": "clipboard set",
+					"clipboard_get_into": "clipboard get into",
+					"run_shell": "run shell",
+					"open_url": "open URL",
+					"open_app": "open app"
+				},
+				"bodyExtras": {
+					"upTo": "up to {seconds} s",
+					"rtlSafe": "rtl-safe · clipboard",
+					"screenshotNote": "(the image lands on the clipboard — no variables)",
+					"saveInto": "save into",
+					"scopePrefix": "scope:",
+					"dryRunNote": "· dry-run only — no changes"
+				}
+			}
+		},
+		"about": {
+			"title": "About",
+			"tagline": "A local-first voice assistant that listens in Hebrew.",
+			"version": "Version",
+			"localFirst": "All processing happens on your machine. No recording or text is sent to the cloud.",
+			"repo": "Source code",
+			"links": "Links",
+			"support": "Support",
+			"checkUpdates": "בדיקת עדכונים · Check for updates",
+			"checking": "Checking for updates…",
+			"downloading": "Downloading update {version}…",
+			"installing": "Installing update…",
+			"installed": "Update installed — restart to finish.",
+			"upToDate": "Lashon is up to date.",
+			"updateError": "Update check failed",
+			"restartToFinish": "Restart to finish update",
+			"updateAvailableVersion": "Version {version} available"
+		},
+		"voice": {
+			"title": "Voice corrections",
+			"intro": "Token-level substitutions applied to the STT transcript before either the recipe cascade or the LLM planner sees it. Useful for proper nouns Whisper keeps mishearing (\"cloud\" instead of \"claude\"), contact-name homonyms, and any word that consistently lands wrong.",
+			"colFrom": "If Lashon hears",
+			"colTo": "Treat as",
+			"fromPlaceholder": "cloud",
+			"toPlaceholder": "claude",
+			"addRow": "Add row",
+			"removeRow": "Remove row",
+			"save": "Save",
+			"saving": "Saving…",
+			"savedToast": "{n} corrections saved",
+			"errorSave": "Save failed",
+			"errorLoad": "Load failed",
+			"loading": "Loading…",
+			"count": "{n} active corrections"
+		}
+	},
+	"command": {
+		"confirm": {
+			"question": "Lashon wants to run `{tool}`. Allow?",
+			"requires": "Requires confirmation",
+			"allow": "Allow",
+			"deny": "Deny",
+			"cwd": "Working directory"
+		},
+		"progress": {
+			"thinking": "Lashon is thinking…"
+		},
+		"transcript": {
+			"heard": "Heard",
+			"cancel": "Cancel",
+			"cancelHint": "Esc · cancel before the command runs"
+		}
+	},
+	"provider": {
+		"llm": {
+			"anthropic": "Anthropic Claude",
+			"openai": "OpenAI",
+			"groq": "Groq",
+			"deepseek": "DeepSeek",
+			"mistral": "Mistral",
+			"together": "Together AI",
+			"openrouter": "OpenRouter",
+			"minimax": "MiniMax",
+			"opencode_go": "OpenCode Go",
+			"ollama_local": "Ollama (local)",
+			"ollama_remote": "Ollama (remote)",
+			"local_llm": "Local (built-in)"
+		}
+	},
+	"hardware": {
+		"label": "Hardware tier",
+		"detected": "Detected",
+		"ramLabel": "Memory",
+		"gpuNvidia": "NVIDIA GPU",
+		"gpuVulkan": "Vulkan-capable GPU",
+		"gpuNone": "No dedicated GPU",
+		"tierA": {
+			"name": "Studio",
+			"desc": "A powerful NVIDIA GPU. Everything runs locally, at full speed."
+		},
+		"tierB": {
+			"name": "Workstation",
+			"desc": "A mid-range NVIDIA GPU. Local processing with compact models."
+		},
+		"tierC": {
+			"name": "Office",
+			"desc": "No NVIDIA GPU. Local dictation; cloud is recommended for advanced commands."
+		},
+		"tierD": {
+			"name": "Minimal",
+			"desc": "Basic hardware. Local dictation; other capabilities via the cloud."
+		}
+	}
+}

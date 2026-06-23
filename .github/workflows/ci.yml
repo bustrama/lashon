@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same ref cancels the in-flight run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # M9 milestone is Windows-first per `docs/stories/m9-recipes.md`.
+    # The CI matrix is cut to `windows-2022` only so the developer
+    # feedback loop is fast (one runner instead of three) and not
+    # blocked by macOS / Ubuntu headless-environment friction
+    # (e.g. `arboard` panicking when no X11/Wayland is present —
+    # see the `clipboard_write_then_read_round_trips_through_runtime`
+    # test in `tests/recipe_runtime.rs`).
+    #
+    # The release matrix (`release.yml`, tag-triggered) still builds
+    # Windows + macOS + Linux installers per ADR-0018 — that's the
+    # cross-OS surface users get. This CI cut is about the per-PR
+    # feedback loop, not what ships.
+    name: build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: apps/desktop/.nvmrc
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Rust (pinned by rust-toolchain.toml)
+        run: rustup show
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install frontend dependencies
+        working-directory: apps/desktop
+        run: npm ci
+
+      - name: Type-check frontend
+        working-directory: apps/desktop
+        run: npm run check
+
+      - name: Build frontend
+        working-directory: apps/desktop
+        run: npm run build
+
+      - name: Install STT sidecar Python dependencies
+        run: pip install ./services/stt-sidecar
+
+      - name: Proto smoke — compile the .proto contracts
+        run: |
+          mkdir -p _proto_smoke
+          python -m grpc_tools.protoc -I packages/proto \
+            --python_out=_proto_smoke --grpc_python_out=_proto_smoke \
+            packages/proto/stt.proto packages/proto/tts.proto
+
+      - name: cargo check
+        run: cargo check --workspace --all-targets
+
+      - name: cargo test
+        run: cargo test --workspace
+
+      - name: End-to-end STT sidecar smoke test
+        run: cargo test -p lashon-core --test healthcheck -- --ignored
+
+  license-scan:
+    name: license scan
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust (pinned by rust-toolchain.toml)
+        run: rustup show
+
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+
+      - name: cargo-deny — Rust license check
+        run: cargo deny check licenses
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pip-licenses and sidecar dependencies
+        run: |
+          pip install pip-licenses==5.5.5
+          pip install ./services/stt-sidecar
+
+      - name: pip-licenses — fail on copyleft / non-commercial
+        run: pip-licenses --fail-on="GPL;LGPL;AGPL;CC-BY-NC"

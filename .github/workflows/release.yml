@@ -1,0 +1,375 @@
+name: Release
+
+# Triggered on `v*` tag pushes (e.g., v0.6.0, v1.0.0).
+# Each OS runner freezes the Python STT sidecar with PyInstaller, then builds
+# and uploads an OS-appropriate installer to the GitHub Release.
+#
+# Auto-update signing (added in feat/auto-update):
+#   tauri-plugin-updater requires two GitHub Actions secrets before the first
+#   signed release. Set them once with:
+#
+#     # Store the private key content as a secret:
+#     gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/lashon.key
+#
+#     # Set the password (use an empty string if the key has no password):
+#     gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+#
+#   The public key committed in tauri.conf.json (plugins.updater.pubkey) is
+#   derived from the same keypair and is safe to commit. See
+#   docs/adr/0017-auto-update-via-tauri-plugin-updater.md for key rotation
+#   instructions.
+#
+#   Cross-OS sidecars + bundling all landed in v0.6.0. The matrix below
+#   builds Windows NSIS + portable zip, macOS x64 + aarch64 DMGs, and the
+#   Linux AppImage.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  # Manual dispatch — used for debugging macOS / sidecar issues without
+  # cutting a tag. Triggers a build that publishes to a draft release (the
+  # tauri-action default), which can be discarded after inspection.
+  workflow_dispatch:
+
+# A newer tag push cancels any in-flight release run for the same ref.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write   # create the GitHub Release and upload assets
+
+env:
+  # tauri-apps/tauri-action pinned to the v0.6.2 tag SHA.
+  # The v0.5.x series swallowed linuxdeploy's stderr (terse "failed to run
+  # linuxdeploy" with no detail) and Ubuntu 24.04 + libfuse2t64 +
+  # APPIMAGE_EXTRACT_AND_RUN=1 still didn't produce an AppImage — see PRs
+  # #50, #51 from the v0.6.0 release. The v0.6.x series bundles a newer
+  # linuxdeploy and surfaces errors. Bump along with a Cargo/npm version
+  # bump.
+  TAURI_ACTION_SHA: 84b9d35b5fc46c1e45415bdb6144030364f7ebc5
+
+jobs:
+  # ── Per-OS build matrix ──────────────────────────────────────────────────────
+  build:
+    name: build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            sidecar_name: lashon-stt.exe
+            tauri_args: --bundles nsis
+          - os: macos-14
+            sidecar_name: lashon-stt
+            tauri_args: --bundles dmg --target aarch64-apple-darwin
+          - os: macos-13
+            sidecar_name: lashon-stt
+            tauri_args: --bundles dmg --target x86_64-apple-darwin
+          # Linux AppImage build is intentionally not in the matrix: the
+          # tauri-action v0.5.x + Ubuntu 24.04 + linuxdeploy combination
+          # produced an opaque "failed to run linuxdeploy" with no stderr
+          # propagation through three rounds of remediation (PRs #50, #51,
+          # #52). Re-introduce when there is a reproducible fix.
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── System dependencies ──────────────────────────────────────────────────
+
+      - name: Install Linux system dependencies (Tauri / WebKitGTK)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libsoup-3.0-dev \
+            libasound2-dev \
+            libfuse2t64
+          # libfuse2t64 is the Ubuntu 24.04 (noble) replacement for the
+          # legacy libfuse2 transition package. linuxdeploy runs as an
+          # AppImage and the AppImage runtime needs libfuse2 at execution
+          # time; without it `tauri build --bundles appimage` fails with
+          # the terse `failed to run linuxdeploy`.
+
+      # ── Toolchain setup ──────────────────────────────────────────────────────
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: apps/desktop/.nvmrc
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Rust (pinned by rust-toolchain.toml)
+        run: |
+          rustup show
+          # Explicit target install for per-arch macOS builds (matrix targets
+          # are aarch64-apple-darwin on macos-14 and x86_64-apple-darwin on
+          # macos-13). On other runners this is a no-op.
+          case "${{ matrix.os }}" in
+            macos-14) rustup target add aarch64-apple-darwin ;;
+            macos-13) rustup target add x86_64-apple-darwin ;;
+          esac
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
+      # ── STT sidecar: freeze with PyInstaller ─────────────────────────────────
+      #
+      # PyInstaller cannot cross-compile — each OS must freeze its own sidecar.
+      # The `build` extra installs PyInstaller; it is deliberately GPL-isolated
+      # from the runtime dependencies so the CI license scan stays clean
+      # (docs/adr/0006, .github/workflows/ci.yml).
+      #
+      # macOS: the `cuda` extra is NOT installed — CUDA is NVIDIA/x86_64 only.
+      #         The macOS sidecar is CPU-only (docs/packaging-macos.md).
+      # Linux: `cuda` is also omitted here so the base runner (no GPU) builds
+      #         cleanly. CUDA wheels are downloaded on first run when nvidia-smi
+      #         is present, exactly as on Windows (docs/adr/0006).
+
+      - name: Install STT sidecar Python dependencies (with build extra)
+        working-directory: services/stt-sidecar
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[build]"
+
+      # Generate the Python gRPC stubs (stt_pb2.py + stt_pb2_grpc.py) so
+      # PyInstaller bundles real files instead of an empty `_generated/`.
+      # codegen.ensure_stubs() generates them on demand at runtime when the
+      # sidecar is run from source, but inside a frozen PyInstaller bundle
+      # the path math for repo_root() doesn't resolve, so the runtime
+      # fallback can't find packages/proto/stt.proto — the sidecar dies on
+      # startup with FileNotFoundError. Generating at build time bypasses
+      # this entirely (docs/adr/0006).
+      - name: Generate gRPC stubs for the Python sidecar
+        working-directory: services/stt-sidecar
+        run: |
+          python -m grpc_tools.protoc \
+            -I../../packages/proto \
+            --python_out=src/lashon_stt/_generated \
+            --grpc_python_out=src/lashon_stt/_generated \
+            ../../packages/proto/stt.proto
+          ls -la src/lashon_stt/_generated/
+
+      - name: Freeze the STT sidecar with PyInstaller
+        working-directory: services/stt-sidecar
+        run: |
+          python -m PyInstaller --noconfirm --clean PyInstaller.spec
+
+      # ── Sidecar smoke-test (macOS — diagnose unsigned-binary issues) ────────
+      #
+      # Runs the freshly-frozen sidecar for a few seconds with no environment
+      # set, captures stdout/stderr, and dumps codesign + file inspection.
+      # The sidecar should print `LASHON_STT_TOKEN=<hex>` and
+      # `LASHON_STT_PORT=<port>` within ~5 s if it boots. If amfid kills the
+      # unsigned aarch64 binary, we capture the "Killed: 9" signal here so
+      # the failure mode is visible in the CI log instead of as a downstream
+      # "transcription doesn't work" report.
+
+      - name: Smoke-test the frozen sidecar (macOS)
+        if: runner.os == 'macOS'
+        working-directory: services/stt-sidecar/dist/lashon-stt
+        run: |
+          set +e
+          echo "=== binary metadata ==="
+          file ./lashon-stt
+          ls -la ./lashon-stt
+          echo
+          echo "=== codesign --verify ==="
+          codesign --verify --verbose ./lashon-stt
+          echo "verify_exit=$?"
+          echo
+          echo "=== codesign --display ==="
+          codesign -dvv ./lashon-stt 2>&1 || true
+          echo
+          echo "=== launch the sidecar (background + 10 s kill) ==="
+          # Spawn the sidecar; wait 10 s; kill if still running; capture
+          # any stdout/stderr and the exit code. We do NOT set
+          # LASHON_MODELS_ROOT etc — the sidecar should at least print
+          # its handshake lines (LASHON_STT_TOKEN=, LASHON_STT_PORT=)
+          # quickly, even before it tries to load a model.
+          ./lashon-stt > /tmp/sidecar.stdout 2> /tmp/sidecar.stderr &
+          SIDECAR_PID=$!
+          sleep 10
+          if kill -0 $SIDECAR_PID 2>/dev/null; then
+            echo "(sidecar still running after 10 s — killing)"
+            kill $SIDECAR_PID 2>/dev/null || true
+            sleep 1
+            kill -9 $SIDECAR_PID 2>/dev/null || true
+            STILL_RUNNING=1
+          else
+            STILL_RUNNING=0
+          fi
+          wait $SIDECAR_PID 2>/dev/null
+          RC=$?
+          echo
+          echo "=== stdout (first 60 lines) ==="
+          head -60 /tmp/sidecar.stdout || true
+          echo
+          echo "=== stderr (first 60 lines) ==="
+          head -60 /tmp/sidecar.stderr || true
+          echo
+          echo "=== sidecar exit code: $RC (still_running_at_10s=$STILL_RUNNING) ==="
+          case $RC in
+            137) echo "(137: SIGKILL — likely amfid rejected the unsigned binary)" ;;
+            134) echo "(134: SIGABRT — assert/abort from inside the binary)" ;;
+            139) echo "(139: SIGSEGV — segfault)" ;;
+            143) echo "(143: SIGTERM — clean kill from our 10s timeout, sidecar was running)" ;;
+            0)   echo "(0: clean exit — probably hit EOF on stdin)" ;;
+            *)   echo "(other exit code: see stderr above for the actual error)" ;;
+          esac
+          echo
+          echo "=== syslog entries mentioning lashon-stt or amfid in the last 2 min ==="
+          log show --predicate 'process == "amfid" OR senderImagePath CONTAINS[c] "lashon-stt" OR eventMessage CONTAINS[c] "lashon-stt"' --last 2m 2>&1 | head -60 || true
+          # Always succeed — this step is diagnostic. The real signal is the
+          # output above, captured into the CI log.
+          true
+
+      # Stage the frozen sidecar bundle where Tauri's bundle.resources expects it.
+      - name: Stage the frozen sidecar for Tauri
+        run: |
+          TARGET=apps/desktop/src-tauri/binaries/lashon-stt
+          rm -rf "$TARGET"
+          cp -r services/stt-sidecar/dist/lashon-stt "$TARGET"
+          echo "Staged sidecar — listing:"
+          ls -la "$TARGET/"
+
+      # ── Frontend ─────────────────────────────────────────────────────────────
+
+      - name: Install frontend dependencies
+        working-directory: apps/desktop
+        run: npm ci
+
+      # ── Tauri build & release upload ─────────────────────────────────────────
+      #
+      # tauri-apps/tauri-action@SHA:
+      #   - Compiles the Tauri app and bundles the per-OS installer.
+      #   - Creates (or updates) the GitHub Release for this tag.
+      #   - Uploads the installer as a release asset.
+      #
+      # Windows:  NSIS installer (.exe) + portable zip (packaged in the next step)
+      # macOS:    .dmg — UNSIGNED (Gatekeeper will warn until M13 obtains an
+      #            Apple Developer ID and notarizes; see docs/adr/0018 and
+      #            docs/packaging-macos.md).
+      # Linux:    .AppImage — no signing required; world-executable on extraction.
+
+      - name: Build and upload the Tauri installer
+        id: tauri
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Minisign signing key for tauri-plugin-updater.
+          # Set these secrets before cutting the first v0.6.0+ release:
+          #   gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/lashon.key
+          #   gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # linuxdeploy and its plugins ship as AppImages whose runtime mounts
+          # itself via FUSE — fragile on GitHub-hosted Ubuntu 24.04 even with
+          # libfuse2t64 installed. APPIMAGE_EXTRACT_AND_RUN=1 tells the
+          # runtime to extract the AppImage to a temp dir and run from there
+          # instead, bypassing FUSE entirely. No-op on macOS/Windows.
+          APPIMAGE_EXTRACT_AND_RUN: 1
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Lashon ${{ github.ref_name }}'
+          releaseBody: |
+            See [CHANGELOG](https://github.com/bustrama/lashon/blob/main/CHANGELOG.md) for details.
+
+            **macOS note:** this release is unsigned. Gatekeeper will show a
+            warning on first launch. Right-click → Open to bypass it.
+            Signed releases are gated on the Apple Developer Program (M13).
+          releaseDraft: true
+          # Non-prerelease — the GitHub `/releases/latest/download/...`
+          # redirect (which tauri-plugin-updater fetches) excludes
+          # prereleases, so marking every release as prerelease=true broke
+          # the in-app updater for v0.6.0. Newer Mn.x releases are public
+          # releases; if a pre-release becomes useful later, set this to
+          # true on that one tag's release page after publishing.
+          prerelease: false
+          projectPath: apps/desktop
+          # Tauri target + bundle args are matrix-driven (per-OS + per-arch).
+          args: ${{ matrix.tauri_args }}
+
+      # ── Windows portable zip (post-build step) ───────────────────────────────
+      #
+      # Packages the release .exe + the pristine frozen sidecar bundle into a
+      # portable zip per ADR-0012. Built from src-tauri/binaries/ (not from
+      # target/release/binaries/) to avoid shipping CUDA libs that a prior run
+      # may have extracted there.
+
+      - name: Package the Windows portable zip
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = (Get-Content apps/desktop/src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          $stage = "$env:RUNNER_TEMP\lashon-portable"
+          Remove-Item -Recurse -Force $stage -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory "$stage\binaries" | Out-Null
+          Copy-Item target\release\lashon.exe $stage
+          Copy-Item -Recurse apps\desktop\src-tauri\binaries\lashon-stt "$stage\binaries\lashon-stt"
+          $zip = "target\release\bundle\Lashon-${version}-windows-x64-portable.zip"
+          Compress-Archive -Path "$stage\*" -DestinationPath $zip -Force
+          echo "PORTABLE_ZIP=$zip" >> $env:GITHUB_ENV
+
+      - name: Upload Windows portable zip to the release
+        if: runner.os == 'Windows'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # tauri-action's `releaseId` output is the GitHub-side numeric id
+          # of the release it created/updated. `gh release upload --clobber`
+          # attaches the zip to that exact release without needing the
+          # legacy upload_url (the actions/upload-release-asset@v1 action is
+          # itself archived and was the source of the previous breakage).
+          gh release upload "${{ github.ref_name }}" "${{ env.PORTABLE_ZIP }}" \
+            --clobber --repo "${{ github.repository }}"
+
+  # ── License gate ─────────────────────────────────────────────────────────────
+  # Re-run the same license check that CI runs, to block a tag push that
+  # accidentally introduced a GPL/AGPL/CC-BY-NC dependency.
+  license-scan:
+    name: license scan
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust (pinned by rust-toolchain.toml)
+        run: rustup show
+
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+
+      - name: cargo-deny — Rust license check
+        run: cargo deny check licenses
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pip-licenses and sidecar dependencies
+        run: |
+          pip install pip-licenses==5.5.5
+          pip install ./services/stt-sidecar
+
+      - name: pip-licenses — fail on copyleft / non-commercial
+        run: pip-licenses --fail-on="GPL;LGPL;AGPL;CC-BY-NC"

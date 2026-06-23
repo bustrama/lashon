@@ -1,0 +1,78 @@
+// Lashon — speech-to-text sidecar contract.
+//
+// This file is the single source of truth for the STT gRPC interface. It is
+// consumed by:
+//   - the Rust core         (apps/desktop/src-tauri, tonic-build, client only)
+//   - the Python STT sidecar (services/stt-sidecar, grpc_tools.protoc)
+//
+// At Milestone M0 only HealthCheck is implemented; TranscribeBytes and
+// TranscribeStream are defined here as the M1 contract and the sidecar returns
+// UNIMPLEMENTED for them.
+
+syntax = "proto3";
+
+package lashon.stt.v1;
+
+// The speech-to-text sidecar service.
+service Stt {
+  // Liveness/readiness probe. Drives the M0 end-to-end smoke test and, later,
+  // confirms a model is warm before the dictation hot path uses the sidecar.
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+
+  // One-shot transcription of a complete PCM buffer.
+  rpc TranscribeBytes(TranscribeBytesRequest) returns (TranscribeResponse);
+
+  // Streaming transcription: the client streams audio chunks, the server
+  // streams partial results followed by a final result.
+  rpc TranscribeStream(stream AudioChunk) returns (stream TranscribePartial);
+}
+
+enum ServingStatus {
+  SERVING_STATUS_UNSPECIFIED = 0;
+  SERVING_STATUS_SERVING = 1;      // process up, gRPC reachable
+  SERVING_STATUS_NOT_SERVING = 2;
+}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  // Overall serving state of the sidecar process.
+  ServingStatus status = 1;
+  // Human-readable detail, e.g. the active engine name or a fault reason.
+  string detail = 2;
+  // Sidecar version string.
+  string version = 3;
+  // True once an STT model is warm and ready for inference. M0: always false.
+  bool model_ready = 4;
+}
+
+// A complete utterance: 16 kHz mono float32 PCM, little-endian, in [-1.0, 1.0].
+message TranscribeBytesRequest {
+  bytes pcm_f32 = 1;
+  // BCP-47-style language hint, e.g. "he", "en". Empty means autodetect.
+  string language = 2;
+}
+
+// One slice of a streamed utterance, same PCM format as TranscribeBytesRequest.
+message AudioChunk {
+  bytes pcm_f32 = 1;
+  // Set true on the final chunk of an utterance.
+  bool end_of_utterance = 2;
+}
+
+message TranscribeResponse {
+  string text = 1;
+  // Detected (or echoed) language.
+  string language = 2;
+  // Mean model confidence in [0.0, 1.0]; 0 if unknown.
+  float confidence = 3;
+  // Wall-clock inference time on the sidecar, milliseconds.
+  uint32 inference_ms = 4;
+}
+
+message TranscribePartial {
+  string text = 1;
+  // True when this is the final result for the utterance.
+  bool is_final = 2;
+  string language = 3;
+}

@@ -1,0 +1,83 @@
+version: 1
+id: send-discord-message
+name: Send Discord message
+description: Send a text message to a recipient in Discord using the quick-switcher.
+long_description: |
+  Opens (or focuses) Discord, hits the Ctrl+K quick switcher, types the
+  recipient name, selects the first hit, types the message body, and
+  presses Enter to send. Designed for the Discord desktop client.
+author: Lashon contributors
+recipe_version: 1.0.0
+tags:
+  - messaging
+  - discord
+intents:
+  # English — three common phrasings the LLM-classifier tier would
+  # also catch; listed verbatim so the cheap regex tier hits first.
+  - "send {body} to {recipient} in discord"
+  - "send {recipient} {body} on discord"
+  - "discord: send {body} to {recipient}"
+  - "dm {recipient} on discord {body}"
+  - "tell {recipient} on discord {body}"
+  - "message {recipient} on discord {body}"
+  # Hebrew — covers the 2x2x2 of {שלח/תשלח}×{ל/ב}×{with/without הודעה}.
+  # All four chat recipes share this matrix; if you add or remove a
+  # variant here, mirror in send-slack-message, send-telegram-message,
+  # send-whatsapp-message.
+  - "שלח לדיסקורד ל{recipient} {body}"
+  - "תשלח לדיסקורד ל{recipient} {body}"
+  - "שלח בדיסקורד ל{recipient} {body}"
+  - "תשלח בדיסקורד ל{recipient} {body}"
+  - "שלח הודעה לדיסקורד ל{recipient} {body}"
+  - "שלח הודעה בדיסקורד ל{recipient} {body}"
+  - "תשלח הודעה לדיסקורד ל{recipient} {body}"
+  - "תשלח הודעה בדיסקורד ל{recipient} {body}"
+parameters:
+  - key: recipient
+    input_type: string
+    requirement: required
+    description: Discord username, display name, or channel name.
+  - key: body
+    input_type: string
+    requirement: required
+    description: Message body to send. Hebrew is routed through the clipboard.
+permissions:
+  - app.focus
+  - keyboard.type
+  - clipboard
+os_steps:
+  windows:
+    - type: focus_window
+      title_contains: Discord
+      process: Discord.exe
+    - type: wait_for_window
+      title_contains: Discord
+      timeout_ms: 8000
+    - type: key_chord
+      keys: [Control, K]
+      comment: Open the quick switcher.
+    - type: wait_ms
+      ms: 150
+      comment: Discord's Electron WebView is opaque to UIA — the whole
+        WebView is one "chrome" element, so wait_for_focus_change can't
+        see focus moving onto the quick-switcher input. Fixed sleep is
+        the realistic tool here. ~100 ms is enough for the local-render
+        modal; 150 leaves safety margin.
+    - type: type_unicode
+      text: "{{ recipient }}"
+      rtl_safe: false
+    - type: wait_ms
+      ms: 400
+      comment: Discord debounces search filter ~200 ms; double for safety.
+    - type: key_chord
+      keys: [Enter]
+      comment: Select the first hit.
+    - type: wait_ms
+      ms: 250
+      comment: Chat panel render — usually < 200 ms warm.
+    - type: type_unicode
+      text: "{{ body }}"
+      rtl_safe: true
+    - type: key_chord
+      keys: [Enter]
+      comment: Send the message.

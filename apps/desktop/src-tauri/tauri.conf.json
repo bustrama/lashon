@@ -1,0 +1,108 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Lashon",
+  "version": "0.7.0",
+  "identifier": "dev.lashon.desktop",
+  "build": {
+    "frontendDist": "../build",
+    "devUrl": "http://localhost:1735",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Lashon",
+        "url": "/",
+        "width": 104,
+        "height": 104,
+        "resizable": true,
+        "maximizable": false,
+        "minimizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "center": true
+      },
+      {
+        "label": "tutorial",
+        "title": "Lashon · מדריך",
+        "url": "/tutorial",
+        "width": 880,
+        "height": 600,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": false,
+        "skipTaskbar": false,
+        "shadow": false,
+        "center": true,
+        "visible": false
+      },
+      {
+        "label": "hub",
+        "title": "Lashon · הגדרות",
+        "url": "/hub",
+        "width": 960,
+        "height": 640,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": false,
+        "skipTaskbar": false,
+        "shadow": false,
+        "center": true,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "dmg", "appimage"],
+    "createUpdaterArtifacts": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [
+      "binaries/lashon-stt/**/*",
+      "binaries/llama-server/**/*",
+      "../../../models/wake/wakewords/hey_lashon.onnx",
+      "../../../models/wake/openwakeword/embedding_model.onnx",
+      "../../../models/wake/openwakeword/melspectrogram.onnx",
+      "../../../models/vad/silero-vad-v5/silero_vad.onnx"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "both"
+      }
+    },
+    "macOS": {
+      "entitlements": "entitlements.plist",
+      "minimumSystemVersion": "13.0"
+    },
+    "linux": {
+      "appimage": {}
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERDM0MyQTUyOUYzNDMzOUEKUldTYU16U2ZVaW84M0JYNmxuT05ZWEtFb2VMRk9jVGNINmxrMm1uNm5SQ0xMczY4RGtzNi96c2YK",
+      "endpoints": [
+        "https://github.com/bustrama/lashon/releases/latest/download/latest.json"
+      ],
+      "dialog": false
+    }
+  }
+}

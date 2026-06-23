@@ -1,0 +1,55 @@
+[project]
+name = "lashon-stt"
+version = "0.7.0"
+description = "Lashon speech-to-text sidecar — gRPC service over faster-whisper."
+requires-python = ">=3.11,<3.13"
+license = "GPL-3.0-only"
+authors = [{ name = "Lashon contributors" }]
+
+# Versions pinned exactly. The faster-whisper / ctranslate2 / numpy trio is the
+# CUDA-matched set described in docs/tech-stack.md — bumping any of them is a
+# deliberate, tested change (CUDA/cuDNN drift — a tracked risk in
+# docs/architecture.md).
+dependencies = [
+  "grpcio==1.68.1",
+  "grpcio-tools==1.68.1",
+  "protobuf==5.29.0",
+  "faster-whisper==1.1.1",
+  "ctranslate2==4.5.0",
+  "numpy==2.1.3",
+  "huggingface-hub==0.27.0",
+  # ctranslate2 imports pkg_resources at runtime; setuptools must stay in the
+  # <81 series, the last that still ships it.
+  "setuptools==80.10.2",
+]
+
+[project.optional-dependencies]
+# GPU acceleration for faster-whisper (NVIDIA, x86_64 Windows/Linux). These CUDA
+# runtime libraries are large; CPU-only installs omit this extra.
+cuda = [
+  "nvidia-cublas-cu12==12.9.2.10",
+  # cuDNN must match the dispatch DLL bundled inside ctranslate2 4.5.0
+  # (cudnn64_9.dll 9.1.0.70) — a newer cuDNN fails the dispatch/sublib check.
+  "nvidia-cudnn-cu12==9.1.0.70",
+]
+# Word-error-rate benchmark over tests/hebrew-corpus.
+bench = [
+  "jiwer==4.0.0",
+]
+# Freeze the sidecar into a standalone executable for release packaging.
+# PyInstaller is GPL — deliberately kept out of the runtime/base dependencies
+# so the CI license scan (which installs only the base set) stays clean.
+build = [
+  "pyinstaller==6.20.0",
+  "pyinstaller-hooks-contrib==2026.5",
+]
+
+[project.scripts]
+lashon-stt = "lashon_stt.server:main"
+
+[build-system]
+requires = ["setuptools==80.10.2"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

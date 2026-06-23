@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS entitlements for Lashon.
+
+  Required capabilities:
+    - Microphone access (STT capture).
+    - Accessibility / automation (text injection via AppleScript / Accessibility API).
+
+  Signing status:
+    These entitlements are declared but not yet activated by a notarized signature.
+    Until an Apple Developer ID is obtained (M13), macOS Gatekeeper will warn on
+    first launch. See docs/adr/0017-cross-os-installer-matrix.md and
+    docs/packaging-macos.md.
+-->
+<plist version="1.0">
+<dict>
+  <!-- Allow reading and writing arbitrary filesystem locations (required for
+       app-local data: models, CUDA runtime, settings). -->
+  <key>com.apple.security.files.user-selected.read-write</key>
+  <true/>
+
+  <!-- Microphone access — required for STT capture. The OS will show a
+       permission prompt on first use. -->
+  <key>com.apple.security.device.audio-input</key>
+  <true/>
+
+  <!-- Accessibility API access — required for text injection (Dictation mode).
+       The user must grant this in System Settings > Privacy & Security >
+       Accessibility after installation. -->
+  <key>com.apple.security.automation.apple-events</key>
+  <true/>
+</dict>
+</plist>

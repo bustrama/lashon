@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "tutorial",
+  "description": "Permissions for the first-run interactive tutorial window (issue #9).",
+  "windows": ["tutorial"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-hide",
+    "core:window:allow-start-dragging",
+    "store:default"
+  ]
+}

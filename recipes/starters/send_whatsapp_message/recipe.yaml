@@ -1,0 +1,71 @@
+version: 1
+id: send-whatsapp-message
+name: Send WhatsApp message
+description: Send a text message to a contact in WhatsApp Desktop.
+long_description: |
+  Focuses WhatsApp Desktop, hits the new-chat / search shortcut, types the
+  contact name, selects the first hit, types the body, and sends. Includes
+  longer waits to absorb the Electron-app startup latency authors hit when
+  the app cold-launches.
+author: Lashon contributors
+recipe_version: 1.0.0
+tags:
+  - messaging
+  - whatsapp
+intents:
+  - "send {body} to {recipient} in whatsapp"
+  - "send {recipient} {body} on whatsapp"
+  - "whatsapp: send {body} to {recipient}"
+  - "dm {recipient} on whatsapp {body}"
+  - "tell {recipient} on whatsapp {body}"
+  - "message {recipient} on whatsapp {body}"
+  - "שלח לוואצאפ ל{recipient} {body}"
+  - "תשלח לוואצאפ ל{recipient} {body}"
+  - "שלח בוואצאפ ל{recipient} {body}"
+  - "תשלח בוואצאפ ל{recipient} {body}"
+  - "שלח הודעה לוואצאפ ל{recipient} {body}"
+  - "שלח הודעה בוואצאפ ל{recipient} {body}"
+  - "תשלח הודעה לוואצאפ ל{recipient} {body}"
+  - "תשלח הודעה בוואצאפ ל{recipient} {body}"
+parameters:
+  - key: recipient
+    input_type: string
+    requirement: required
+    description: WhatsApp contact name as it appears in the contact list.
+  - key: body
+    input_type: string
+    requirement: required
+    description: Message body to send. Hebrew routes via the clipboard.
+permissions:
+  - app.focus
+  - keyboard.type
+  - clipboard
+os_steps:
+  windows:
+    - type: focus_window
+      title_contains: WhatsApp
+    - type: wait_for_window
+      title_contains: WhatsApp
+      timeout_ms: 12000
+    - type: key_chord
+      keys: [Control, N]
+      comment: Open the new-chat / contact search panel.
+    - type: wait_ms
+      ms: 300
+      comment: WhatsApp's Electron cold-launch is genuinely slower; keep
+        a touch more headroom than Discord / Slack / Telegram.
+    - type: type_unicode
+      text: "{{ recipient }}"
+      rtl_safe: true
+    - type: wait_ms
+      ms: 600
+    - type: key_chord
+      keys: [Enter]
+      comment: Select the first contact hit.
+    - type: wait_ms
+      ms: 450
+    - type: type_unicode
+      text: "{{ body }}"
+      rtl_safe: true
+    - type: key_chord
+      keys: [Enter]

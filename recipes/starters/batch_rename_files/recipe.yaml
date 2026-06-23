@@ -1,0 +1,46 @@
+version: 1
+id: batch-rename-files
+name: Batch-rename files in a directory
+description: Rename files in {directory} matching {pattern} by substituting {find} with {replace}.
+long_description: |
+  Runs a single PowerShell `Get-ChildItem | Rename-Item` pipeline. Lives
+  behind the `shell.run` permission and the standard confirmation modal:
+  the user sees the literal command before it runs. Pattern is a Windows
+  glob (`*.txt`, `report*.csv`); find / replace are literal strings.
+author: Lashon contributors
+recipe_version: 1.0.0
+tags:
+  - files
+  - shell
+intents:
+  - "rename files in {directory} matching {pattern}"
+  - "batch rename {pattern} in {directory}"
+parameters:
+  - key: directory
+    input_type: string
+    requirement: required
+    description: Directory to rename within (absolute path).
+  - key: pattern
+    input_type: string
+    requirement: required
+    description: Glob pattern of files to rename (e.g. "*.txt").
+  - key: find
+    input_type: string
+    requirement: required
+    description: Substring to replace in each filename.
+  - key: replace
+    input_type: string
+    requirement: required
+    description: Replacement substring.
+permissions:
+  - shell.run
+  - destructive
+os_steps:
+  windows:
+    - type: run_shell
+      command: >
+        powershell -NoProfile -Command "Get-ChildItem -LiteralPath
+        '{{ directory }}' -Filter '{{ pattern }}' -File | Rename-Item -NewName
+        { $_.Name -replace '{{ find }}', '{{ replace }}' }"
+      timeout_ms: 30000
+      capture_into: rename_output

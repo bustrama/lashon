@@ -1,0 +1,89 @@
+{
+  "_comment": "Hardware tier -> default-model map. Encodes the hardware tiers in docs/tech-stack.md. Tier detection runs at onboarding (tiers are tested A, then B, then C, then D); the user may override and Lashon never silently downgrades.",
+  "tiers": {
+    "A": {
+      "name": "Studio",
+      "hardware": "RTX 4070+ / 4080 / 4090, 12+ GB VRAM, 32 GB RAM",
+      "detect": { "requires_cuda": true, "min_vram_gb": 12.0, "min_ram_gb": 24.0 },
+      "defaults": {
+        "stt": {
+          "provider": "faster-whisper",
+          "model": "ivrit-ai/whisper-large-v3-turbo-ct2",
+          "compute_type": "int8_float16",
+          "is_local": true
+        },
+        "llm": {
+          "provider": "llama-server",
+          "model": "DictaLM-3.0-Nemotron-12B-Instruct",
+          "quant": "Q4_K_M",
+          "is_local": true
+        },
+        "tts": { "provider": "piper", "model": "he_IL-default-medium", "is_local": true }
+      },
+      "latency_targets_ms": { "dictation_e2e": 800, "command_e2e": 1800, "chat_first_byte": 900 }
+    },
+    "B": {
+      "name": "Workstation",
+      "hardware": "RTX 3060 / 4060, 6-8 GB VRAM, 16 GB RAM",
+      "detect": { "requires_cuda": true, "min_vram_gb": 6.0, "min_ram_gb": 12.0 },
+      "defaults": {
+        "stt": {
+          "provider": "faster-whisper",
+          "model": "ivrit-ai/whisper-large-v3-turbo-ct2",
+          "compute_type": "int8_float16",
+          "is_local": true
+        },
+        "llm": {
+          "provider": "llama-server",
+          "model": "DictaLM-3.0-1.7B-Instruct",
+          "quant": "Q8_0",
+          "is_local": true
+        },
+        "tts": { "provider": "piper", "model": "he_IL-default-medium", "is_local": true }
+      },
+      "latency_targets_ms": { "dictation_e2e": 1500, "command_e2e": 2500, "chat_first_byte": 1500 }
+    },
+    "C": {
+      "name": "Office",
+      "hardware": "CPU-only (i5+ / Ryzen 5+) or AMD GPU with Vulkan, 8+ GB RAM",
+      "detect": { "requires_vulkan": true, "min_ram_gb": 8.0 },
+      "defaults": {
+        "stt": {
+          "provider": "whisper-cpp",
+          "model": "ivrit-ai/whisper-large-v3-turbo-ggml",
+          "quant": "Q5_0",
+          "is_local": true
+        },
+        "llm": {
+          "provider": "rule-based",
+          "model": null,
+          "is_local": true,
+          "cloud_recommended": true
+        },
+        "tts": { "provider": "piper", "model": "he_IL-default-medium", "is_local": true }
+      },
+      "latency_targets_ms": { "dictation_e2e": 3000, "command_e2e": null, "chat_first_byte": null }
+    },
+    "D": {
+      "name": "Minimal",
+      "hardware": "Old laptop, <= 4 GB free RAM",
+      "detect": { "fallback": true },
+      "defaults": {
+        "stt": {
+          "provider": "whisper-cpp",
+          "model": "whisper-small-he",
+          "quant": "Q4_0",
+          "is_local": true
+        },
+        "llm": { "provider": "cloud", "model": null, "is_local": false, "cloud_required": true },
+        "tts": { "provider": "piper", "model": "he_IL-default-medium", "is_local": true }
+      },
+      "latency_targets_ms": { "dictation_e2e": null, "command_e2e": null, "chat_first_byte": null }
+    }
+  },
+  "memory_swap_policy": {
+    "llm": "stays warm permanently (most expensive to reload)",
+    "stt": "warm by default on Tier A; loaded on hotkey on Tier B and below",
+    "tts": "streams from disk (Piper) or a warm Python sidecar (MMS / XTTS)"
+  }
+}

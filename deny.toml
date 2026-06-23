@@ -1,0 +1,41 @@
+# cargo-deny — license hygiene for the Rust dependency tree.
+#
+# CI runs `cargo deny check licenses` (the docs/architecture.md risks table:
+# no GPL / LGPL / AGPL / CC-BY-NC contamination). cargo-deny parses each
+# crate's SPDX license
+# expression and requires it to be satisfied by the `allow` list below; any
+# crate that is not — e.g. anything copyleft or non-commercial — fails CI.
+#
+# The list was derived from the actual dependency tree. When a new dependency
+# introduces a new *permissive* license, add it here in the same PR.
+
+[licenses]
+allow = [
+    # Lashon's own workspace crates (lashon, lashon-core) are GPL-3.0-only as of
+    # ADR-0032 (the open-core relicense). cargo-deny checks workspace members
+    # too, so the project's own license must be allowed here. This does NOT
+    # invite copyleft *dependencies* — third-party crates stay permissive, and
+    # AGPL / CC-BY-NC remain barred by their absence from this list.
+    "GPL-3.0-only",
+    "MIT",
+    "MIT-0",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "ISC",
+    "Zlib",
+    "0BSD",
+    "Unlicense",
+    "Unicode-3.0",
+    "CC0-1.0",
+    "MPL-2.0",
+    # CDLA-Permissive-2.0 — the Mozilla CCADB root-certificate bundle that
+    # `webpki-roots` / `webpki-root-certs` ships under. Permissive and OSI-
+    # equivalent (no copyleft, no non-commercial clause); it enters our tree
+    # transitively via the rustls TLS stack used by `reqwest` (the Hub's
+    # opt-in wake-word downloads) and by `ureq` inside `ort-sys`'s build
+    # script. Safe to permit.
+    "CDLA-Permissive-2.0",
+]

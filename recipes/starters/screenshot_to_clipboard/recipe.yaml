@@ -1,0 +1,24 @@
+version: 1
+id: screenshot-to-clipboard
+name: Screenshot active window to clipboard
+description: Capture the foreground window as an image and place it on the clipboard.
+long_description: |
+  One-step recipe — snapshots the foreground window and stages the bitmap
+  on the OS clipboard so the user can paste it into chat / a doc / a bug
+  report. No parameters.
+author: Lashon contributors
+recipe_version: 1.0.0
+tags:
+  - utility
+  - screenshot
+intents:
+  - "screenshot to clipboard"
+  - "take a screenshot"
+  - "צלם מסך"
+parameters: []
+permissions:
+  - screenshot
+  - clipboard
+os_steps:
+  windows:
+    - type: screenshot_to_clipboard

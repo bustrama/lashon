@@ -1,0 +1,69 @@
+version: 1
+id: send-slack-message
+name: Send Slack message
+description: Send a text message to a person or channel in Slack using the quick switcher.
+long_description: |
+  Opens (or focuses) Slack, hits Ctrl+K to summon the channel switcher,
+  types the recipient, selects the first hit, types the body, and sends
+  with Enter. Works with the Slack desktop app.
+author: Lashon contributors
+recipe_version: 1.0.0
+tags:
+  - messaging
+  - slack
+intents:
+  - "send {body} to {recipient} in slack"
+  - "send {recipient} {body} on slack"
+  - "slack: send {body} to {recipient}"
+  - "dm {recipient} on slack {body}"
+  - "tell {recipient} on slack {body}"
+  - "message {recipient} on slack {body}"
+  - "שלח לסלאק ל{recipient} {body}"
+  - "תשלח לסלאק ל{recipient} {body}"
+  - "שלח בסלאק ל{recipient} {body}"
+  - "תשלח בסלאק ל{recipient} {body}"
+  - "שלח הודעה לסלאק ל{recipient} {body}"
+  - "שלח הודעה בסלאק ל{recipient} {body}"
+  - "תשלח הודעה לסלאק ל{recipient} {body}"
+  - "תשלח הודעה בסלאק ל{recipient} {body}"
+parameters:
+  - key: recipient
+    input_type: string
+    requirement: required
+    description: Slack person or channel (e.g. "@alice" or "#general").
+  - key: body
+    input_type: string
+    requirement: required
+    description: Message body to send.
+permissions:
+  - app.focus
+  - keyboard.type
+  - clipboard
+os_steps:
+  windows:
+    - type: focus_window
+      title_contains: Slack
+      process: slack.exe
+    - type: wait_for_window
+      title_contains: Slack
+      timeout_ms: 8000
+    - type: key_chord
+      keys: [Control, K]
+      comment: Open the channel / DM switcher.
+    - type: wait_ms
+      ms: 200
+      comment: Slack switcher; slightly slower than Discord's, still local.
+    - type: type_unicode
+      text: "{{ recipient }}"
+      rtl_safe: false
+    - type: wait_ms
+      ms: 450
+    - type: key_chord
+      keys: [Enter]
+    - type: wait_ms
+      ms: 300
+    - type: type_unicode
+      text: "{{ body }}"
+      rtl_safe: true
+    - type: key_chord
+      keys: [Enter]

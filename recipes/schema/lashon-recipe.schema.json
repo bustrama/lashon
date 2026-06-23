@@ -1,0 +1,581 @@
+{
+  "$defs": {
+    "OsSteps": {
+      "additionalProperties": false,
+      "description": "Per-OS step variants. At least one of `windows` / `macos` / `linux`\nmust be `Some(_)` and non-empty. v1 runtime only honours `windows`\n(per ADR-0028 scope), but the other two slots are spec'd so authors\ncan declare them now and the runtime gains coverage later.",
+      "properties": {
+        "linux": {
+          "items": {
+            "$ref": "#/$defs/Step"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "macos": {
+          "items": {
+            "$ref": "#/$defs/Step"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "windows": {
+          "items": {
+            "$ref": "#/$defs/Step"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Parameter": {
+      "additionalProperties": false,
+      "description": "Goose-style parameter declaration.",
+      "properties": {
+        "default": {
+          "description": "Optional default value. Type must be compatible with\n`input_type`; the validator does not enforce this in v1 (the\nruntime coerces at slot-fill time)."
+        },
+        "description": {
+          "description": "Human-readable description. Shown in the Hub modal as the\nfield label hint.",
+          "type": "string"
+        },
+        "input_type": {
+          "$ref": "#/$defs/ParameterType",
+          "description": "Value shape, used by the Hub slot-fill modal to pick a control."
+        },
+        "key": {
+          "description": "Slot name. Validated to match `[a-z][a-z0-9_]*` and to be\nreferenced (via `{{ key }}`) somewhere in the step list.",
+          "type": "string"
+        },
+        "requirement": {
+          "$ref": "#/$defs/ParameterRequirement",
+          "description": "Whether the slot must be filled, may be left empty, or always\nprompts the user even when a default is set."
+        }
+      },
+      "required": [
+        "key",
+        "input_type",
+        "requirement",
+        "description"
+      ],
+      "type": "object"
+    },
+    "ParameterRequirement": {
+      "description": "Whether the slot is required, optional, or always-prompt.\n`UserPrompt` is the \"ignore any default; ask every run\" mode.",
+      "enum": [
+        "required",
+        "optional",
+        "user_prompt"
+      ],
+      "type": "string"
+    },
+    "ParameterType": {
+      "description": "Parameter value shape. Mirrors the Goose enum verbatim — extending\nit is a separate spec change.",
+      "enum": [
+        "string",
+        "number",
+        "boolean",
+        "file",
+        "date"
+      ],
+      "type": "string"
+    },
+    "Region": {
+      "additionalProperties": false,
+      "description": "Pixel rectangle for `screenshot_to_clipboard` region capture.\nCoordinates are physical pixels on the primary display.",
+      "properties": {
+        "height": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "width": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "x": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "type": "object"
+    },
+    "Step": {
+      "description": "A single OS-UI primitive. The `type:` discriminator carries the\nvariant tag in YAML.\n\nLashon-specific design notes:\n- `rtl_safe: true` on a `type_unicode` step routes via the clipboard\n  path instead of synthetic keypresses — Electron apps mangle\n  synthetic BiDi otherwise (`.claude/rules/hebrew.md`).\n- `click_label.ocr_fallback: true` declares intent; Phase 1 doesn't\n  ship the OCR adapter, Phase 2 does. The validator accepts the\n  flag now so authors don't have to bump the schema later.\n- `run_shell` always requires the `shell.run` permission and gates\n  on the same confirmation modal as the Command-mode `run_command`\n  tool. v1 honours `timeout_ms` and `capture_into`.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Press a key chord. `keys` is the chord in order — modifiers\nfirst, target last. Common chords:\n`[\"Control\", \"K\"]`, `[\"Control\", \"Shift\", \"Enter\"]`.",
+          "properties": {
+            "comment": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "keys": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "key_chord",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "keys"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Type Unicode text, with `{{ param }}` interpolation.\nSet `rtl_safe: true` for Hebrew + Electron — routes through the\nclipboard so the target app sees a `WM_PASTE`, not synthetic\nkeypresses.",
+          "properties": {
+            "comment": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "rtl_safe": {
+              "default": false,
+              "type": "boolean"
+            },
+            "text": {
+              "type": "string"
+            },
+            "type": {
+              "const": "type_unicode",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "text"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Click a UI element by its accessibility label (UIA on Windows).\n`window` narrows the search to a single window when set.\n`ocr_fallback: true` signals authors' intent; Phase 2 wires\nthe actual OCR adapter.",
+          "properties": {
+            "comment": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "label": {
+              "type": "string"
+            },
+            "ocr_fallback": {
+              "default": false,
+              "type": "boolean"
+            },
+            "type": {
+              "const": "click_label",
+              "type": "string"
+            },
+            "window": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "label"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Focus the first window whose title contains `title_contains`.\n`process` narrows the match to a specific executable when set —\nuseful when multiple apps' windows share a substring.",
+          "properties": {
+            "comment": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "process": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "title_contains": {
+              "type": "string"
+            },
+            "type": {
+              "const": "focus_window",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "title_contains"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Block until a window matching `title_contains` exists, or\ntimeout. Used to bridge cold-launch latency for Electron apps\nwhere `focus_window` immediately after `open_app` would miss.",
+          "properties": {
+            "comment": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timeout_ms": {
+              "default": 5000,
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "title_contains": {
+              "type": "string"
+            },
+            "type": {
+              "const": "wait_for_window",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "title_contains"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Sleep for a fixed duration. Use sparingly — prefer\n`wait_for_window` for state-driven waits. Authors reach for\nthis when the target signal is invisible to the OS (an\nin-app animation, a network round-trip).",
+          "properties": {
+            "comment": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ms": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "wait_ms",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "ms"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Wait until keyboard focus moves to a *different* UIA element.\nSnapshots the currently-focused element's runtime id when the\nstep starts; polls every 50 ms until the focused element has\na different id, or errors on timeout.\n\nThe cheap state-driven companion to `wait_ms` for **native\nWin32 apps** (Notepad, File Explorer, settings dialogs, native\ninstallers) where focus genuinely tracks across discrete\ncontrols. After a key chord that opens a modal, the modal's\ninput typically receives focus within ~50 ms and the poll\nreturns instantly.\n\n**Electron apps don't benefit.** Chrome/Electron expose their\nentire WebView as a single UIA \"chrome window\" element —\n`GetFocusedElement` returns the same runtime id whether\nfocus is on the chat sidebar or a freshly-opened modal's\ninput. Discord, Slack, Telegram Desktop, WhatsApp, VS Code,\nCursor, Notion, etc. all hit this. Use `wait_ms` for those.\n\nAlso doesn't help when focus stays put — typing into a\nsearch box debounces a list filter but keeps focus on the\ninput; for that, keep `wait_ms`.",
+          "properties": {
+            "comment": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timeout_ms": {
+              "default": 2000,
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "wait_for_focus_change",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Take a screenshot and place it on the clipboard. `region` of\n`None` captures the foreground window; a `Region` captures\njust that rectangle.",
+          "properties": {
+            "comment": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "region": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Region"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": {
+              "const": "screenshot_to_clipboard",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Set the clipboard to a (possibly interpolated) text value.",
+          "properties": {
+            "comment": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "text": {
+              "type": "string"
+            },
+            "type": {
+              "const": "clipboard_set",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "text"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Read the current clipboard contents into a recipe-local\nvariable named `var`. Later steps reference it via\n`{{ var }}`, same as parameter slots.",
+          "properties": {
+            "comment": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "clipboard_get_into",
+              "type": "string"
+            },
+            "var": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "var"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Run a shell command. Requires the `shell.run` permission;\nthe confirmation modal gates execution at runtime. The\ncommand string is interpolated.\n\n`dry_run: true` skips actual execution — the runtime logs the\ninterpolated command and binds `capture_into` (if set) to a\n\"(dry-run)\" placeholder. Designed for recipe authors testing a\nnew shell step without side effects; the Hub Steps panel shows\na small rose-italic \"dry-run בלבד · no changes\" annotation so\nthe user can see at a glance the command won't actually fire.",
+          "properties": {
+            "capture_into": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "command": {
+              "type": "string"
+            },
+            "comment": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "dry_run": {
+              "default": false,
+              "description": "When `true`, the runtime does NOT actually run the command;\nit just records what *would* have run. Default `false`.",
+              "type": "boolean"
+            },
+            "timeout_ms": {
+              "default": 30000,
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "run_shell",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "command"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Open a URL in the user's default browser.",
+          "properties": {
+            "comment": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "open_url",
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "url"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Launch an application by name (Windows: the start-menu name or\npath; macOS: bundle id or app name; Linux: desktop-file name).",
+          "properties": {
+            "comment": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "const": "open_app",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "name"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A `recipe.yaml`. Top-level fields are split between identity (the\nAgent-Skills-shaped envelope) and behaviour (Goose-shaped\n`parameters:` + Lashon-shaped `os_steps:`).",
+  "properties": {
+    "author": {
+      "description": "Recipe author / maintainer. Free-text; not parsed.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "description": {
+      "description": "One-line description of what the recipe does. Lives in both the\nbrowser list and the LLM intent classifier's prompt\n(`recipes::intent`, Phase 1c).",
+      "type": "string"
+    },
+    "id": {
+      "description": "Stable kebab-case id — used as the on-disk directory name, the\nimport key, and the cascade-match key. Validated to match\n`[a-z][a-z0-9-]*`.",
+      "type": "string"
+    },
+    "intents": {
+      "default": [],
+      "description": "Natural-language phrases the intent cascade matches against.\n`{param}` placeholders are substituted with extracted slot values.\nBoth Hebrew and English entries are conventional.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "long_description": {
+      "description": "Optional longer description (markdown). Shown on hover / in the\nrecipe detail pane.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "name": {
+      "description": "Human-readable name shown in the Hub Recipes browser.",
+      "type": "string"
+    },
+    "os_steps": {
+      "$ref": "#/$defs/OsSteps",
+      "description": "Per-OS step list. At least one variant must be populated; the\nruntime selects the host-OS variant at execution time."
+    },
+    "parameters": {
+      "default": [],
+      "description": "Goose-compatible parameter declarations. Order is preserved so\nthe Hub slot-fill modal can render fields in author intent.",
+      "items": {
+        "$ref": "#/$defs/Parameter"
+      },
+      "type": "array"
+    },
+    "permissions": {
+      "default": [],
+      "description": "Declared permissions. Descriptive in v1 — the runtime does not\nreject a step that exceeds them. Phase M11+ may enforce. Known\nvalues: `keyboard.type`, `app.focus`, `app.open`, `clipboard`,\n`screenshot`, `file.write`, `shell.run`, `network`, `destructive`.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "recipe_version": {
+      "default": "1.0.0",
+      "description": "Recipe semantic version, independent of [`SCHEMA_VERSION`]. The\nHub uses it to detect \"newer than installed\" upgrades for\nbundled recipes. Defaults to `\"1.0.0\"`.",
+      "type": "string"
+    },
+    "tags": {
+      "default": [],
+      "description": "Tags the Hub groups by (`messaging`, `media`, `productivity`, …).",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "version": {
+      "description": "Recipe-schema version. Must be [`SCHEMA_VERSION`] for v1 recipes.",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "version",
+    "id",
+    "name",
+    "description",
+    "os_steps"
+  ],
+  "title": "Recipe",
+  "type": "object"
+}

@@ -1,0 +1,216 @@
+{
+  "_comment": "Hebrew STT test corpus. The 'read' and 'studio' tiers gate the WER benchmark: 'read' (FLEURS, fetched by scripts/fetch-corpus.py) is the active corpus; 'studio' (user-recorded clean dictation) gates once recordings are added. 'code-switch' is a local-only, non-gating baseline for Hebrew/English code-switching. FLEURS read speech is a harder domain than clean dictation. See README.md and scripts/wer-bench.py.",
+  "categories": {
+    "studio": {
+      "description": "Clean Hebrew dictation recorded in a quiet room — the M1 WER gate.",
+      "gate": true,
+      "wer_target": 0.12,
+      "clips": [
+        {
+          "file": "studio/studio-01.wav",
+          "transcript": "שלום, קוראים לי דנה ואני גרה בתל אביב."
+        },
+        {
+          "file": "studio/studio-02.wav",
+          "transcript": "מחר בבוקר אני צריך לקנות לחם, חלב וגבינה מהסופר."
+        },
+        {
+          "file": "studio/studio-03.wav",
+          "transcript": "הפגישה נקבעה ליום שלישי בשעה תשע וחצי בבוקר."
+        },
+        {
+          "file": "studio/studio-04.wav",
+          "transcript": "שלחתי לך את ה־email עם כל הפרטים על הפרויקט החדש."
+        },
+        {
+          "file": "studio/studio-05.wav",
+          "transcript": "אני עובד עכשיו על ה־bug ב־main, ואתקן אותו עד הצהריים."
+        },
+        {
+          "file": "studio/studio-06.wav",
+          "transcript": "מה השעה עכשיו, ומתי מתחילה ההרצאה על בינה מלאכותית?"
+        },
+        {
+          "file": "studio/studio-07.wav",
+          "transcript": "פתח את הדפדפן, חפש מתכון לעוגת שוקולד ושמור אותו במועדפים."
+        },
+        {
+          "file": "studio/studio-08.wav",
+          "transcript": "אתמול בערב הלכנו לים, ראינו את השקיעה ואכלנו ארוחת ערב ליד הנמל."
+        },
+        {
+          "file": "studio/studio-09.wav",
+          "transcript": "המחיר הכולל הוא מאתיים שלושים וחמישה שקלים, כולל מע״מ."
+        },
+        {
+          "file": "studio/studio-10.wav",
+          "transcript": "תזכיר לי להתקשר לאבי ולנעמה בקשר לטיול בצפון בסוף השבוע."
+        },
+        {
+          "file": "studio/studio-11.wav",
+          "transcript": "המערכת עובדת באופן מקומי, וכל הנתונים נשמרים על המחשב שלך בלבד."
+        },
+        {
+          "file": "studio/studio-12.wav",
+          "transcript": "כבה את האור ונעל את הדלת לפני שאתה יוצא מהבית."
+        }
+      ]
+    },
+    "read": {
+      "description": "CC-licensed Hebrew read speech (FLEURS) — the active M1 corpus. The WER target is a regression baseline; encyclopedic text with transliterated foreign names makes it a harder domain than clean dictation.",
+      "gate": true,
+      "wer_target": 0.27,
+      "clips": [
+        {
+          "file": "read/read-001.wav",
+          "transcript": "מרטלי השביע אתמול ועדת בחירות זמנית (CEP) חדשה בת תשעה חברים."
+        },
+        {
+          "file": "read/read-002.wav",
+          "transcript": "\"הנמל היה האתר של סכסוך  ימי מפורסם מ-1889 כאשר שבע אוניות מגרמניה, ארה\"\"ב ובריטניה סירבו לצאת את הנמל.\""
+        },
+        {
+          "file": "read/read-003.wav",
+          "transcript": "סולטאן מרוקו בנה את העיר מחדש בתור דאר אל-ביידא והיא קיבלה את השם קזבלנקה מסוחרים ספרדים שהקימו בה מרכזי סחר."
+        },
+        {
+          "file": "read/read-004.wav",
+          "transcript": "\"מועצת ההתעמלות של ארה\"\"ב והוועד האולימפי שותפים לאותה מטרה - להפוך את ענף ההתעמלות, וענפים אחרים, לכמה שיותר בטוחים לספורטאים לשאוף להגשים את חלומותיהם בסביבה בטוחה, חיובית ומועצמת.\""
+        },
+        {
+          "file": "read/read-005.wav",
+          "transcript": "נושאים אחרים העומדים על הפרק בבאלי כוללים הצלת היערות הנותרים בעולם, ושיתוף טכנולוגיות שיעזרו למדינות מתפתחות לצמוח בדרכים פחות מזהמות."
+        },
+        {
+          "file": "read/read-006.wav",
+          "transcript": "בזמן תקופה זו בהיסטוריה האירופאית, הכנסייה הקתולית, שהפכה לעשירה ורבת כוח, ספגה ביקורת קפדנית."
+        },
+        {
+          "file": "read/read-007.wav",
+          "transcript": "יתכן שיש יותר ימות ירחיות בצד הקרוב מכיוון שהקרום דק יותר. כך היה קל יותר ללבה לעלות אל פני השטח."
+        },
+        {
+          "file": "read/read-008.wav",
+          "transcript": "השירות לעתים קרובות משמש כלי שיט, כולל ספינות תענוגות, כמו גם משלחות מחקר שצריכות תקשורת נתונים מרחוק ותקשורת קולית."
+        },
+        {
+          "file": "read/read-009.wav",
+          "transcript": "מרבית האיים הקטנים יותר הם מדינות עצמאיות, או הקשורות לצרפת, וידועים כאתרי נופש יוקרתיים בחוף."
+        },
+        {
+          "file": "read/read-010.wav",
+          "transcript": "סולטאן מרוקו בנה את העיר מחדש בתור דאר אל-ביידא והיא קיבלה את השם קזבלנקה מסוחרים ספרדים שהקימו בה מרכזי סחר."
+        },
+        {
+          "file": "read/read-011.wav",
+          "transcript": "נראה כי עזים בויתו לראשונה לפני כ-10,000 שנה בהרי זגרוס באיראן."
+        },
+        {
+          "file": "read/read-012.wav",
+          "transcript": "זמן קצת לאחר שהחלו מעשי האיבה, הטילה בריטניה מצור ימי על גרמניה."
+        },
+        {
+          "file": "read/read-013.wav",
+          "transcript": "הפירמידה הגדולה של גיזה היא היחידה מבין שבעת הפלאים שעדיין קיימת היום."
+        },
+        {
+          "file": "read/read-014.wav",
+          "transcript": "ב-1990, הוא נוסף לרשימת אתרי המורשת העולמיים שבסיכון, עקב הסכנה של חולות מדבר."
+        },
+        {
+          "file": "read/read-015.wav",
+          "transcript": "\"ב-15 באוגוסט 1940, בעלות הברית פלשו לדרום צרפת, הפלישה נקראה \"\"מבצע דרקון\"\".\""
+        },
+        {
+          "file": "read/read-016.wav",
+          "transcript": "מעבר לאירוע של יום רביעי, קרפנדו התחרתה בשני מרוצים אינדיבידואלים באליפות."
+        },
+        {
+          "file": "read/read-017.wav",
+          "transcript": "חוקרים מאוניברסיטת פרינסטון בארצות הברית ואוניברסיטת אופסלה בשוודיה, דיווחו שהמין החדש התפתח תוך שני דורות בלבד, אף שבעבר חשבו שהתהליך אורך זמן רב בהרבה, זאת בשל הכלאה בין פרוש דרווין אנדמי (Geospiza fortes), ופרוש הקקטוס הגדול המהגר (Geospiza conirostris)."
+        },
+        {
+          "file": "read/read-018.wav",
+          "transcript": "אם אתם מגיעים לחוף רק באמצעות טיולי שיט, לא תצטרכו ויזה נפרדת (נכון ל-2009)."
+        },
+        {
+          "file": "read/read-019.wav",
+          "transcript": "רולנדו מנדוזה ירה ברובה ה-M16 שלו אל עבר התיירים."
+        },
+        {
+          "file": "read/read-020.wav",
+          "transcript": "לסין העתיקה הייתה דרך משלה להציג תקופות זמן שונות; כל שלב בתולדות סין או כל משפחה שהחזיקה בשלטון הייתה שושלת ייחודית."
+        },
+        {
+          "file": "read/read-021.wav",
+          "transcript": "הסצנות מוצגות על גבי הפירמידות והפירמידות השונות מוארות."
+        },
+        {
+          "file": "read/read-022.wav",
+          "transcript": "בנוסף מצפון תוכלו לבקר במשכן הגדול של גבירתנו מפטימה (מקדש), מקום בו התרחשו התגלויות של מריה המפורסמות ברחבי העולם."
+        },
+        {
+          "file": "read/read-023.wav",
+          "transcript": "אנג'ל (2006), מסביר את גישת הרצף כשיטה המשמשת כדי לעזור לארגונים להגיע לרמת ביצועים גבוהה יותר."
+        },
+        {
+          "file": "read/read-024.wav",
+          "transcript": "פצצת ההיתוך פועלת על פי העיקרון שצריך אנרגיה כדי להרכיב גרעין עם פרוטונים וניוטרונים רבים."
+        },
+        {
+          "file": "read/read-025.wav",
+          "transcript": "אתר חדשות הבידור TMZ מבין כי הצלם עצר את רכבו בצד השני של שדרות ספולוודה וניסה לצלם את המחסום המשטרתי לפני שחצה את הכביש והמשיך, מה שהוביל את שוטר משטרת התנועה של קליפורניה שניהל את מחסום התנועה במקום להורות לו פעמיים לחזור אחורה."
+        }
+      ]
+    },
+    "code-switch": {
+      "description": "Hebrew/English code-switching clips, recorded locally. Transcribed with language detection ON (the read/studio tiers force 'he'), so this tier exercises the companion detector from docs/adr/0009. Informational baseline — not a CI gate.",
+      "_comment": "Clips live in tests/hebrew-corpus/local/, which is git-ignored: the recordings stay off GitHub, only these transcripts are committed. wer-bench.py runs the tier wherever the clips exist on disk and skips it otherwise.",
+      "gate": false,
+      "detect_language": true,
+      "wer_target": 0.3,
+      "clips": [
+        {
+          "file": "local/cs-01.m4a",
+          "transcript": "Can you review my pull request before the end of the day?"
+        },
+        {
+          "file": "local/cs-02.m4a",
+          "transcript": "I need to refactor this function and write a few more tests."
+        },
+        {
+          "file": "local/cs-03.m4a",
+          "transcript": "The deployment failed because the database connection timed out."
+        },
+        {
+          "file": "local/cs-04.m4a",
+          "transcript": "Let's reschedule tomorrow's meeting to the afternoon."
+        },
+        {
+          "file": "local/cs-05.m4a",
+          "transcript": "שלחתי לך email עם כל הפרטים, תבדוק אותו בבקשה."
+        },
+        {
+          "file": "local/cs-06.m4a",
+          "transcript": "יש bug ב־code שצריך לתקן לפני ה־release."
+        },
+        {
+          "file": "local/cs-07.m4a",
+          "transcript": "תפתח את ה־browser ותיכנס ל־dashboard."
+        },
+        {
+          "file": "local/cs-08.m4a",
+          "transcript": "אחרי ה־lunch יש לנו call חשוב עם הלקוח."
+        },
+        {
+          "file": "local/cs-09.m4a",
+          "transcript": "אמרתי לו ש־the project is almost ready."
+        },
+        {
+          "file": "local/cs-10.m4a",
+          "transcript": "This looks great, אבל צריך עוד עבודה על העיצוב."
+        }
+      ]
+    }
+  }
+}

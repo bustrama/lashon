@@ -1,0 +1,30 @@
+version: 1
+id: lock-workstation
+name: Lock the workstation
+description: Lock the session immediately (Win+L on Windows).
+long_description: |
+  Single key-chord recipe — the OS lock-screen takes over instantly.
+  Useful as a worked example of a zero-parameter recipe and as a fast
+  voice-triggered "I'm walking away from the desk" shortcut.
+
+  Replaces the doc's proposed "translate clipboard contents to target
+  language" which would need an LLM-call step type (`recipes::Step`
+  variant) the Phase 1 schema doesn't include — translation lands when
+  the recipe runtime gains LLM steps (post-M9).
+author: Lashon contributors
+recipe_version: 1.0.0
+tags:
+  - utility
+  - security
+intents:
+  - "lock the screen"
+  - "lock my computer"
+  - "נעל את המחשב"
+parameters: []
+permissions:
+  - keyboard.type
+os_steps:
+  windows:
+    - type: key_chord
+      keys: [Meta, L]
+      comment: Win+L — Windows session lock.

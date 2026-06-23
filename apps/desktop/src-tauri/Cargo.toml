@@ -1,0 +1,55 @@
+[package]
+name = "lashon"
+version = "0.7.0"
+description = "Lashon — local-first Hebrew voice assistant"
+authors = ["Lashon contributors"]
+edition = "2021"
+rust-version = "1.95"
+license = "GPL-3.0-only"
+publish = false
+
+# This crate is a thin Tauri GUI shell. Testable logic lives in `lashon-core`.
+# `test = false` keeps `cargo test` from building a Tauri-linked test binary,
+# which fails to load on Windows. See
+# docs/adr/0003-core-logic-in-a-tauri-independent-crate.md.
+[lib]
+name = "lashon_lib"
+test = false
+doctest = false
+
+[[bin]]
+name = "lashon"
+path = "src/main.rs"
+test = false
+doctest = false
+
+[build-dependencies]
+tauri-build = { version = "=2.6.2", features = [] }
+
+[features]
+# Editioning (ADR-0034): `command-mode` forwards to lashon-core's umbrella
+# feature. A free `--no-default-features` build ships dictation only — command
+# mode (LLM, tools, recipes, local LLM, MCP) is compiled out of the binary.
+default = ["command-mode"]
+command-mode = ["lashon-core/command-mode"]
+
+[dependencies]
+lashon-core = { path = "../../../packages/shared-rust", default-features = false }
+tauri = { version = "=2.11.2", features = ["tray-icon", "macos-private-api"] }
+tauri-plugin-global-shortcut = "=2.3.1"
+tauri-plugin-opener = "=2.5.4"
+tauri-plugin-store = "=2.4.3"
+tauri-plugin-updater = "=2.10.1"
+# For parsing `settings:changed` event payloads in the wake-word live reload.
+serde_json = "=1.0.149"
+# Derive macros for the M7 LLM command surface (LlmMode, etc.).
+serde = { version = "=1.0.228", features = ["derive"] }
+# Error wrapping / context chains for the M7 Tauri command surface.
+anyhow = "=1.0.102"
+# Async runtime primitives — `tokio::sync::oneshot` and `tokio::time::timeout`
+# for the M8 Command-mode confirmation flow. The full Tokio runtime is
+# already brought in by `tauri::async_runtime`; this just pins the surface
+# we touch directly.
+tokio = { version = "=1.52.3", features = ["sync", "time", "rt"] }
+tracing = "=0.1.44"
+tracing-subscriber = { version = "=0.3.23", features = ["env-filter"] }

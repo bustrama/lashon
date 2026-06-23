@@ -1,0 +1,35 @@
+version: 1
+id: open-app
+name: Open application
+description: Launch an application by name and focus its window when it appears.
+long_description: |
+  Calls the OS launcher with the app name and waits for the window to
+  appear before focusing it. Use this as the front half of any
+  application-specific chain that doesn't have its own dedicated recipe.
+author: Lashon contributors
+recipe_version: 1.0.0
+tags:
+  - productivity
+  - launcher
+intents:
+  - "open {app}"
+  - "launch {app}"
+  - "פתח את {app}"
+  - "הפעל את {app}"
+parameters:
+  - key: app
+    input_type: string
+    requirement: required
+    description: "Application name (Windows: start-menu name or executable path)."
+permissions:
+  - app.open
+  - app.focus
+os_steps:
+  windows:
+    - type: open_app
+      name: "{{ app }}"
+    - type: wait_for_window
+      title_contains: "{{ app }}"
+      timeout_ms: 10000
+    - type: focus_window
+      title_contains: "{{ app }}"

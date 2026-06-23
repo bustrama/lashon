@@ -1,0 +1,44 @@
+{
+  "_comment": "M6 audio-overhaul model registry — Silero VAD (and, later, the openWakeWord wake-word pipeline). ONNX weights are downloaded, never committed; each file records a direct download URL, its byte size, and a SHA-256. lashon-core re-verifies every file against this manifest before ONNX Runtime loads it, because a tampered ONNX graph is native code (docs/adr/0010, docs/adr/0015).",
+  "models": [
+    {
+      "id": "silero-vad-v5",
+      "role": "voice-activity-detection",
+      "source": "https://github.com/snakers4/silero-vad",
+      "revision": "v5.1.2",
+      "license": "MIT",
+      "local_dir": "models/vad/silero-vad-v5",
+      "files": [
+        {
+          "path": "silero_vad.onnx",
+          "url": "https://raw.githubusercontent.com/snakers4/silero-vad/v5.1.2/src/silero_vad/data/silero_vad.onnx",
+          "bytes": 2327524,
+          "sha256": "2623a2953f6ff3d2c1e61740c6cdb7168133479b267dfef114a4a3cc5bdd788f"
+        }
+      ]
+    },
+    {
+      "id": "openwakeword-shared",
+      "role": "wake-word-features",
+      "_comment": "openWakeWord's shared melspectrogram and audio-embedding models — Apache-2.0, safe to ship. The per-phrase classifier is NOT here: it is an offline-trained artifact loaded by path (docs/adr/0016).",
+      "source": "https://github.com/dscripka/openWakeWord",
+      "revision": "v0.5.1",
+      "license": "Apache-2.0",
+      "local_dir": "models/wake/openwakeword",
+      "files": [
+        {
+          "path": "embedding_model.onnx",
+          "url": "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/embedding_model.onnx",
+          "bytes": 1326578,
+          "sha256": "70d164290c1d095d1d4ee149bc5e00543250a7316b59f31d056cff7bd3075c1f"
+        },
+        {
+          "path": "melspectrogram.onnx",
+          "url": "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/melspectrogram.onnx",
+          "bytes": 1087958,
+          "sha256": "ba2b0e0f8b7b875369a2c89cb13360ff53bac436f2895cced9f479fa65eb176f"
+        }
+      ]
+    }
+  ]
+}

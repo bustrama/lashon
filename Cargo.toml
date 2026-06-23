@@ -1,0 +1,10 @@
+# Cargo workspace root. Two crates:
+#   - lashon-core (packages/shared-rust): GUI-independent logic; fully tested.
+#   - lashon (apps/desktop/src-tauri):    the Tauri 2 application shell.
+# See docs/adr/0003-core-logic-in-a-tauri-independent-crate.md.
+[workspace]
+resolver = "2"
+members = [
+    "apps/desktop/src-tauri",
+    "packages/shared-rust",
+]

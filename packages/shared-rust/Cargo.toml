@@ -1,0 +1,224 @@
+[package]
+name = "lashon-core"
+version = "0.7.0"
+description = "Lashon core — provider clients and shared logic, independent of the GUI."
+authors = ["Lashon contributors"]
+edition = "2021"
+rust-version = "1.95"
+license = "GPL-3.0-only"
+publish = false
+
+[lib]
+name = "lashon_core"
+
+# M9 Phase 1g (ADR-0028) — the stdio MCP server binary Claude Desktop
+# (and any other MCP client) spawns to talk to Lashon. Lives in
+# `lashon-core` rather than the Tauri shell because it depends only on
+# the GUI-independent tool catalogue + recipes module + rmcp; avoiding
+# the Tauri runtime keeps the binary small (~5 MB stripped, vs ~80 MB
+# if it linked Tauri). The Tauri shell bundles it as a resource so the
+# installer ships a single `lashon-mcp.exe`.
+[[bin]]
+name = "lashon-mcp"
+path = "src/bin/lashon_mcp.rs"
+required-features = ["mcp-server"]
+
+# M9 Phase 1b — CLI driver for the recipe runtime. Lets a user run a
+# recipe by id (`lashon-recipe send-discord-message --recipient=kuki
+# --body=hi`) without going through Hub or voice — the testing surface
+# for authored recipes until Phase 1c (intent cascade) and Phase 1d
+# (Hub Recipes tab) land. Requires `command-mode` — the recipe runtime is
+# part of the paid command-mode tier (ADR-0034).
+[[bin]]
+name = "lashon-recipe"
+path = "src/bin/lashon_recipe.rs"
+required-features = ["command-mode"]
+
+# Cargo features (docs/adr/0025).
+#
+# `local-llm` enables the `LocalLlmProvider` — a thin OpenAI-compat
+# shim over a Lashon-managed `llama-server` subprocess (the prebuilt
+# ggml binary, bundled as a Tauri resource). The feature is **on by
+# default** so every CI run exercises the path (a fork can opt out
+# with `--no-default-features`). When the feature is off, the
+# provider's `chat` returns a clear "compiled without local LLM
+# support" error and the Hub renders that state honestly.
+#
+# The subprocess design replaces an earlier in-process attempt:
+# `mistralrs` was abandoned for >100× perf and Windows-toolchain
+# reasons (no SIMD, candle-cuda + VS 2025 incompatibility), and the
+# `llama-cpp-2` Rust bindings hit a separate build wall (needed
+# cmake + LLVM/libclang + Vulkan SDK). The subprocess gives us the
+# same llama.cpp inference engine with no build-tooling cost and
+# Vulkan compute on any GPU.
+[features]
+default = ["command-mode"]
+# `command-mode` is the paid-tier umbrella (ADR-0034): the LLM dispatcher, the
+# tool set, recipes, the local LLM, and MCP. A free `--no-default-features`
+# build ships dictation only, with command mode compiled out of the binary.
+command-mode = ["local-llm", "mcp-server"]
+local-llm = []
+# `mcp-server` enables the `lashon_core::mcp` module + the `lashon-mcp`
+# stdio binary (ADR-0028). The feature gates the `rmcp` dep so a
+# library-only consumer of `lashon-core` doesn't pull the MCP transport
+# stack. On by default so every CI run exercises the path; a downstream
+# fork can opt out via `--no-default-features --features local-llm`.
+mcp-server = ["dep:rmcp", "dep:tracing-subscriber"]
+
+[build-dependencies]
+tonic-build = "=0.12.3"
+protoc-bin-vendored = "=3.2.0"
+
+[dependencies]
+tonic = "=0.12.3"
+prost = "=0.13.5"
+tokio = { version = "=1.52.3", features = ["full"] }
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.149"
+anyhow = "=1.0.102"
+tracing = "=0.1.44"
+cpal = "=0.16.0"
+enigo = "=0.5.0"
+arboard = "=3.6.1"
+# Hardware-tier detection (docs/tech-stack.md, docs/adr/0013): NVIDIA GPU/VRAM,
+# system RAM, and a Vulkan-GPU probe for the AMD/Intel path. All three load
+# their backend at runtime, so the crate builds on a GPU-less CI runner.
+nvml-wrapper = "=0.12.1"
+sysinfo = { version = "=0.39.2", default-features = false, features = ["system"] }
+ash = "=0.38.0"
+# ONNX Runtime — Silero VAD and the wake-word engine (docs/adr/0015, 0016).
+# The default `download-binaries` feature statically links a prebuilt CPU
+# build at compile time: no GPU execution provider, and no runtime library to
+# ship alongside the app.
+ort = "=2.0.0-rc.12"
+# SHA-256 verification of model files before ort loads them — a tampered ONNX
+# graph is native code, so integrity is checked on every boot (docs/adr/0010).
+sha2 = "=0.10.9"
+# HTTP client for the in-app opt-in downloads of CC-BY-NC wake-word
+# classifiers (docs/adr/0016, models/manifests/wake-classifiers.json) and for
+# the M7 cloud LLM providers (docs/adr/0019). rustls avoids the OpenSSL system
+# dependency on Linux runners; the `json` feature drives the LLM wire format.
+reqwest = { version = "=0.12.24", default-features = false, features = ["rustls-tls", "stream", "json"] }
+# Streams + futures combinators for the M7 LLM streaming impls. `futures-util`
+# is already an indirect dep via tonic — pinning the umbrella crate here pulls
+# `Stream`, `StreamExt`, and `Pin<Box<dyn Stream<…>>>` into the trait surface
+# without taking on `async-trait` (docs/adr/0019).
+futures = "=0.3.32"
+# `thiserror` for typed `ProviderError` variants — `KeyNotFound`,
+# `Unauthorized`, `RateLimited`, etc. Surfaces in toasts when a cloud
+# provider fails (docs/adr/0019).
+thiserror = "=2.0.18"
+# OS-keychain access for the M7 cloud API keys (docs/adr/0020).
+#
+# `default-features = false` + explicit platform features is **load-bearing**:
+# keyring 3.x without any backend feature falls through to its in-memory
+# `mock` credential, which makes every `Entry::new(...)` an isolated store
+# (set + get from a fresh Entry returns `NoEntry`). The Hub then sees
+# `save_api_key` succeed and `has_api_key` immediately return false on the
+# next IPC call, locking the user out of cloud providers.
+#
+# Each feature pulls in the platform-native backend:
+# - `apple-native`     → macOS Keychain Services
+# - `windows-native`   → Windows Credential Manager
+# - `sync-secret-service` → Linux `libsecret` D-Bus (synchronous)
+#
+# `crypto-rust` is keyring's encryption helper used by some backends; pinning
+# it explicitly here keeps the dependency-tree resolution deterministic.
+keyring = { version = "=3.6.3", default-features = false, features = [
+    "apple-native",
+    "windows-native",
+    "sync-secret-service",
+    "crypto-rust",
+] }
+# Cross-platform URL / file open for the M8 `open_url` Command-mode tool.
+# Pinned exactly — bumping is a deliberate, separate commit.
+open = "=5.3.4"
+# Glob matching for the M8.2 `list_files` tool — `*.gguf`, `screenshot*.png`,
+# etc. The crate is unicode-aware and matches Unix shell semantics, which
+# is what users dictate (`"all png files"`).
+glob = "=0.3.3"
+# Desktop notifications for the M8.2 `show_notification` tool. Cross-platform
+# (Win32 toast, macOS NSUserNotification, Linux libnotify) so the tool ships
+# the same surface on all three OS targets. Lives in lashon-core for
+# parity with the rest of the tool catalogue (the tool pattern is "tools live
+# in core, the Tauri shell stays thin" — `.claude/rules/architecture.md`).
+notify-rust = "=4.17.0"
+# Date stamp in Command mode's system prompt. `chrono` over `time` because
+# the date-only formatting is shorter and `chrono` is already an indirect
+# dep via `keyring`; this just pins it directly.
+chrono = { version = "=0.4.44", default-features = false, features = ["clock"] }
+# M9 Phase 1a — recipe YAML parser. `serde_yaml_ng` is dtolnay's official
+# continuation of the archived `serde_yaml`; the alternative `serde_yml` fork
+# carries RUSTSEC-2025-0068 (unsound + unmaintained) and is avoided. Recipes
+# live in `lashon_core::recipes`.
+serde_yaml_ng = "=0.10.0"
+# M9 Phase 1a — JSON Schema generation for `recipe.yaml`. Auto-derived from
+# the Rust types via `#[derive(JsonSchema)]` so the in-repo schema can never
+# drift from the parser; a snapshot test checks the export against the
+# committed `docs/recipes/recipe.schema.json`.
+schemars = "=1.2.1"
+# M9 Phase 1c — regex tier of the intent cascade. `regex-lite` over the
+# full `regex` crate: ~80 KB vs ~500 KB, and we don't need Unicode
+# character classes (the patterns are anchored literals + `.+?` slots).
+# Hebrew + English literal characters in both pattern and input work
+# unchanged.
+regex-lite = "=0.1.9"
+# M9 Phase 1g — official Anthropic Rust SDK for the Model Context Protocol
+# (`rmcp`, ADR-0028). Optional under the `mcp-server` feature; the
+# `lashon-mcp` stdio binary is the consumer. Features:
+#   - `server`        the `ServerHandler` trait + serve/waiting loop
+#   - `macros`        `#[tool]` / `#[tool_router]` derive macros
+#   - `transport-io`  stdin/stdout transport for the Claude Desktop launcher
+# The crate has its own bundled schemars dep (separate semver from
+# Lashon's `schemars = "=1.2.1"` recipes schema export) — Cargo resolves
+# both versions side-by-side; we don't share `JsonSchema` impls across
+# the two trees.
+rmcp = { version = "=1.7.0", default-features = false, features = [
+    "server",
+    "macros",
+    "transport-io",
+], optional = true }
+# `tracing-subscriber` for the `lashon-mcp` stdio binary (under the
+# `mcp-server` feature). Library code stays subscriber-agnostic — the
+# Tauri shell installs its own subscriber — but the standalone binary
+# needs one of its own to surface tracing on stderr. Pinned to the
+# version the Tauri shell uses to avoid two copies in the workspace
+# tree.
+tracing-subscriber = { version = "=0.3.23", features = ["env-filter"], optional = true }
+
+# Win32 Job Object wrapper for the STT sidecar — if the parent Lashon process
+# exits abruptly (panic, hard Ctrl+C of `cargo run`), `kill_on_drop(true)`
+# doesn't always reach the sidecar grandchild and the orphan holds file locks
+# on its PyInstaller `_internal\*.pyd` files, breaking the next build.
+# Assigning the sidecar to a job with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`
+# makes Windows kill it on parent termination. Pinned to the same version
+# Tauri already pulls in (no extra transitive crate version).
+[target.'cfg(windows)'.dependencies]
+windows = { version = "=0.61.3", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Com",
+    "Win32_System_JobObjects",
+    "Win32_System_Threading",
+    "Win32_UI_Accessibility",
+    "Win32_UI_WindowsAndMessaging",
+    # M8.2 OS-control tools — `set_volume` (IAudioEndpointVolume),
+    # `lock_screen` (LockWorkStation), and the WM_CLOSE / minimize /
+    # maximize window family. The new features pull in COM-shaped audio
+    # endpoint enumeration and the shutdown API; no new transitive
+    # crates beyond what `windows` already vendors.
+    "Win32_Media_Audio",
+    "Win32_Media_Audio_Endpoints",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Shutdown",
+    "Win32_System_Variant",
+    "Win32_UI_Input_KeyboardAndMouse",
+] }
+
+# M9 Phase 1d storage-module unit tests need disposable directories under
+# the `LASHON_BUNDLED_RECIPES_DIR` / `LASHON_USER_RECIPES_DIR` env vars.
+# `tempfile` is the standard Rust dev-dep for that and is already pulled
+# in transitively by `keyring`; pinning it here makes the dependency
+# explicit for the test build.
+[dev-dependencies]
+tempfile = "=3.27.0"

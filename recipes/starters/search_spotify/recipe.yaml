@@ -1,0 +1,47 @@
+version: 1
+id: search-spotify
+name: Search Spotify and play first hit
+description: Open Spotify's search, type a query, and play the first result.
+long_description: |
+  Focuses Spotify, opens the search bar (Ctrl+L), types the query, waits
+  for results to render, then double-clicks the first result row to start
+  playback. Works with the Spotify desktop app.
+author: Lashon contributors
+recipe_version: 1.0.0
+tags:
+  - media
+  - spotify
+intents:
+  - "play {query} on spotify"
+  - "spotify: play {query}"
+  - "תנגן {query} בספוטיפיי"
+parameters:
+  - key: query
+    input_type: string
+    requirement: required
+    description: Song, artist, album, or playlist to search for.
+permissions:
+  - app.focus
+  - keyboard.type
+os_steps:
+  windows:
+    - type: focus_window
+      title_contains: Spotify
+      process: Spotify.exe
+    - type: wait_for_window
+      title_contains: Spotify
+      timeout_ms: 8000
+    - type: key_chord
+      keys: [Control, L]
+      comment: Jump to search.
+    - type: wait_ms
+      ms: 400
+    - type: type_unicode
+      text: "{{ query }}"
+      rtl_safe: false
+    - type: wait_ms
+      ms: 1200
+      comment: Search results need a beat to render.
+    - type: key_chord
+      keys: [Enter]
+      comment: Press Enter on the highlighted top hit to play.
