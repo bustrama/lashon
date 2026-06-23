@@ -10,6 +10,7 @@
 	import DebugSurface from '$lib/components/DebugSurface.svelte';
 	import { restorePosition, scheduleSnap } from '$lib/snap';
 	import { startClickThrough } from '$lib/clickThrough';
+	import { FULL_EDITION } from '$lib/edition';
 
 	// Ctrl+Shift+D toggles the debug surface (an M0 deliverable; docs/roadmap.md).
 	const DEBUG_SHORTCUT = 'CommandOrControl+Shift+D';
@@ -243,7 +244,10 @@
 				void register(dictationShortcut, onDictationEdge).catch(() => {});
 			}
 		});
-		void register(commandShortcut, onCommandEdge).catch((err) => {
+		// Command mode is full-edition only — the free dictation build has no
+		// command backend, so don't register the chord (it would shadow Ctrl+`
+		// globally and error on press). See docs/adr/0034.
+		if (FULL_EDITION) void register(commandShortcut, onCommandEdge).catch((err) => {
 			console.warn(`command hotkey "${commandShortcut}" could not be registered:`, err);
 			if (commandShortcut !== DEFAULTS['hotkeys.command']) {
 				commandShortcut = DEFAULTS['hotkeys.command'];

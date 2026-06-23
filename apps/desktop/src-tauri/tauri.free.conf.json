@@ -1,0 +1,13 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "createUpdaterArtifacts": false,
+    "resources": [
+      "binaries/lashon-stt/**/*",
+      "../../../models/wake/wakewords/hey_lashon.onnx",
+      "../../../models/wake/openwakeword/embedding_model.onnx",
+      "../../../models/wake/openwakeword/melspectrogram.onnx",
+      "../../../models/vad/silero-vad-v5/silero_vad.onnx"
+    ]
+  }
+}

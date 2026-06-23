@@ -18,6 +18,7 @@
 	import Mark from '$lib/components/Mark.svelte';
 	import RecipesSection from '$lib/recipes/RecipesSection.svelte';
 	import VoiceCorrectionsSection from '$lib/voice/VoiceCorrectionsSection.svelte';
+	import { FULL_EDITION } from '$lib/edition';
 
 	type Section =
 		| 'general'
@@ -28,7 +29,7 @@
 		| 'recipes'
 		| 'voice'
 		| 'about';
-	const SECTIONS: Section[] = [
+	const ALL_SECTIONS: Section[] = [
 		'general',
 		'shortcuts',
 		'wakeword',
@@ -38,6 +39,13 @@
 		'voice',
 		'about'
 	];
+	// The free (dictation-only) edition compiles out command mode, so its
+	// LLM / Recipes / Voice-corrections sections have no backing Tauri
+	// commands — drop them from the nav so the surface matches the binary
+	// (docs/adr/0034-command-mode-editioning.md).
+	const SECTIONS: Section[] = FULL_EDITION
+		? ALL_SECTIONS
+		: ALL_SECTIONS.filter((id) => id !== 'llm' && id !== 'recipes' && id !== 'voice');
 
 	// English subtitles for the section headers — the Lamp design pairs each
 	// Hebrew title with a small italic English sublabel ("כללי · General").
@@ -418,7 +426,9 @@
 		void getVersion()
 			.then((value) => (version = value))
 			.catch(() => {});
-		void loadLlmState();
+		// The LLM catalog lives behind command mode — only load it in the full
+		// edition (the free build has no get_llm_providers command).
+		if (FULL_EDITION) void loadLlmState();
 
 		// Subscribe to the in-process LLM's download progress events
 		// (docs/adr/0025). The Tauri shell emits one per integer-percent
@@ -951,11 +961,13 @@
 							<p class="field-hint">{$t('hub.shortcuts.dictationHint')}</p>
 							<HotkeyCapture value={hotkey} onchange={saveHotkey} />
 						</div>
-						<div class="field" style="margin-block-start: 24px;">
-							<span class="field-label">{$t('hub.shortcuts.command')}</span>
-							<p class="field-hint">{$t('hub.shortcuts.commandHint')}</p>
-							<HotkeyCapture value={commandHotkey} onchange={saveCommandHotkey} />
-						</div>
+						{#if FULL_EDITION}
+							<div class="field" style="margin-block-start: 24px;">
+								<span class="field-label">{$t('hub.shortcuts.command')}</span>
+								<p class="field-hint">{$t('hub.shortcuts.commandHint')}</p>
+								<HotkeyCapture value={commandHotkey} onchange={saveCommandHotkey} />
+							</div>
+						{/if}
 					</section>
 				{:else if section === 'wakeword'}
 						<section aria-live="polite">
@@ -1053,16 +1065,18 @@
 									commandModel,
 								)}
 
-								{@render slotCard(
-									'command',
-									commandEnabled,
-									commandSensitivity,
-									commandModel,
-									saveCommandEnabled,
-									saveCommandSensitivity,
-									saveCommandModel,
-									dictationModel,
-								)}
+								{#if FULL_EDITION}
+									{@render slotCard(
+										'command',
+										commandEnabled,
+										commandSensitivity,
+										commandModel,
+										saveCommandEnabled,
+										saveCommandSensitivity,
+										saveCommandModel,
+										dictationModel,
+									)}
+								{/if}
 							</div>
 
 							<!-- Shared library: download more classifiers + train-your-own link.
