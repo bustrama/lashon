@@ -2486,7 +2486,7 @@ dependencies = [
 
 [[package]]
 name = "lashon"
-version = "0.7.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "lashon-core",
@@ -2505,7 +2505,7 @@ dependencies = [
 
 [[package]]
 name = "lashon-core"
-version = "0.7.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "arboard",

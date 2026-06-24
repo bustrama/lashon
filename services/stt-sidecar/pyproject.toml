@@ -1,6 +1,6 @@
 [project]
 name = "lashon-stt"
-version = "0.7.0"
+version = "1.0.0"
 description = "Lashon speech-to-text sidecar — gRPC service over faster-whisper."
 requires-python = ">=3.11,<3.13"
 license = "GPL-3.0-only"
