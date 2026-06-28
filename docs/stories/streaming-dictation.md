@@ -163,14 +163,20 @@ analysis in [ADR-0035](../adr/0035-streaming-dictation-via-repeated-unary.md).
   cases for any new pure logic (`.claude/rules/hebrew.md`).
 - Update this story as the work lands.
 
-## Model / quality note (separable from streaming)
+## Model / quality note (resolved — see ADR-0036)
 
-The shipped model is `ivrit-ai/whisper-large-v3-turbo-ct2` (turbo). The research/issue
-recommend non-turbo `large-v3` for better Hebrew accuracy. For **streaming latency**,
-turbo's speed is actually an advantage. Treat the turbo→large-v3 accuracy swap as a
-**separate decision** (it touches the WER bench, model manifests, CUDA pinning — see
-`.claude/rules/stt-sidecar.md`); it must not block streaming. The streaming driver is
-model-agnostic. User-provided reference weights: https://huggingface.co/ivrit-ai/whisper-large-v3/tree/main
+The shipped model is `ivrit-ai/whisper-large-v3-turbo-ct2` (turbo). The non-turbo
+`large-v3` swap recommended by #1 was held as a **separate decision** so it would not
+block streaming. It has now been evaluated and **declined** — see
+[ADR-0036](../adr/0036-keep-turbo-over-large-v3-for-hebrew-stt.md) and
+[#9](https://github.com/bustrama/lashon/issues/9): on a Tier-A GPU `large-v3` gives only
+a modest Hebrew-WER gain (`read` 23.9% → 22.2%) and is slightly *worse* on
+code-switching, while decoding **4.6–6× slower** (775 ms–2.1 s vs 167–343 ms re-decode —
+over the 500 ms hop and the streaming self-disable budget) for a near-doubled
+(1.6 → 3.1 GB) download. Turbo's speed is exactly what keeps streaming viable. The
+driver stays model-agnostic, so the conclusion is revisitable if streaming is dropped or
+a clean-dictation (`studio`) corpus shows a larger gap. Reference weights:
+https://huggingface.co/ivrit-ai/whisper-large-v3
 
 ## Risks / open questions
 
