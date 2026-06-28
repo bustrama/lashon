@@ -21,7 +21,7 @@
 	import { invoke } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
 	import { t } from '$lib/i18n';
-	import type { DictationState } from '$lib/dictation';
+	import type { DictationState, DictationPartial } from '$lib/dictation';
 	import Mark from '$lib/components/Mark.svelte';
 	import StateGlyph from '$lib/components/StateGlyph.svelte';
 
@@ -72,6 +72,7 @@
 		state: dictationState = 'idle',
 		takeMode = 'idle',
 		wakeActive = false,
+		partial = null,
 		commandFlash = null,
 		commandState = 'idle',
 		commandToolLabel = null,
@@ -89,6 +90,7 @@
 		state?: DictationState;
 		takeMode?: TakeMode;
 		wakeActive?: boolean;
+		partial?: DictationPartial | null;
 		commandFlash?: string | null;
 		commandState?: CommandState;
 		commandToolLabel?: string | null;
@@ -336,6 +338,22 @@
 	const showTranscript = $derived(
 		!!commandTranscript && !commandFlash && !confirmRequest
 	);
+
+	// Live dictation partials (docs/adr/0035). Shown during a dictation take
+	// while there is committed or provisional text, and never alongside a
+	// command surface (command takes have their own transcript bubble) or once
+	// the take has ended. The panel grows the window via the ResizeObserver and
+	// collapses when the parent clears `partial` on idle.
+	const hasPartialText = $derived(
+		!!partial && (partial.committed.length > 0 || partial.provisional.length > 0)
+	);
+	const showPartial = $derived(
+		hasPartialText &&
+			takeMode !== 'command' &&
+			commandState === 'idle' &&
+			!commandFlash &&
+			!confirmRequest
+	);
 	const showCommandProgress = $derived(
 		commandState !== 'idle' && !commandFlash && !confirmRequest && !showTranscript
 	);
@@ -552,6 +570,32 @@
 
 	<!-- ─── Ephemeral surfaces. Stacked under the mark. ─── -->
 
+	<!-- Live dictation partials (docs/adr/0035). Committed words render solid,
+	     the provisional tail muted; `dir="auto"` keeps Hebrew RTL and isolates
+	     mixed Hebrew/English runs. Visual only (aria-hidden) — the committed
+	     text is announced once-settled by the polite sr-only region below, so a
+	     screen reader hears stable words, not the flickering tail. -->
+	{#if showPartial && partial}
+		<div
+			class="bubble bubble-partial"
+			style="--tint: var(--saffron)"
+			aria-hidden="true"
+			data-interactive
+		>
+			<span class="bubble-wave" aria-hidden="true">
+				<span></span><span></span><span></span><span></span>
+			</span>
+			<p class="partial-text" dir="auto">
+				<span class="partial-committed">{partial.committed}</span>
+				{#if partial.provisional}
+					<span class="partial-provisional" dir="auto">
+						{partial.committed ? ' ' : ''}{partial.provisional}</span
+					>
+				{/if}
+			</p>
+		</div>
+	{/if}
+
 	<!-- Transcript preview — what STT heard, one line, with mini-wave + Cancel.
 	     Same hue as the take mode (saffron for dict, garnet for cmd). -->
 	{#if showTranscript}
@@ -679,6 +723,12 @@
 	<span class="sr-only" aria-live="polite" aria-atomic="true"
 		>{$t(`tongue.${dictationState}`)}</span
 	>
+	<!-- Committed dictation text, announced politely as it settles. Only the
+	     stable (committed) words are voiced — never the provisional tail — so a
+	     screen reader isn't spammed by the ~2 Hz re-decode flicker. -->
+	{#if showPartial && partial?.committed}
+		<span class="sr-only" aria-live="polite" aria-atomic="true">{partial.committed}</span>
+	{/if}
 </div>
 
 <style>
@@ -911,6 +961,30 @@
 		font-size: 14px;
 		color: var(--ink-text);
 		word-break: break-word;
+	}
+
+	/* ─── Live partial bubble ─── */
+	.bubble-partial {
+		display: flex;
+		align-items: flex-start;
+		gap: 10px;
+	}
+	.partial-text {
+		flex: 1;
+		margin: 0;
+		font-family: var(--font-he-sans);
+		font-size: 14px;
+		line-height: 1.5;
+		word-break: break-word;
+	}
+	/* Committed words are final — solid ink. */
+	.partial-committed {
+		color: var(--ink-text);
+	}
+	/* The provisional tail may still change — muted so the eye treats it as
+	   not-yet-settled and committed words read as the stable transcript. */
+	.partial-provisional {
+		color: var(--ink-mute);
 	}
 	/* Cancel chip — destructive-style. Rose-tinted background + rose
 	   border so it reads unambiguously as a clickable "cancel this take"
