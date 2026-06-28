@@ -259,13 +259,6 @@ impl Streamer {
         }
     }
 
-    /// The language to force on the final decode: the latched code, or `""`
-    /// (autodetect) if no streaming decode ever latched one — which keeps the
-    /// final byte-identical to today's one-shot path.
-    fn final_language(&self) -> String {
-        self.latch.query().to_string()
-    }
-
     /// Settle the preview on the closing transcript: everything committed,
     /// nothing provisional. The raw transcript is still what gets injected.
     fn finalize(&mut self, final_text: &str) {
@@ -342,12 +335,14 @@ fn run_worker(rx: Receiver<DictationCommand>, app: AppHandle, gates: crate::Gate
         };
 
         emit_state(&app, "transcribing");
-        // Force the language the streaming decodes latched (autodetected on the
-        // first decode, docs/adr/0009); an empty string when nothing streamed —
-        // which keeps this final byte-identical to the one-shot path. The final
-        // decode is authoritative: its raw text is what gets injected.
-        let final_language = streamer.final_language();
-        match tauri::async_runtime::block_on(provider.transcribe(&pcm, &final_language)) {
+        // The final decode is authoritative and must match the one-shot path
+        // byte-for-byte: pass "" so the language is re-detected on the *full*
+        // take (docs/adr/0009), not forced from the language the streaming
+        // committer latched off the first ~1 s — a short, noisier sample the
+        // detector can occasionally misread. The latch still spares the
+        // per-chunk detector runs during streaming; only this final ignores it.
+        // Its raw text is what gets injected.
+        match tauri::async_runtime::block_on(provider.transcribe(&pcm, "")) {
             Ok(transcript) => {
                 tracing::info!(
                     chars = transcript.text.chars().count(),
