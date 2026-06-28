@@ -13,9 +13,9 @@
 //!
 //! The mode becomes a user setting in a later milestone.
 
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -23,6 +23,8 @@ use tauri::{AppHandle, Emitter};
 
 use lashon_core::audio::{AudioCapture, TARGET_RATE};
 use lashon_core::inject::inject_text;
+use lashon_core::local_agreement::{LocalAgreement, Preview};
+use lashon_core::streaming::{DecodeScheduler, LanguageLatch};
 use lashon_core::stt::{FasterWhisperProvider, SttProvider};
 use lashon_core::vad::{self, EndpointSignal, Endpointer, SileroVad, FRAME_SAMPLES};
 
@@ -54,6 +56,23 @@ const MAX_SIDECAR_FAILURES: u32 = 3;
 
 /// How long the tongue holds the Error state before falling back to Idle.
 const ERROR_DWELL: Duration = Duration::from_millis(1600);
+
+/// Live streaming: minimum buffered audio before the first re-decode (~1 s).
+/// Sub-second decodes are mostly noise — the benchmark's min-decode gate.
+const MIN_DECODE_SAMPLES: usize = TARGET_RATE as usize; // 16_000 = 1.0 s
+
+/// Live streaming: re-decode once this much new audio has arrived (~500 ms).
+/// On a Tier-A GPU a re-decode is ~130 ms, comfortably inside this hop; the
+/// number is the cadence `scripts/stream-test.py` validated (docs/adr/0035).
+const DECODE_HOP_SAMPLES: usize = TARGET_RATE as usize / 2; // 8_000 = 0.5 s
+
+/// Live streaming: per-decode budget. A machine whose re-decode overruns this
+/// cannot sustain live partials (a CPU decode of the turbo model is ~12 s, far
+/// past it), so streaming self-disables and the take keeps only its final
+/// decode — today's one-shot behaviour. The threshold sits well above a slow
+/// GPU and the one-time ~1 s CUDA warm-up, so only a genuinely non-viable
+/// machine trips it (docs/adr/0035).
+const MAX_DECODE_LATENCY: Duration = Duration::from_millis(2500);
 
 /// How a dictation take is started and stopped.
 #[derive(Clone, Copy)]
@@ -124,9 +143,152 @@ pub fn spawn_worker(app: AppHandle, gates: crate::Gates) -> DictationChannel {
     DictationChannel(Mutex::new(tx))
 }
 
+/// The result of one off-thread streaming re-decode, sent back to the worker.
+struct DecodeOutcome {
+    /// The hypothesis text and the language the decode reported, or `None` when
+    /// the decode errored. Latency still comes back either way so a slow,
+    /// erroring machine can still self-disable.
+    hypothesis: Option<(String, String)>,
+    /// Wall-clock the decode took — feeds the scheduler's self-disable.
+    latency: Duration,
+}
+
+/// Drives live partial transcripts for one hands-free take.
+///
+/// Every capture tick the worker calls [`pump`](Self::pump). When the
+/// [`DecodeScheduler`] says so, it snapshots the growing buffer and spawns a
+/// single-flight off-thread re-decode (so the capture thread never stalls on
+/// inference). Each finished decode comes back through an mpsc channel, is
+/// folded through LocalAgreement-2 into a flicker-free `(committed, provisional)`
+/// preview, and is emitted as `dictation:partial`. The architecture is unary
+/// re-decode + client-side commit, not bidi streaming — see docs/adr/0035.
+struct Streamer {
+    provider: Arc<FasterWhisperProvider>,
+    app: AppHandle,
+    scheduler: DecodeScheduler,
+    latch: LanguageLatch,
+    committer: LocalAgreement,
+    /// Set while an off-thread decode is running — the single-flight guard.
+    in_flight: Arc<AtomicBool>,
+    tx: Sender<DecodeOutcome>,
+    rx: Receiver<DecodeOutcome>,
+}
+
+impl Streamer {
+    fn new(provider: Arc<FasterWhisperProvider>, app: AppHandle) -> Self {
+        let (tx, rx) = mpsc::channel();
+        Self {
+            provider,
+            app,
+            scheduler: DecodeScheduler::new(
+                MIN_DECODE_SAMPLES,
+                DECODE_HOP_SAMPLES,
+                MAX_DECODE_LATENCY,
+            ),
+            latch: LanguageLatch::new(),
+            committer: LocalAgreement::new(),
+            in_flight: Arc::new(AtomicBool::new(false)),
+            tx,
+            rx,
+        }
+    }
+
+    /// Ready the streamer for a new take: fresh committer and language latch, a
+    /// reset cadence, and any stale decode from a prior take drained. The
+    /// scheduler's session-wide self-disable is preserved across takes.
+    fn begin(&mut self) {
+        self.committer = LocalAgreement::new();
+        self.latch.reset();
+        self.scheduler.reset();
+        // A decode from the previous take may still be in flight; abandon its
+        // result rather than letting it bleed into this take's preview.
+        for _ in self.rx.try_iter() {}
+    }
+
+    /// One capture tick: ingest any finished decode, then maybe fire the next.
+    /// `buffered` is the current capture buffer length in samples.
+    fn pump(&mut self, capture: &AudioCapture, buffered: usize) {
+        self.drain();
+        if self
+            .scheduler
+            .should_decode(buffered, self.in_flight.load(Ordering::Acquire))
+        {
+            // Snapshot the whole growing buffer (an owned, Send copy) and decode
+            // it off-thread. samples_since(0) copies without consuming.
+            let snapshot = capture.samples_since(0);
+            self.scheduler.mark_decoded(snapshot.len());
+            self.in_flight.store(true, Ordering::Release);
+            let provider = Arc::clone(&self.provider);
+            let in_flight = Arc::clone(&self.in_flight);
+            let tx = self.tx.clone();
+            let language = self.latch.query().to_string();
+            tauri::async_runtime::spawn(async move {
+                let started = Instant::now();
+                let result = provider.transcribe(&snapshot, &language).await;
+                let latency = started.elapsed();
+                let hypothesis = match result {
+                    Ok(transcript) => Some((transcript.text, transcript.language)),
+                    Err(err) => {
+                        tracing::warn!("dictation: streaming re-decode failed: {err:#}");
+                        None
+                    }
+                };
+                let _ = tx.send(DecodeOutcome {
+                    hypothesis,
+                    latency,
+                });
+                // Clear the single-flight guard last, after the result is queued,
+                // so the worker observes the latency before it can fire again.
+                in_flight.store(false, Ordering::Release);
+            });
+        }
+    }
+
+    /// Fold every finished decode into the committer and emit its preview.
+    fn drain(&mut self) {
+        // Collect first so the borrow of `self.rx` ends before we touch the
+        // rest of `self`.
+        let outcomes: Vec<DecodeOutcome> = self.rx.try_iter().collect();
+        for outcome in outcomes {
+            self.scheduler.observe_latency(outcome.latency);
+            if let Some((text, language)) = outcome.hypothesis {
+                self.latch.observe(&language);
+                let preview = self.committer.observe(&text);
+                self.emit(&preview);
+            }
+        }
+    }
+
+    /// The language to force on the final decode: the latched code, or `""`
+    /// (autodetect) if no streaming decode ever latched one — which keeps the
+    /// final byte-identical to today's one-shot path.
+    fn final_language(&self) -> String {
+        self.latch.query().to_string()
+    }
+
+    /// Settle the preview on the closing transcript: everything committed,
+    /// nothing provisional. The raw transcript is still what gets injected.
+    fn finalize(&mut self, final_text: &str) {
+        let committed = self.committer.finalize(final_text);
+        self.emit(&Preview {
+            committed,
+            provisional: String::new(),
+        });
+    }
+
+    /// Emit a preview to the tongue. A dropped partial is cosmetic — the next
+    /// decode (or the final) supersedes it — so a failed emit is swallowed.
+    fn emit(&self, preview: &Preview) {
+        let _ = self.app.emit("dictation:partial", preview);
+    }
+}
+
 fn run_worker(rx: Receiver<DictationCommand>, app: AppHandle, gates: crate::Gates) {
     let mut capture = AudioCapture::new();
-    let provider = FasterWhisperProvider::new();
+    // Shared so an off-thread streaming re-decode can run concurrently with the
+    // capture loop and the final decode. transcribe() takes &self.
+    let provider = Arc::new(FasterWhisperProvider::new());
+    let mut streamer = Streamer::new(Arc::clone(&provider), app.clone());
 
     // The Silero VAD model drives hands-free auto-stop. It is small and loaded
     // once for the worker's lifetime. If it is missing — a fresh checkout
@@ -169,7 +331,8 @@ fn run_worker(rx: Receiver<DictationCommand>, app: AppHandle, gates: crate::Gate
         gates.is_capturing.store(true, Ordering::Relaxed);
         emit_state(&app, "capturing");
 
-        let outcome = listen(&rx, &capture, &mut vad, &app);
+        streamer.begin();
+        let outcome = listen(&rx, &capture, &mut vad, &app, &mut streamer);
         let pcm = finish_take(&mut capture, &outcome);
 
         // Skip takes under ~0.25 s — a stray tap, not speech.
@@ -179,8 +342,12 @@ fn run_worker(rx: Receiver<DictationCommand>, app: AppHandle, gates: crate::Gate
         };
 
         emit_state(&app, "transcribing");
-        // "" lets the sidecar auto-detect the language — Hebrew, English, or mixed.
-        match tauri::async_runtime::block_on(provider.transcribe(&pcm, "")) {
+        // Force the language the streaming decodes latched (autodetected on the
+        // first decode, docs/adr/0009); an empty string when nothing streamed —
+        // which keeps this final byte-identical to the one-shot path. The final
+        // decode is authoritative: its raw text is what gets injected.
+        let final_language = streamer.final_language();
+        match tauri::async_runtime::block_on(provider.transcribe(&pcm, &final_language)) {
             Ok(transcript) => {
                 tracing::info!(
                     chars = transcript.text.chars().count(),
@@ -188,6 +355,10 @@ fn run_worker(rx: Receiver<DictationCommand>, app: AppHandle, gates: crate::Gate
                     mode = ?take_mode,
                     "dictation transcribed"
                 );
+                // Settle the live preview on the final transcript — committed in
+                // full, nothing provisional — so the tongue shows the same text
+                // about to be injected.
+                streamer.finalize(&transcript.text);
                 // Broadcast the text so in-app surfaces — the first-run
                 // tutorial's practice step — can echo back what was heard.
                 // This is an in-process Tauri event; the text is never logged
@@ -335,6 +506,7 @@ fn listen(
     capture: &AudioCapture,
     vad: &mut Option<SileroVad>,
     app: &AppHandle,
+    streamer: &mut Streamer,
 ) -> TakeOutcome {
     match DICTATION_MODE {
         // Hold — capture until the hotkey is released.
@@ -381,6 +553,11 @@ fn listen(
                                 FrameVerdict::VadFailed => vad_failed = true,
                             }
                         }
+
+                        // Drive live partials: fold any finished decode into the
+                        // preview and fire the next when the cadence allows. The
+                        // decode runs off-thread, so this never stalls capture.
+                        streamer.pump(capture, cursor);
 
                         if started.elapsed() >= MAX_TAKE {
                             break;
