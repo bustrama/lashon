@@ -107,15 +107,21 @@ async fn initialise_then_list_tools_then_call_list_recipes() {
     ));
     let _ = std::fs::remove_dir_all(&temp_user);
 
-    let mut child = Command::new(&binary)
-        .env("LASHON_BUNDLED_RECIPES_DIR", &starters)
+    let mut cmd = Command::new(&binary);
+    cmd.env("LASHON_BUNDLED_RECIPES_DIR", &starters)
         .env("LASHON_USER_RECIPES_DIR", &temp_user)
         .env("RUST_LOG", "warn")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn lashon-mcp");
+        .stderr(Stdio::piped());
+    // CREATE_NO_WINDOW — the lashon-mcp binary is a console-subsystem program;
+    // spawning it from a console-less parent (an IDE or background test runner)
+    // pops a console window that steals foreground focus. Mirrors the production
+    // spawn sites (run_command, recipe runtime, sidecar). See
+    // .claude/rules/recipes.md.
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(0x0800_0000);
+    let mut child = cmd.spawn().expect("spawn lashon-mcp");
 
     let mut stdin = child.stdin.take().expect("stdin pipe");
     let stdout = child.stdout.take().expect("stdout pipe");

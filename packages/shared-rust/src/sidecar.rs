@@ -628,6 +628,7 @@ mod tests {
     #[test]
     fn job_object_kills_its_child_on_drop() {
         use std::os::windows::io::AsRawHandle;
+        use std::os::windows::process::CommandExt;
         use std::process::{Command, Stdio};
         use std::thread::sleep;
         use std::time::{Duration, Instant};
@@ -635,8 +636,15 @@ mod tests {
         // A process that runs long enough to outlive the job if the job
         // *didn't* kill it. `timeout` is a built-in Windows command; with
         // `nobreak` it waits the full 30 s without responding to keys.
+        //
+        // CREATE_NO_WINDOW — the same focus-steal guard the production spawn
+        // sites use (sidecar, llama-server, run_command, recipe runtime).
+        // Without it, running this test from a console-less parent (an IDE or
+        // background test runner) pops a `cmd` console window that steals
+        // foreground focus. See .claude/rules/recipes.md.
         let mut child = Command::new("cmd")
             .args(["/c", "timeout", "/t", "30", "/nobreak"])
+            .creation_flags(0x0800_0000)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
