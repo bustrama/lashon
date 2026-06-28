@@ -4,7 +4,7 @@
 	import { register, unregisterAll } from '@tauri-apps/plugin-global-shortcut';
 	import { invoke } from '@tauri-apps/api/core';
 	import { emit, listen } from '@tauri-apps/api/event';
-	import type { DictationState } from '$lib/dictation';
+	import type { DictationState, DictationPartial } from '$lib/dictation';
 	import { getSetting, DEFAULTS } from '$lib/settings';
 	import Tongue from '$lib/components/Tongue.svelte';
 	import DebugSurface from '$lib/components/DebugSurface.svelte';
@@ -25,6 +25,15 @@
 
 	let debugVisible = $state(false);
 	let dictationState = $state<DictationState>('idle');
+
+	// Live streaming dictation (docs/adr/0035). The worker re-decodes the
+	// growing take and emits `dictation:partial` ~twice a second; we hold the
+	// latest LocalAgreement-2 split here and pass it to the Tongue, which grows
+	// a text panel to show committed (solid) + provisional (muted) words. It is
+	// cleared when the take ends (state → idle / error), collapsing the panel.
+	// The frontend holds no dictation state of its own — this is a render cache
+	// of the last event, nothing more (.claude/rules/frontend.md).
+	let partial = $state<DictationPartial | null>(null);
 
 	// REDESIGN — the redesigned Tongue draws the two armed listening states
 	// (dictation = saffron / gold halo, command = cobalt blue halo, the
@@ -470,6 +479,11 @@
 		// The Rust dictation worker drives the tongue's listening animation.
 		const stateUnlisten = listen<DictationState>('dictation:state', (event) => {
 			dictationState = event.payload;
+			// A take ending collapses the live-partial panel: the final text was
+			// already injected, and a lingering preview would outlast the take.
+			if (event.payload === 'idle' || event.payload === 'error') {
+				partial = null;
+			}
 			// REDESIGN — reset `takeMode` when the dictation lifecycle ends
 			// (state returns to idle) UNLESS a command-mode dispatch is still
 			// running. For command takes the dispatcher's `command:result`
@@ -483,6 +497,13 @@
 			) {
 				takeMode = 'idle';
 			}
+		});
+		// Live streaming partials (docs/adr/0035). Additive to the existing
+		// dictation events — the worker emits the running LocalAgreement-2 split
+		// as it re-decodes the take; the Tongue renders it. Never logged here
+		// (it is transcript content — .claude/rules/security.md).
+		const partialUnlisten = listen<DictationPartial>('dictation:partial', (event) => {
+			partial = event.payload;
 		});
 		// M8 — command-mode result + confirmation events from Rust.
 		const commandResultUnlisten = listen<{
@@ -583,6 +604,7 @@
 			void movedUnlisten.then((unlisten) => unlisten());
 			void resizedUnlisten.then((unlisten) => unlisten());
 			void stateUnlisten.then((unlisten) => unlisten());
+			void partialUnlisten.then((unlisten) => unlisten());
 			void commandResultUnlisten.then((unlisten) => unlisten());
 			void commandConfirmUnlisten.then((unlisten) => unlisten());
 			void commandStateUnlisten.then((unlisten) => unlisten());
@@ -605,6 +627,7 @@
 			state={dictationState}
 			{takeMode}
 			{wakeActive}
+			{partial}
 			{commandFlash}
 			{commandState}
 			{commandToolLabel}

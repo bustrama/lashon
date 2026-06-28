@@ -12,6 +12,7 @@ pub mod hardware;
 pub mod hotkey;
 pub mod inject;
 pub mod keychain;
+pub mod local_agreement;
 #[cfg(feature = "command-mode")]
 pub mod llama_server;
 #[cfg(feature = "command-mode")]
@@ -25,6 +26,7 @@ pub mod provider_registry;
 #[cfg(feature = "command-mode")]
 pub mod recipes;
 pub mod sidecar;
+pub mod streaming;
 pub mod stt;
 pub mod stt_proto;
 #[cfg(feature = "command-mode")]

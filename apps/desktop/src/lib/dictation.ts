@@ -10,3 +10,15 @@
  * - `error`        — a take failed; the tongue flickers red, then returns to idle
  */
 export type DictationState = 'idle' | 'preparing' | 'capturing' | 'transcribing' | 'error';
+
+/**
+ * A live partial transcript, broadcast on the `dictation:partial` Tauri event
+ * as the worker re-decodes the growing take (docs/adr/0035). The split is the
+ * LocalAgreement-2 committer's: `committed` words are final (two consecutive
+ * hypotheses agreed) and render solid; `provisional` is the unconfirmed tail
+ * and renders muted. Both can be empty (silence at the start of a take).
+ */
+export type DictationPartial = {
+	committed: string;
+	provisional: string;
+};

@@ -65,6 +65,14 @@ def _make_servicer(stt_pb2, stt_pb2_grpc, token: str):
             self._token = token
             self._engine = None
             self._ready = threading.Event()
+            # The gRPC server runs a thread pool (max_workers > 1), so RPCs can
+            # land concurrently — live streaming dictation in particular fires a
+            # re-decode of the growing buffer that can still be running when the
+            # final decode arrives on stop. faster-whisper's WhisperModel is not
+            # guaranteed thread-safe, so serialize every decode through one lock.
+            # Contention is rare (only the streaming/final overlap) and bounded
+            # by a single decode; correctness is not worth trading for it.
+            self._decode_lock = threading.Lock()
             # Human-readable warm-up state, surfaced through HealthCheck so the
             # tongue can show "preparing" while the model downloads on first run.
             self._status = "starting"
@@ -144,7 +152,8 @@ def _make_servicer(stt_pb2, stt_pb2_grpc, token: str):
             engine = self._await_engine(context)
             pcm = np.frombuffer(request.pcm_f32, dtype=np.float32)
             # Empty language → let Whisper auto-detect (Hebrew, English, mixed).
-            result = engine.transcribe(pcm, language=request.language or None)
+            with self._decode_lock:
+                result = engine.transcribe(pcm, language=request.language or None)
             return stt_pb2.TranscribeResponse(
                 text=result.text,
                 language=result.language,
@@ -166,7 +175,8 @@ def _make_servicer(stt_pb2, stt_pb2_grpc, token: str):
                 if chunks
                 else np.zeros(0, dtype=np.float32)
             )
-            result = engine.transcribe(pcm)
+            with self._decode_lock:
+                result = engine.transcribe(pcm)
             # M1 yields a single final result; incremental partials arrive later.
             yield stt_pb2.TranscribePartial(
                 text=result.text, is_final=True, language=result.language
