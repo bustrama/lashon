@@ -12,6 +12,7 @@ Run in the STT sidecar environment (faster-whisper + the `bench` extra):
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -38,8 +39,10 @@ def main() -> int:
     from lashon_stt.engines.faster_whisper_engine import SAMPLE_RATE, load_engine
 
     manifest = json.loads((CORPUS / "manifest.json").read_text(encoding="utf-8"))
-    engine = load_engine()
-    print(f"engine: {engine.device} ({engine.compute_type})\n")
+    # LASHON_STT_MODEL_ID selects the transcription model for an A/B run (e.g.
+    # turbo vs non-turbo large-v3); unset loads the shipped default. See ADR-0036.
+    engine = load_engine(model_id=os.environ.get("LASHON_STT_MODEL_ID"))
+    print(f"engine: {engine.device} ({engine.compute_type}) — model {engine.model_id}\n")
 
     gate_ok = True
     gates_scored = 0

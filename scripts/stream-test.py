@@ -47,6 +47,7 @@ if the partials reorder/flicker in a way the committer cannot absorb.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time
 from pathlib import Path
@@ -113,6 +114,13 @@ def main(argv: list[str] | None = None) -> int:
              "Default selection prefers CUDA when available.",
     )
     parser.add_argument(
+        "--model",
+        default=os.environ.get("LASHON_STT_MODEL_ID"),
+        help="Transcription model id to benchmark (default: the shipped model, "
+             "or $LASHON_STT_MODEL_ID). Pass the non-turbo large-v3 id to "
+             "compare re-decode latency against turbo (see ADR-0036).",
+    )
+    parser.add_argument(
         "--realtime",
         action="store_true",
         help="Pace decodes to wall-clock (simulates a live mic). "
@@ -130,10 +138,11 @@ def main(argv: list[str] | None = None) -> int:
 
     print("loading engine... ", end="", flush=True)
     t0 = time.monotonic()
-    engine = load_engine(cpu_only=args.cpu)
+    engine = load_engine(cpu_only=args.cpu, model_id=args.model)
     print(
         f"{(time.monotonic() - t0):.1f}s "
-        f"(device={engine.device}, compute={engine.compute_type})"
+        f"(device={engine.device}, compute={engine.compute_type}, "
+        f"model={engine.model_id})"
     )
 
     pcm = load_wav(args.wav)

@@ -12,7 +12,7 @@ from pathlib import Path
 
 import numpy as np
 
-from lashon_stt.model_registry import DETECTOR_MODEL_ID, model_dir
+from lashon_stt.model_registry import DEFAULT_MODEL_ID, DETECTOR_MODEL_ID, model_dir
 from lashon_stt.postprocess import sanitize
 
 logger = logging.getLogger(__name__)
@@ -72,14 +72,20 @@ class Transcript:
 class FasterWhisperEngine:
     """A loaded faster-whisper model, transcribing Hebrew-first PCM audio."""
 
-    def __init__(self, device: str, compute_type: str) -> None:
+    def __init__(
+        self, device: str, compute_type: str, model_id: str | None = None
+    ) -> None:
         # Imported here so module import stays cheap and dependency-free.
         from faster_whisper import WhisperModel
 
         self.device = device
         self.compute_type = compute_type
+        # The transcription model. ``None`` loads the shipped DEFAULT_MODEL_ID;
+        # an explicit id is the seam for A/B model evaluations (e.g. turbo vs
+        # non-turbo large-v3 — scripts/wer-bench.py, scripts/stream-test.py).
+        self.model_id = model_id or DEFAULT_MODEL_ID
         self._model = WhisperModel(
-            str(model_dir()), device=device, compute_type=compute_type
+            str(model_dir(self.model_id)), device=device, compute_type=compute_type
         )
         # The ivrit-ai Hebrew fine-tune's language detector is collapsed — it
         # reports 'he' for every language, English included. A small vanilla
@@ -138,12 +144,18 @@ def _confidence(logprobs: list[float]) -> float:
     return round(min(1.0, math.exp(sum(logprobs) / len(logprobs))), 4)
 
 
-def load_engine(cpu_only: bool = False) -> FasterWhisperEngine:
+def load_engine(
+    cpu_only: bool = False, model_id: str | None = None
+) -> FasterWhisperEngine:
     """Load the STT engine.
 
     By default the GPU is preferred, with a CPU fallback. With ``cpu_only`` —
     hardware tiers C/D, or a user who overrode to them — the CUDA device is not
     attempted at all and the engine loads straight on the CPU (docs/adr/0014).
+
+    ``model_id`` selects the transcription model; ``None`` loads the shipped
+    ``DEFAULT_MODEL_ID``. A non-default id is the seam for A/B model
+    evaluations and is never passed on the shipped hot path.
     """
     # The CUDA runtime is downloaded on first run, so register its DLL
     # directories now — not at import, which is before that download.
@@ -155,8 +167,15 @@ def load_engine(cpu_only: bool = False) -> FasterWhisperEngine:
     )
     for device, compute_type in candidates:
         try:
-            engine = FasterWhisperEngine(device=device, compute_type=compute_type)
-            logger.info("STT engine loaded on %s (%s)", device, compute_type)
+            engine = FasterWhisperEngine(
+                device=device, compute_type=compute_type, model_id=model_id
+            )
+            logger.info(
+                "STT engine loaded on %s (%s) — model %s",
+                device,
+                compute_type,
+                engine.model_id,
+            )
             return engine
         except Exception as exc:  # device probing — ctranslate2 raises varied errors
             logger.warning("STT engine load on %s failed: %s", device, exc)
