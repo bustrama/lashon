@@ -248,6 +248,56 @@
 		};
 	});
 
+	// ---- Take elapsed-time counter (streaming UI) ----
+	// A dictation take can now run up to the 5-minute backstop (docs/adr/0037),
+	// so the streaming bubble shows how long the current take has been running.
+	// Presentation only — the authoritative take length and its cap live in the
+	// Rust FSM; this just counts from the `capturing` state and clears when the
+	// take ends. A ticking value is information, not decorative motion, so it is
+	// deliberately NOT gated by prefers-reduced-motion.
+	const streamingTake = $derived(dictationState === 'capturing' && takeMode !== 'command');
+	let elapsedLabel = $state('');
+
+	function formatElapsed(ms: number): string {
+		const total = Math.floor(ms / 1000);
+		const mins = Math.floor(total / 60);
+		const secs = total % 60;
+		return `${mins}:${secs.toString().padStart(2, '0')}`;
+	}
+
+	$effect(() => {
+		// Re-runs whenever the take starts/stops. Cleanup clears the interval so
+		// it never ticks past the take.
+		if (!streamingTake) {
+			elapsedLabel = '';
+			return;
+		}
+		const start = performance.now();
+		elapsedLabel = formatElapsed(0);
+		// 250 ms keeps the seconds readout snappy without a per-frame loop.
+		const id = setInterval(() => {
+			elapsedLabel = formatElapsed(performance.now() - start);
+		}, 250);
+		return () => clearInterval(id);
+	});
+
+	// ---- Prompter scroll (streaming UI) ----
+	// On a long take the partial text would tower and grow the window unbounded.
+	// Instead the text area is height-capped (CSS) and the latest line is pinned
+	// to the bottom — old text scrolls up out of view, teleprompter-style.
+	let partialScrollEl: HTMLParagraphElement | null = $state(null);
+	let partialOverflowing = $state(false);
+
+	$effect(() => {
+		// Reference `partial` so this re-runs on every update, after the DOM has
+		// patched in the new text.
+		partial;
+		const el = partialScrollEl;
+		if (!el) return;
+		el.scrollTop = el.scrollHeight; // stick to the newest text
+		partialOverflowing = el.scrollHeight > el.clientHeight + 1;
+	});
+
 	type GlyphKind =
 		| 'pen'
 		| 'gear'
@@ -585,7 +635,12 @@
 			<span class="bubble-wave" aria-hidden="true">
 				<span></span><span></span><span></span><span></span>
 			</span>
-			<p class="partial-text" dir="auto">
+			<p
+				class="partial-text"
+				class:prompter-fade={partialOverflowing}
+				dir="auto"
+				bind:this={partialScrollEl}
+			>
 				<span class="partial-committed">{partial.committed}</span>
 				{#if partial.provisional}
 					<span class="partial-provisional" dir="auto">
@@ -593,6 +648,9 @@
 					>
 				{/if}
 			</p>
+			{#if elapsedLabel}
+				<span class="partial-timer mono" aria-hidden="true">{elapsedLabel}</span>
+			{/if}
 		</div>
 	{/if}
 
@@ -976,6 +1034,17 @@
 		font-size: 14px;
 		line-height: 1.5;
 		word-break: break-word;
+		/* Prompter: cap the height and pin to the latest line (the effect sticks
+		   scrollTop to the bottom) so a long take scrolls instead of towering the
+		   window. ~5 lines tall. */
+		max-height: 7.5em;
+		overflow: hidden;
+	}
+	/* Fade old text out at the top — only while actually overflowing, so short
+	   partials aren't clipped. */
+	.partial-text.prompter-fade {
+		-webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 1.6em);
+		mask-image: linear-gradient(to bottom, transparent 0, #000 1.6em);
 	}
 	/* Committed words are final — solid ink. */
 	.partial-committed {
@@ -985,6 +1054,17 @@
 	   not-yet-settled and committed words read as the stable transcript. */
 	.partial-provisional {
 		color: var(--ink-mute);
+	}
+	/* Elapsed-take timer — a small mono readout at the bubble's trailing edge so
+	   the user sees how long the current take has run (up to the 5-min backstop,
+	   docs/adr/0037). Tabular figures so the digits don't jiggle as they tick. */
+	.partial-timer {
+		flex: 0 0 auto;
+		align-self: flex-start;
+		margin-top: 1px;
+		font-size: 11px;
+		color: var(--ink-faint);
+		font-variant-numeric: tabular-nums;
 	}
 	/* Cancel chip — destructive-style. Rose-tinted background + rose
 	   border so it reads unambiguously as a clickable "cancel this take"
