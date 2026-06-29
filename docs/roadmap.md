@@ -133,8 +133,10 @@ Tier A hardware.
 - `cpal` 16 kHz mono Float32 input.
 - A 30-second rolling ring buffer (`ringbuf` crate).
 - **Silero VAD v5** via the `ort` crate (ONNX), 32 ms frames.
-- Endpoint logic: 500 ms silence → end-of-utterance; a 1500 ms extended hold if
-  there is mid-word energy.
+- Endpoint logic: clean silence → end-of-utterance; an extended hold if there is
+  mid-word energy. Thresholds re-tuned for long-form dictation — 5 s silence /
+  6 s hold ([adr/0038](adr/0038-tolerate-long-pauses-in-dictation-endpointing.md);
+  originally 500 ms / 1500 ms in [adr/0015](adr/0015-silero-vad-and-utterance-endpointing.md)).
 - Suspend the wake-word detector during active capture using a
   `Mutex<bool> is_capturing` gate.
 

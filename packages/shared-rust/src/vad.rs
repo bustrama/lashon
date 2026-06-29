@@ -181,8 +181,16 @@ impl Default for EndpointConfig {
             // run lower than confident Hebrew talking.
             speech_threshold: 0.4,
             energy_threshold: 0.25,
-            silence: Duration::from_millis(500),
-            hold: Duration::from_millis(1500),
+            // Long-form dictation: tolerate a multi-second thinking pause before
+            // ending the take, so a breath or a beat to gather the next sentence
+            // doesn't cut you off (docs/adr/0038). Clean silence ends the take at
+            // 5 s; a pause carrying faint "mid-word" energy holds to 6 s. The
+            // trade-off — a ~5 s wait after you truly finish before the take
+            // finalises — is deliberate, chosen over eager cut-offs. For a clean
+            // pause `quiet` and `trailing` grow together, so `hold` must stay
+            // ≥ `silence` or it would end the take first.
+            silence: Duration::from_secs(5),
+            hold: Duration::from_secs(6),
             min_speech: Duration::from_millis(250),
             no_speech_timeout: Duration::from_secs(6),
         }
@@ -202,10 +210,13 @@ pub enum EndpointSignal {
 ///
 /// Fed one Silero speech probability per 32 ms frame, it tracks trailing
 /// silence and reports when the utterance is over. The rule (docs/roadmap.md
-/// §1.1): end on 500 ms of clean silence, or — when faint mid-word energy keeps
-/// the silence from being clean — 1500 ms after the last real speech. It is
-/// pure and deterministic, so the call site in the dictation worker stays a
-/// thin shell and the logic is exercised entirely by unit tests.
+/// §1.1): end on [`silence`](EndpointConfig::silence) of clean silence, or —
+/// when faint mid-word energy keeps the silence from being clean —
+/// [`hold`](EndpointConfig::hold) after the last real speech. The shipped
+/// defaults tolerate a multi-second pause for long-form dictation
+/// (docs/adr/0038). It is pure and deterministic, so the call site in the
+/// dictation worker stays a thin shell and the logic is exercised entirely by
+/// unit tests.
 #[derive(Debug, Clone)]
 pub struct Endpointer {
     config: EndpointConfig,
@@ -330,6 +341,18 @@ mod tests {
         last
     }
 
+    /// Short silence/hold thresholds for the mechanism tests, so frame counts
+    /// stay small and readable — independent of the shipped (long-pause)
+    /// default, which is pinned separately in
+    /// [`the_default_endpoint_tolerates_a_long_pause`].
+    fn quick_config() -> EndpointConfig {
+        EndpointConfig {
+            silence: Duration::from_millis(500),
+            hold: Duration::from_millis(1500),
+            ..EndpointConfig::default()
+        }
+    }
+
     #[test]
     fn continues_through_steady_speech() {
         let mut ep = Endpointer::default();
@@ -340,16 +363,32 @@ mod tests {
 
     #[test]
     fn ends_after_500ms_of_clean_silence() {
-        let mut ep = Endpointer::default();
+        let mut ep = Endpointer::new(quick_config());
         feed(&mut ep, 0.9, 30); // ~1 s of speech
                                 // 500 ms / 32 ms ≈ 16 frames of true silence end the take.
         assert_eq!(feed(&mut ep, 0.0, 15), EndpointSignal::Continue);
         assert_eq!(ep.observe(0.0), EndpointSignal::Ended);
     }
 
+    /// The shipped default tolerates a multi-second pause — a thinking beat in
+    /// long-form dictation must not end the take (docs/adr/0038). This pins the
+    /// product policy; the tests above pin the mechanism at fast thresholds.
+    #[test]
+    fn the_default_endpoint_tolerates_a_long_pause() {
+        assert_eq!(EndpointConfig::default().silence, Duration::from_secs(5));
+        assert_eq!(EndpointConfig::default().hold, Duration::from_secs(6));
+
+        let mut ep = Endpointer::default();
+        feed(&mut ep, 0.9, 30); // ~1 s of speech
+                                // ~4 s of silence (125 frames) is a pause, not the end.
+        assert_eq!(feed(&mut ep, 0.0, 125), EndpointSignal::Continue);
+        // Past ~5 s of clean silence, the take finally ends.
+        assert_eq!(feed(&mut ep, 0.0, 40), EndpointSignal::Ended);
+    }
+
     #[test]
     fn faint_energy_holds_past_the_500ms_silence_window() {
-        let mut ep = Endpointer::default();
+        let mut ep = Endpointer::new(quick_config());
         feed(&mut ep, 0.9, 30); // speech
                                 // 0.3 sits above energy_threshold (0.25) but below speech_threshold
                                 // (0.4): "mid-word energy". Poking it through every other frame keeps
@@ -413,7 +452,7 @@ mod tests {
 
     #[test]
     fn ended_is_sticky_even_against_later_speech() {
-        let mut ep = Endpointer::default();
+        let mut ep = Endpointer::new(quick_config());
         feed(&mut ep, 0.9, 30);
         feed(&mut ep, 0.0, 16); // ends the take
         assert_eq!(ep.observe(0.0), EndpointSignal::Ended);

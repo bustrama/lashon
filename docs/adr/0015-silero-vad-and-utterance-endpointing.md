@@ -6,6 +6,13 @@
 - **Context source:** `docs/roadmap.md` workstream 1.1; milestone M6. Supersedes
   the VAD half of [ADR-0005](0005-hands-free-dictation-and-energy-vad.md).
 
+> **Amended 2026-06-29 by [ADR-0038](0038-tolerate-long-pauses-in-dictation-endpointing.md):**
+> the two-tier endpoint **mechanism** below is unchanged, but the dictation
+> **thresholds** were re-tuned for long-form dictation — clean silence
+> 500 ms → **5 s**, hold 1500 ms → **6 s**. Read the specific "500 ms / 1500 ms"
+> values below as "the snappy values this ADR shipped"; the current defaults are
+> in ADR-0038.
+
 ## Context
 
 [ADR-0005](0005-hands-free-dictation-and-energy-vad.md) shipped hands-free
@@ -69,8 +76,10 @@ timeout with a real endpoint detector.
 - The Silero model (~2.3 MB) is resolved and verified at runtime. If it is
   absent — a fresh checkout, or a packaged build before its first-run
   download — the worker logs it and hands-free **degrades to a second press or
-  the 30 s hard cap**, rather than failing. Wiring the packaged-build first-run
-  download is a tracked follow-up.
+  the hard-cap backstop**, rather than failing. (That backstop was raised from
+  30 s to 5 minutes so it no longer fires mid-utterance —
+  [ADR-0037](0037-tail-only-windowed-redecode.md).) Wiring the packaged-build
+  first-run download is a tracked follow-up.
 - ADR-0005 predicted the worker's VAD call site would be unchanged; in practice
   the frame cadence moved from 200 ms to 32 ms and the `Endpointer` was added —
   a refinement of that prediction, not a contradiction of the seam.
