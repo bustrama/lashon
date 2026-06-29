@@ -6,6 +6,13 @@ Accepted — 2026-06-28. Supersedes the abandoned bidirectional-streaming spike
 (`spike/local-streaming`, reverted in `8c3cad7`). Implements the live-partial
 goal in [`docs/stories/streaming-dictation.md`](../stories/streaming-dictation.md).
 
+> **Amended 2026-06-29 by [ADR-0037](0037-tail-only-windowed-redecode.md):** the
+> whole-buffer re-decode below, and the 30 s take cap it implied, are replaced by
+> a tail-only **windowed** re-decode that keeps cost bounded for takes of any
+> length. Everything else in this ADR (repeated-unary transport, client-side
+> LocalAgreement-2, single-flight, the sidecar decode lock, the language latch,
+> the authoritative final) still stands.
+
 ## Context
 
 Dictation today captures audio, transcribes **once on stop**, then injects. The
@@ -128,6 +135,12 @@ The CPU cost is **~constant in buffer length** (11.9 s at a 1 s buffer → 12.5 
 at 7 s): faster-whisper processes a fixed 30 s mel window, so a re-decode costs
 roughly the same regardless of how much audio is buffered. At 500 ms cadence a
 CPU worker would fall progressively further behind and never catch up.
+
+This constant-cost regime holds **only while the buffer fits one 30 s mel
+window**. Past that a whole-buffer re-decode windows the audio sequentially and
+grows with the take — which is exactly why this ADR capped a take at 30 s, and
+why [ADR-0037](0037-tail-only-windowed-redecode.md) switches to re-decoding only
+the uncommitted tail.
 
 **Cadence chosen:** 1 s min-sample gate, 0.5 s re-decode hop — the spike's
 numbers, reconfirmed here.

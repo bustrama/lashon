@@ -51,6 +51,12 @@ message TranscribeBytesRequest {
   bytes pcm_f32 = 1;
   // BCP-47-style language hint, e.g. "he", "en". Empty means autodetect.
   string language = 2;
+  // Recent already-committed text, passed to Whisper as decoding context
+  // (initial_prompt) for a *windowed* streaming re-decode whose buffer no
+  // longer starts at the utterance's beginning — it restores the linguistic
+  // context the tail would otherwise lose. Empty for the one-shot final decode
+  // and any decode that starts at sample 0. See docs/adr/0037.
+  string initial_prompt = 3;
 }
 
 // One slice of a streamed utterance, same PCM format as TranscribeBytesRequest.
@@ -68,6 +74,19 @@ message TranscribeResponse {
   float confidence = 3;
   // Wall-clock inference time on the sidecar, milliseconds.
   uint32 inference_ms = 4;
+  // Per-segment text with audio timestamps, in order. The streaming
+  // re-decode uses these to advance its window anchor past audio whose text
+  // has already committed (docs/adr/0037). Always populated; the one-shot
+  // final decode simply ignores it.
+  repeated Segment segments = 5;
+}
+
+// One decoded segment and where it sits in the submitted audio. Timestamps are
+// seconds from the start of *this request's* buffer, not the whole utterance.
+message Segment {
+  string text = 1;
+  float start = 2;
+  float end = 3;
 }
 
 message TranscribePartial {

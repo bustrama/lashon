@@ -46,6 +46,13 @@ _AUTH_METADATA_KEY = "x-lashon-auth"
 # Longest a transcription RPC waits for the model warm-up to finish.
 MODEL_WAIT_SECONDS = 120.0
 
+# Max gRPC message size, bytes. The 4 MB default caps a TranscribeBytes request
+# at ~65 s of 16 kHz f32 PCM (64 KB/s); a dictation take now runs up to the
+# 5-minute backstop (~19 MB), so without this the final decode of a long take is
+# rejected ResourceExhausted (docs/adr/0037). 64 MB leaves headroom. Must match
+# MAX_GRPC_MESSAGE_BYTES in packages/shared-rust/src/sidecar.rs — change both.
+MAX_GRPC_MESSAGE_BYTES = 64 * 1024 * 1024
+
 
 def _load_stubs():
     """Generate (if needed) and import the gRPC stubs — see codegen.ensure_stubs."""
@@ -152,13 +159,22 @@ def _make_servicer(stt_pb2, stt_pb2_grpc, token: str):
             engine = self._await_engine(context)
             pcm = np.frombuffer(request.pcm_f32, dtype=np.float32)
             # Empty language → let Whisper auto-detect (Hebrew, English, mixed).
+            # Empty initial_prompt → no decoding context (one-shot / window-at-0).
             with self._decode_lock:
-                result = engine.transcribe(pcm, language=request.language or None)
+                result = engine.transcribe(
+                    pcm,
+                    language=request.language or None,
+                    initial_prompt=request.initial_prompt or None,
+                )
             return stt_pb2.TranscribeResponse(
                 text=result.text,
                 language=result.language,
                 confidence=result.confidence,
                 inference_ms=result.inference_ms,
+                segments=[
+                    stt_pb2.Segment(text=s.text, start=s.start, end=s.end)
+                    for s in result.segments
+                ],
             )
 
         def TranscribeStream(self, request_iterator, context):
@@ -197,7 +213,13 @@ def serve() -> grpc.Server:
     # caller can sit; this token limits who may call — without it a
     # co-resident process cannot drive STT. See ADR-0010.
     token = secrets.token_hex(32)
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
+    server = grpc.server(
+        futures.ThreadPoolExecutor(max_workers=4),
+        options=[
+            ("grpc.max_receive_message_length", MAX_GRPC_MESSAGE_BYTES),
+            ("grpc.max_send_message_length", MAX_GRPC_MESSAGE_BYTES),
+        ],
+    )
     stt_pb2_grpc.add_SttServicer_to_server(
         _make_servicer(stt_pb2, stt_pb2_grpc, token), server
     )

@@ -35,6 +35,15 @@ const PORT_LINE_PREFIX: &str = "LASHON_STT_PORT=";
 /// in `services/stt-sidecar/src/lashon_stt/server.py`.
 const AUTH_METADATA_KEY: &str = "x-lashon-auth";
 
+/// Max gRPC message size for the STT transport, in bytes. The gRPC default is
+/// 4 MB, which caps a `TranscribeBytes` request at ~65 s of 16 kHz f32 PCM
+/// (64 KB/s) — fine under the old 30 s take cap, but a take now runs up to the
+/// 5-minute backstop (~19 MB), so the final decode of a long take was rejected
+/// `ResourceExhausted` (docs/adr/0037). 64 MB leaves generous headroom. Must be
+/// matched by `grpc.max_receive_message_length` in the Python sidecar's
+/// `server.py` — change both together.
+const MAX_GRPC_MESSAGE_BYTES: usize = 64 * 1024 * 1024;
+
 /// How long to wait for the sidecar to announce its port.
 const PORT_WAIT: Duration = Duration::from_secs(8);
 
@@ -148,7 +157,12 @@ impl Sidecar {
         let interceptor = AuthInterceptor {
             token: self.token.clone(),
         };
-        Ok(SttClient::with_interceptor(channel, interceptor))
+        // Raise both directions off the 4 MB default so a long take's PCM
+        // upload (and any large response) isn't rejected mid-dictation — the
+        // server's receive limit is bumped to match (docs/adr/0037).
+        Ok(SttClient::with_interceptor(channel, interceptor)
+            .max_encoding_message_size(MAX_GRPC_MESSAGE_BYTES)
+            .max_decoding_message_size(MAX_GRPC_MESSAGE_BYTES))
     }
 }
 

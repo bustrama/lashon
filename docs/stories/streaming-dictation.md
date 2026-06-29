@@ -151,8 +151,11 @@ the growing buffer via `capture.samples_since`. Add streaming around it:
 
 CPU cost is ~constant in buffer length (30 s mel window), so it can never catch
 up — streaming **self-disables** on it (measured latency > 2.5 s budget) and the
-take keeps only its final decode. **Cadence chosen:** 1 s gate, 0.5 s hop. Full
-analysis in [ADR-0035](../adr/0035-streaming-dictation-via-repeated-unary.md).
+take keeps only its final decode. (That constant-cost holds while a re-decode
+fits one 30 s mel window; tail-only windowing keeps it there for takes of any
+length — [ADR-0037](../adr/0037-tail-only-windowed-redecode.md).) **Cadence
+chosen:** 1 s gate, 0.5 s hop. Full analysis in
+[ADR-0035](../adr/0035-streaming-dictation-via-repeated-unary.md).
 
 ### 5. Story/ADR/tests housekeeping (`.claude/rules/workflow.md`)
 
@@ -184,8 +187,10 @@ https://huggingface.co/ivrit-ai/whisper-large-v3
 - Re-decode load on CPU — bounded by single-flight + cadence; pseudo-streaming is the
   graceful floor.
 - Interim Tongue-shape exception vs the design system — temporary, ADR-recorded.
-- `transcribe_bytes` re-sends the whole growing buffer each tick over loopback —
-  negligible bytes, but confirm no copy blow-up on long takes (cap at MAX_TAKE = 30 s).
+- `transcribe_bytes` re-sends audio each tick over loopback — negligible bytes,
+  and on long takes the re-decode now covers only the uncommitted tail (not the
+  whole buffer), with the take bounded by a 5-minute backstop
+  ([ADR-0037](../adr/0037-tail-only-windowed-redecode.md)).
 
 ## Definition of done
 

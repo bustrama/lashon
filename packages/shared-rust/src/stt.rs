@@ -11,6 +11,18 @@ use crate::stt_proto::stt;
 // `use lashon_core::stt::Confidence`.
 pub use crate::provider::Confidence;
 
+/// One decoded segment and where it sits in the submitted audio. Timestamps are
+/// seconds from the start of *that request's* buffer — for a windowed streaming
+/// re-decode that is the window, not the whole utterance. The streaming
+/// committer advances its window anchor past already-committed segments with
+/// these (docs/adr/0037).
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct Segment {
+    pub text: String,
+    pub start: f32,
+    pub end: f32,
+}
+
 /// A completed transcription.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct Transcript {
@@ -18,6 +30,35 @@ pub struct Transcript {
     pub language: String,
     pub confidence: f32,
     pub inference_ms: u32,
+    /// Per-segment timings, in order. Empty unless the decode reported them; the
+    /// one-shot final decode ignores them.
+    pub segments: Vec<Segment>,
+}
+
+/// Per-call knobs for [`SttProvider::transcribe`]. A struct rather than bare
+/// arguments so new options (e.g. a windowed-decode prompt) don't churn every
+/// call site each time the seam grows.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TranscribeOptions<'a> {
+    /// BCP-47-style language hint, e.g. "he". Empty autodetects via the
+    /// companion detector (docs/adr/0009).
+    pub language: &'a str,
+    /// Recent committed text, passed to Whisper as decoding context for a
+    /// *windowed* streaming re-decode whose buffer no longer starts at the
+    /// utterance's beginning (docs/adr/0037). Empty for the one-shot final
+    /// decode and any decode anchored at sample 0.
+    pub initial_prompt: &'a str,
+}
+
+impl<'a> TranscribeOptions<'a> {
+    /// Options that just force a language, no decoding-context prompt — the
+    /// shape every non-streaming caller wants.
+    pub fn language(language: &'a str) -> Self {
+        Self {
+            language,
+            initial_prompt: "",
+        }
+    }
 }
 
 /// A speech-to-text provider. Each engine implements this trait; callers route
@@ -25,7 +66,7 @@ pub struct Transcript {
 #[allow(async_fn_in_trait)]
 pub trait SttProvider {
     /// Transcribe 16 kHz mono float32 PCM (samples in [-1.0, 1.0]).
-    async fn transcribe(&self, pcm_f32: &[f32], language: &str) -> Result<Transcript>;
+    async fn transcribe(&self, pcm_f32: &[f32], opts: TranscribeOptions<'_>) -> Result<Transcript>;
 
     /// How well this provider handles Hebrew.
     fn supports_hebrew(&self) -> Confidence;
@@ -65,13 +106,14 @@ impl FasterWhisperProvider {
 }
 
 impl SttProvider for FasterWhisperProvider {
-    async fn transcribe(&self, pcm_f32: &[f32], language: &str) -> Result<Transcript> {
+    async fn transcribe(&self, pcm_f32: &[f32], opts: TranscribeOptions<'_>) -> Result<Transcript> {
         let sidecar = ready_sidecar(&self.sidecar).await?;
         let mut client = sidecar.client().await?;
         let response = client
             .transcribe_bytes(stt::TranscribeBytesRequest {
                 pcm_f32: pcm_to_le_bytes(pcm_f32),
-                language: language.to_string(),
+                language: opts.language.to_string(),
+                initial_prompt: opts.initial_prompt.to_string(),
             })
             .await
             .context("STT sidecar TranscribeBytes RPC")?
@@ -81,6 +123,15 @@ impl SttProvider for FasterWhisperProvider {
             language: response.language,
             confidence: response.confidence,
             inference_ms: response.inference_ms,
+            segments: response
+                .segments
+                .into_iter()
+                .map(|s| Segment {
+                    text: s.text,
+                    start: s.start,
+                    end: s.end,
+                })
+                .collect(),
         })
     }
 
@@ -120,8 +171,26 @@ mod tests {
             language: "he".to_string(),
             confidence: 0.97,
             inference_ms: 240,
+            segments: vec![Segment {
+                text: "שלום עולם".to_string(),
+                start: 0.0,
+                end: 1.2,
+            }],
         };
         assert_eq!(transcript.text, "שלום עולם");
         assert_eq!(transcript.language, "he");
+        assert_eq!(transcript.segments[0].end, 1.2);
+    }
+
+    #[test]
+    fn transcribe_options_default_to_autodetect_no_prompt() {
+        let opts = TranscribeOptions::default();
+        assert_eq!(opts.language, "");
+        assert_eq!(opts.initial_prompt, "");
+        // The `language` constructor sets the hint and leaves the prompt empty —
+        // the shape every non-streaming caller uses.
+        let he = TranscribeOptions::language("he");
+        assert_eq!(he.language, "he");
+        assert_eq!(he.initial_prompt, "");
     }
 }

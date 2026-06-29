@@ -1,10 +1,12 @@
 //! LocalAgreement-2 commit policy for streaming transcription.
 //!
 //! faster-whisper is not a streaming model. The dictation worker fakes live
-//! transcription by re-decoding the growing audio buffer roughly twice a second
-//! (see `apps/desktop/src-tauri/src/dictation.rs`). Each re-decode returns the
-//! *entire* utterance-so-far, and successive hypotheses revise their tail as the
-//! model hears more audio. Shown verbatim, that tail flickers — words appear,
+//! transcription by re-decoding the audio buffer roughly twice a second and
+//! folding each result into the utterance-so-far (see
+//! `apps/desktop/src-tauri/src/dictation.rs`; since `docs/adr/0037` the re-decode
+//! covers only the uncommitted tail, reassembled with the committed prefix
+//! before it reaches this committer). Successive hypotheses revise their tail as
+//! the model hears more audio. Shown verbatim, that tail flickers — words appear,
 //! change, and vanish — which reads as broken.
 //!
 //! LocalAgreement-n (the CUNI-KIT IWSLT-2022 policy) removes the flicker: a word

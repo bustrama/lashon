@@ -60,6 +60,19 @@ SAMPLE_RATE = 16000
 
 
 @dataclass(frozen=True)
+class Segment:
+    """One decoded segment and its span in the submitted audio.
+
+    ``start`` / ``end`` are seconds from the start of *this* buffer — for a
+    windowed streaming re-decode that is the window, not the whole utterance.
+    """
+
+    text: str
+    start: float
+    end: float
+
+
+@dataclass(frozen=True)
 class Transcript:
     """Result of a single transcription."""
 
@@ -67,6 +80,9 @@ class Transcript:
     language: str
     confidence: float
     inference_ms: int
+    # Per-segment timings, in order. The streaming re-decode advances its window
+    # anchor with these (docs/adr/0037); the final decode ignores them.
+    segments: tuple[Segment, ...] = ()
 
 
 class FasterWhisperEngine:
@@ -96,12 +112,22 @@ class FasterWhisperEngine:
             compute_type=compute_type,
         )
 
-    def transcribe(self, pcm: np.ndarray, language: str | None = None) -> Transcript:
+    def transcribe(
+        self,
+        pcm: np.ndarray,
+        language: str | None = None,
+        initial_prompt: str | None = None,
+    ) -> Transcript:
         """Transcribe 16 kHz mono float32 PCM (samples in [-1.0, 1.0]).
 
         With no explicit ``language``, the spoken language is identified by the
         companion detector model and forced for the decode — the transcription
         model's own auto-detection cannot be trusted (docs/adr/0009).
+
+        ``initial_prompt`` primes the decoder with recent committed text so a
+        *windowed* streaming re-decode — whose buffer no longer starts at the
+        utterance's beginning — keeps the context its tail would otherwise lose
+        (docs/adr/0037). It biases decoding only; it is never emitted.
         """
         # frombuffer arrays are read-only; ascontiguousarray gives a clean copy.
         audio = np.ascontiguousarray(pcm, dtype=np.float32)
@@ -113,19 +139,30 @@ class FasterWhisperEngine:
             language=language,
             beam_size=5,
             vad_filter=False,
+            initial_prompt=initial_prompt or None,
         )
         # faster-whisper decodes lazily — iterating the generator runs inference.
         texts: list[str] = []
         logprobs: list[float] = []
+        spans: list[Segment] = []
         for segment in segments:
-            texts.append(segment.text.strip())
+            # Sanitise per segment, not just the joined text: the streaming
+            # anchor matches segment tokens against the committed tokens (which
+            # derive from the joined, sanitised text), so both must tokenise
+            # identically — a special token left in one side but not the other
+            # would stop the window anchor from ever advancing. sanitize is
+            # idempotent, so the outer join stays clean.
+            text = sanitize(segment.text)
+            texts.append(text)
             logprobs.append(segment.avg_logprob)
+            spans.append(Segment(text=text, start=segment.start, end=segment.end))
         elapsed_ms = int((time.monotonic() - start) * 1000)
         return Transcript(
             text=sanitize(" ".join(t for t in texts if t)),
             language=info.language or language,
             confidence=_confidence(logprobs),
             inference_ms=elapsed_ms,
+            segments=tuple(spans),
         )
 
     def _detect_language(self, audio: np.ndarray) -> str:

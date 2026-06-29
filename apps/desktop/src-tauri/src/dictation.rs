@@ -24,8 +24,8 @@ use tauri::{AppHandle, Emitter};
 use lashon_core::audio::{AudioCapture, TARGET_RATE};
 use lashon_core::inject::inject_text;
 use lashon_core::local_agreement::{LocalAgreement, Preview};
-use lashon_core::streaming::{DecodeScheduler, LanguageLatch};
-use lashon_core::stt::{FasterWhisperProvider, SttProvider};
+use lashon_core::streaming::{DecodeScheduler, LanguageLatch, WindowAnchor};
+use lashon_core::stt::{FasterWhisperProvider, Segment, SttProvider, TranscribeOptions};
 use lashon_core::vad::{self, EndpointSignal, Endpointer, SileroVad, FRAME_SAMPLES};
 
 /// Active activation mode. A settings panel will make this user-selectable;
@@ -40,10 +40,14 @@ const LEVEL_INTERVAL: Duration = Duration::from_millis(50);
 /// trailing silence never reaches the transcriber.
 const TAIL_MARGIN: Duration = Duration::from_millis(500);
 
-/// Hands-free: a hard cap on a take's length. A backstop against a capture
-/// that never ends — a wedged detector, or VAD unavailable so only a second
-/// press would otherwise stop it.
-const MAX_TAKE: Duration = Duration::from_secs(30);
+/// Hands-free: a safety backstop on a take's length, **not** a normal cap. The
+/// utterance is meant to end on the VAD endpoint or a second press; this only
+/// catches a capture that would otherwise never end — a wedged detector, or VAD
+/// unavailable so nothing but a second press stops it. It must sit far above any
+/// real continuous utterance (the old 30 s fired mid-sentence during ordinary
+/// long-form dictation), while still bounding a forgotten session — at 16 kHz
+/// mono f32 the buffer grows ~62 KB/s, so five minutes is ~19 MB.
+const MAX_TAKE: Duration = Duration::from_secs(5 * 60);
 
 /// How often to poll the STT sidecar while it prepares the model on first run.
 const MODEL_POLL_INTERVAL: Duration = Duration::from_millis(1500);
@@ -73,6 +77,13 @@ const DECODE_HOP_SAMPLES: usize = TARGET_RATE as usize / 2; // 8_000 = 0.5 s
 /// GPU and the one-time ~1 s CUDA warm-up, so only a genuinely non-viable
 /// machine trips it (docs/adr/0035).
 const MAX_DECODE_LATENCY: Duration = Duration::from_millis(2500);
+
+/// Live streaming: how many recent committed words to feed a windowed re-decode
+/// as Whisper decoding context (`initial_prompt`). Enough to restore sentence
+/// context at the window's start, while staying well inside Whisper's prompt
+/// budget (~half of the 448-token context); Hebrew words can be several tokens
+/// each, so this stays modest. See [`WindowAnchor`] and docs/adr/0037.
+const STREAM_PROMPT_WORDS: usize = 40;
 
 /// How a dictation take is started and stopped.
 #[derive(Clone, Copy)]
@@ -145,10 +156,11 @@ pub fn spawn_worker(app: AppHandle, gates: crate::Gates) -> DictationChannel {
 
 /// The result of one off-thread streaming re-decode, sent back to the worker.
 struct DecodeOutcome {
-    /// The hypothesis text and the language the decode reported, or `None` when
-    /// the decode errored. Latency still comes back either way so a slow,
-    /// erroring machine can still self-disable.
-    hypothesis: Option<(String, String)>,
+    /// The window's hypothesis text, the language the decode reported, and its
+    /// segments (for advancing the window anchor) — or `None` when the decode
+    /// errored. Latency still comes back either way so a slow, erroring machine
+    /// can still self-disable.
+    hypothesis: Option<(String, String, Vec<Segment>)>,
     /// Wall-clock the decode took — feeds the scheduler's self-disable.
     latency: Duration,
 }
@@ -156,18 +168,24 @@ struct DecodeOutcome {
 /// Drives live partial transcripts for one hands-free take.
 ///
 /// Every capture tick the worker calls [`pump`](Self::pump). When the
-/// [`DecodeScheduler`] says so, it snapshots the growing buffer and spawns a
-/// single-flight off-thread re-decode (so the capture thread never stalls on
-/// inference). Each finished decode comes back through an mpsc channel, is
-/// folded through LocalAgreement-2 into a flicker-free `(committed, provisional)`
-/// preview, and is emitted as `dictation:partial`. The architecture is unary
-/// re-decode + client-side commit, not bidi streaming — see docs/adr/0035.
+/// [`DecodeScheduler`] says so, it snapshots the uncommitted tail of the buffer
+/// — the audio from the [`WindowAnchor`] forward, not the whole take — and spawns
+/// a single-flight off-thread re-decode (so the capture thread never stalls on
+/// inference). Each finished decode comes back through an mpsc channel; its
+/// window text is reassembled with the committed prefix, folded through
+/// LocalAgreement-2 into a flicker-free `(committed, provisional)` preview,
+/// emitted as `dictation:partial`, and its segments advance the anchor past
+/// whatever just committed. The architecture is unary windowed re-decode +
+/// client-side commit, not bidi streaming — see docs/adr/0035 and docs/adr/0037.
 struct Streamer {
     provider: Arc<FasterWhisperProvider>,
     app: AppHandle,
     scheduler: DecodeScheduler,
     latch: LanguageLatch,
     committer: LocalAgreement,
+    /// Tracks the re-decode window so each decode covers only the uncommitted
+    /// tail, keeping cost bounded however long the take runs (docs/adr/0037).
+    anchor: WindowAnchor,
     /// Set while an off-thread decode is running — the single-flight guard.
     in_flight: Arc<AtomicBool>,
     tx: Sender<DecodeOutcome>,
@@ -187,6 +205,7 @@ impl Streamer {
             ),
             latch: LanguageLatch::new(),
             committer: LocalAgreement::new(),
+            anchor: WindowAnchor::new(TARGET_RATE),
             in_flight: Arc::new(AtomicBool::new(false)),
             tx,
             rx,
@@ -200,6 +219,7 @@ impl Streamer {
         self.committer = LocalAgreement::new();
         self.latch.reset();
         self.scheduler.reset();
+        self.anchor.reset();
         // A decode from the previous take may still be in flight; abandon its
         // result rather than letting it bleed into this take's preview.
         for _ in self.rx.try_iter() {}
@@ -213,21 +233,41 @@ impl Streamer {
             .scheduler
             .should_decode(buffered, self.in_flight.load(Ordering::Acquire))
         {
-            // Snapshot the whole growing buffer (an owned, Send copy) and decode
-            // it off-thread. samples_since(0) copies without consuming.
-            let snapshot = capture.samples_since(0);
-            self.scheduler.mark_decoded(snapshot.len());
+            // Re-decode only the uncommitted tail — the audio from the window
+            // anchor forward, not the whole growing buffer — so cost stays
+            // bounded however long the take runs (docs/adr/0037). samples_since
+            // copies without consuming.
+            let snapshot = capture.samples_since(self.anchor.offset());
+            // Pace by total new audio (`buffered`), not the window length, so the
+            // cadence is unchanged as the anchor advances and the window shrinks.
+            self.scheduler.mark_decoded(buffered);
+            if snapshot.is_empty() {
+                return; // window caught up to the buffer end — wait for more audio
+            }
             self.in_flight.store(true, Ordering::Release);
             let provider = Arc::clone(&self.provider);
             let in_flight = Arc::clone(&self.in_flight);
             let tx = self.tx.clone();
             let language = self.latch.query().to_string();
+            // Prime the windowed decode with the committed tail so it keeps the
+            // sentence context it would otherwise lose by not starting at audio 0.
+            let prompt = self.anchor.prompt(STREAM_PROMPT_WORDS);
             tauri::async_runtime::spawn(async move {
                 let started = Instant::now();
-                let result = provider.transcribe(&snapshot, &language).await;
+                let result = provider
+                    .transcribe(
+                        &snapshot,
+                        TranscribeOptions {
+                            language: &language,
+                            initial_prompt: &prompt,
+                        },
+                    )
+                    .await;
                 let latency = started.elapsed();
                 let hypothesis = match result {
-                    Ok(transcript) => Some((transcript.text, transcript.language)),
+                    Ok(transcript) => {
+                        Some((transcript.text, transcript.language, transcript.segments))
+                    }
                     Err(err) => {
                         tracing::warn!("dictation: streaming re-decode failed: {err:#}");
                         None
@@ -251,9 +291,17 @@ impl Streamer {
         let outcomes: Vec<DecodeOutcome> = self.rx.try_iter().collect();
         for outcome in outcomes {
             self.scheduler.observe_latency(outcome.latency);
-            if let Some((text, language)) = outcome.hypothesis {
+            if let Some((text, language, segments)) = outcome.hypothesis {
                 self.latch.observe(&language);
-                let preview = self.committer.observe(&text);
+                // The decode saw only the window; reassemble the full-utterance
+                // hypothesis (committed prefix + window text) before committing,
+                // so the committer's view still spans the whole take.
+                let global = self.anchor.global(&text);
+                let preview = self.committer.observe(&global);
+                // Move the window past whatever just committed, mapping committed
+                // words to audio time via this decode's segments (docs/adr/0037).
+                self.anchor
+                    .advance(&self.committer.committed_text(), &segments);
                 self.emit(&preview);
             }
         }
@@ -342,7 +390,9 @@ fn run_worker(rx: Receiver<DictationCommand>, app: AppHandle, gates: crate::Gate
         // detector can occasionally misread. The latch still spares the
         // per-chunk detector runs during streaming; only this final ignores it.
         // Its raw text is what gets injected.
-        match tauri::async_runtime::block_on(provider.transcribe(&pcm, "")) {
+        match tauri::async_runtime::block_on(
+            provider.transcribe(&pcm, TranscribeOptions::default()),
+        ) {
             Ok(transcript) => {
                 tracing::info!(
                     chars = transcript.text.chars().count(),
@@ -528,12 +578,20 @@ fn listen(
             let mut cursor = 0usize;
             let mut frame_buf: Vec<f32> = Vec::new();
             let mut vad_failed = false;
+            // Why the take stopped — assigned on every break path, logged below.
+            let reason: &str;
 
             loop {
                 match rx.recv_timeout(LEVEL_INTERVAL) {
-                    Ok(DictationCommand::HotkeyPressed(_)) => break, // press again
-                    Ok(DictationCommand::HotkeyReleased) => {}       // the tap's key-up
-                    Err(RecvTimeoutError::Disconnected) => break,
+                    Ok(DictationCommand::HotkeyPressed(_)) => {
+                        reason = "second-press";
+                        break;
+                    }
+                    Ok(DictationCommand::HotkeyReleased) => {} // the tap's key-up
+                    Err(RecvTimeoutError::Disconnected) => {
+                        reason = "shutdown";
+                        break;
+                    }
                     Err(RecvTimeoutError::Timeout) => {
                         let chunk = capture.samples_since(cursor);
                         cursor += chunk.len();
@@ -544,7 +602,10 @@ fn listen(
                             frame_buf.extend_from_slice(&chunk);
                             match drain_frames(silero, &mut endpointer, &mut frame_buf) {
                                 FrameVerdict::Continue => {}
-                                FrameVerdict::Ended => break,
+                                FrameVerdict::Ended => {
+                                    reason = "vad-endpoint";
+                                    break;
+                                }
                                 FrameVerdict::VadFailed => vad_failed = true,
                             }
                         }
@@ -555,11 +616,21 @@ fn listen(
                         streamer.pump(capture, cursor);
 
                         if started.elapsed() >= MAX_TAKE {
+                            reason = "max-take-cap";
                             break;
                         }
                     }
                 }
             }
+
+            // Duration + stop reason only — never transcript or audio content
+            // (.claude/rules/security.md). Lets a "it cut off too early" report
+            // be diagnosed: VAD endpoint vs the hard cap vs a second press.
+            tracing::info!(
+                reason,
+                secs = started.elapsed().as_secs_f32(),
+                "dictation take ended"
+            );
 
             // The endpoint verdict is usable only if Silero ran start to end.
             let vad_ran = vad.is_some() && !vad_failed;
