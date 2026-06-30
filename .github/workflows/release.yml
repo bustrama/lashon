@@ -59,20 +59,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # v1.0.0 ships the free (dictation-only) edition, Windows-only and
+          # unsigned (docs/adr/0039). `--no-default-features` drops command mode
+          # (ADR-0034); `--no-sign` skips updater signing (no key yet); the
+          # frontend free flag is VITE_LASHON_EDITION in the build step env.
           - os: windows-2022
             sidecar_name: lashon-stt.exe
-            tauri_args: --bundles nsis
-          - os: macos-14
-            sidecar_name: lashon-stt
-            tauri_args: --bundles dmg --target aarch64-apple-darwin
-          - os: macos-13
-            sidecar_name: lashon-stt
-            tauri_args: --bundles dmg --target x86_64-apple-darwin
-          # Linux AppImage build is intentionally not in the matrix: the
-          # tauri-action v0.5.x + Ubuntu 24.04 + linuxdeploy combination
-          # produced an opaque "failed to run linuxdeploy" with no stderr
-          # propagation through three rounds of remediation (PRs #50, #51,
-          # #52). Re-introduce when there is a reproducible fix.
+            tauri_args: --bundles nsis --no-sign -- --no-default-features
+          # macOS (macos-14 / macos-13 DMGs) and the Linux AppImage are dropped
+          # for v1.0.0 — Windows-first (ADR-0033). Re-add the per-arch macOS
+          # matrix entries (and the Linux libfuse2 remediation, PRs #50–#52)
+          # when those platforms ship.
 
     defaults:
       run:
@@ -271,6 +268,12 @@ jobs:
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Free (dictation-only) edition: tree-shake the command-mode Hub
+          # surface out of the frontend bundle (ADR-0034). Pairs with
+          # `--no-default-features` in the matrix tauri_args, which drops the
+          # command-mode Rust. Both are required — the Vite build can't see the
+          # Cargo feature flags.
+          VITE_LASHON_EDITION: free
           # Minisign signing key for tauri-plugin-updater.
           # Set these secrets before cutting the first v0.6.0+ release:
           #   gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/lashon.key
@@ -287,11 +290,17 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'Lashon ${{ github.ref_name }}'
           releaseBody: |
-            See [CHANGELOG](https://github.com/bustrama/lashon/blob/main/CHANGELOG.md) for details.
+            Lashon v1.0.0 — free dictation-only edition (Windows).
 
-            **macOS note:** this release is unsigned. Gatekeeper will show a
-            warning on first launch. Right-click → Open to bypass it.
-            Signed releases are gated on the Apple Developer Program (M13).
+            Hebrew long-form dictation: hotkey → transcribe → inject, with
+            multi-second pause tolerance and a live prompter overlay.
+
+            **Unsigned build (docs/adr/0039):** Windows SmartScreen will warn on
+            first launch — click **More info → Run anyway**. A signed release
+            follows once code-signing is wired.
+
+            First launch downloads the Hebrew STT model + CUDA runtime (~2.8 GB)
+            into the app's data directory.
           releaseDraft: true
           # Non-prerelease — the GitHub `/releases/latest/download/...`
           # redirect (which tauri-plugin-updater fetches) excludes
