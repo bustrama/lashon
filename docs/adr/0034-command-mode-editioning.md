@@ -51,7 +51,7 @@ default for users who do not build from source.
 |---|---|---|
 | **lashon-core** | audio, vad, sidecar, stt, inject, wake, hotkey, hardware, model, transcript, keychain | command_mode, llm (+ providers), llama_server, tool, tools/, recipes/, mcp/, the 2 bins |
 | **Tauri shell** | dictation (inject path), wakeword (dictation slot), core commands | command_mode.rs, llm.rs, recipes.rs; command-hotkey handlers; command wake-slot; ~22 `invoke_handler` entries; the 2 `.manage()` states |
-| **Frontend / Hub** | tongue (dictation), Hardware, Language, dictation hotkey, wake **dictation** slot, Voice-corrections | **Hub:** LLM section, Recipes tab, MCP tab, command/chat hotkeys, wake **command** slot; tongue command + chat modes |
+| **Frontend / Hub** | tongue (dictation), Hardware, Language, dictation hotkey, wake **dictation** slot | **Hub:** LLM section, Recipes tab, **Voice-corrections** (word aliases apply only in the command-mode dispatch — `command_mode.rs`), MCP tab, command/chat hotkeys, wake **command** slot; tongue command + chat modes |
 
 ## Consequences
 
