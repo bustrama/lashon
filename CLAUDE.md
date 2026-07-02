@@ -35,10 +35,12 @@ source, **Windows-first** for v1.0, never a subscription.
   critical path (supersedes ADR-0023).
 - **Forward plan:** [`docs/roadmap.md`](docs/roadmap.md) - **decisions:** [`docs/adr/`](docs/adr/)
 
-Shipped: M0-M9, plus unsigned pre-releases v0.1.0-v0.6.0 (in-app auto-update +
-cross-OS installers landed in v0.6.0; previews were removed from Releases
-pending the v1.0.0 launch). The next release is the open-core **v1.0.0**
-(Windows). The full milestone-by-milestone dev narrative is kept off-repo.
+Shipped: M0-M9, plus unsigned pre-releases v0.1.0-v0.6.0 and the open-core
+**v1.0.0** — the free, dictation-only, Windows, unsigned edition (in-app
+auto-update + cross-OS installers landed in v0.6.0). The next release is
+**v1.1.0** (Windows): single-instance enforcement and persistent diagnostic
+logging that harden the shipped build. Code-signing is still the next major
+step. The full milestone-by-milestone dev narrative is kept off-repo.
 
 ## Repository layout
 

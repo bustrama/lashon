@@ -1,6 +1,6 @@
 [package]
 name = "lashon-core"
-version = "1.0.0"
+version = "1.1.0"
 description = "Lashon core — provider clients and shared logic, independent of the GUI."
 authors = ["Lashon contributors"]
 edition = "2021"

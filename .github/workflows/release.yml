@@ -290,10 +290,22 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'Lashon ${{ github.ref_name }}'
           releaseBody: |
-            Lashon v1.0.0 — free dictation-only edition (Windows).
+            Lashon v1.1.0 — free dictation-only edition (Windows).
 
-            Hebrew long-form dictation: hotkey → transcribe → inject, with
-            multi-second pause tolerance and a live prompter overlay.
+            A hardening release on top of v1.0.0:
+
+            - **Single instance:** launching Lashon while it is already running
+              now focuses the running window instead of starting a second
+              process (which would fight over the dictation hotkey, the STT
+              model, and the microphone).
+            - **Diagnostic logs:** a rolling on-disk log now lives under
+              `%LOCALAPPDATA%\dev.lashon.desktop\logs`. If you hit an error, open
+              the tray menu (or right-click the tongue) → **Open logs folder**
+              and attach it to a bug report. The log records only diagnostic
+              events — never your transcribed text or audio.
+
+            Hebrew long-form dictation is unchanged: hotkey → transcribe →
+            inject, with multi-second pause tolerance and a live prompter overlay.
 
             **Unsigned build (docs/adr/0039):** Windows SmartScreen will warn on
             first launch — click **More info → Run anyway**. A signed release
