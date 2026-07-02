@@ -87,6 +87,15 @@ The full roadmap — scope, milestones, and per-phase workstreams — lives in
 [`docs/roadmap.md`](docs/roadmap.md). Active work is tracked as stories in
 [`docs/stories/`](docs/stories/).
 
+## Diagnostic logs
+
+If Lashon errors or crashes, its diagnostic log is the most useful thing to
+attach to a bug report. Open the tray menu (or right-click the tongue) and
+choose **יומני אבחון · Open logs folder** — on Windows the logs live under
+`%LOCALAPPDATA%\dev.lashon.desktop\logs`. They record only structural
+diagnostic events — start-up, hardware tier, errors, timings — and, by design,
+**never** contain your transcribed text, audio, or prompts.
+
 ## Contributing
 
 Lashon is a **solo-maintained** project. **External pull requests are not

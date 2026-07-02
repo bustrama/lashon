@@ -315,10 +315,16 @@ async fn check_for_updates(app: tauri::AppHandle) -> Result<String, String> {
 
 /// Build and run the Lashon desktop application.
 pub fn run() {
-    init_tracing();
-    tracing::info!("Lashon starting");
-
     let builder = tauri::Builder::default()
+        // Single-instance must be the FIRST plugin (issue #12). It intercepts a
+        // second launch and hands off to the already-running process before any
+        // other plugin can act — so the duplicate never double-registers the
+        // dictation hotkey, loads a second Whisper model, grabs the mic, or
+        // races the settings store. No CLI args to forward: just raise the
+        // running window.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            focus_main_window(app);
+        }))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -407,6 +413,16 @@ pub fn run() {
             command_mode::set_word_aliases
         ])
         .setup(|app| {
+            // Initialize logging first, so every start-up step below is
+            // captured: a rolling on-disk log for shipped builds plus a dev
+            // console (issue #13). It lives in `setup` rather than at the top of
+            // `run` because the log directory is derived from the resolved
+            // per-user data dir. The panic hook is installed right after, once
+            // the subscriber is live, so a panic lands in that same log.
+            init_tracing(app.handle());
+            install_panic_hook();
+            tracing::info!("Lashon starting");
+
             // Point lashon-core at the bundled, frozen STT sidecar and a
             // per-user model directory before the dictation worker can spawn
             // it. In `tauri dev` the resources are absent and this is a no-op.
@@ -533,24 +549,52 @@ fn build_app_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let show = MenuItem::with_id(app, "show", "הצג את לשון · Show Lashon", true, None::<&str>)?;
     let tutorial = MenuItem::with_id(app, "tutorial", "מדריך · Tutorial", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "הגדרות · Settings", true, None::<&str>)?;
+    let logs = MenuItem::with_id(app, "logs", "יומני אבחון · Open logs folder", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "יציאה · Quit", true, None::<&str>)?;
-    Menu::with_items(app, &[&show, &tutorial, &settings, &quit])
+    Menu::with_items(app, &[&show, &tutorial, &settings, &logs, &quit])
 }
 
 /// Dispatch a menu selection — shared by the tray menu and the tongue's
 /// right-click context menu, which carry the same item ids.
 fn handle_menu_event(app: &tauri::AppHandle, id: &str) {
     match id {
-        "show" => {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.set_focus();
-            }
-        }
+        "show" => focus_main_window(app),
         "tutorial" => show_tutorial(app, true),
         "settings" => show_hub(app),
+        "logs" => open_logs_folder(app),
         "quit" => app.exit(0),
         _ => {}
+    }
+}
+
+/// Raise the primary (tongue) window: reveal it if hidden, un-minimize, and
+/// focus. Shared by the tray / context-menu "Show Lashon" action and the
+/// single-instance handoff (issue #12), which raises the running window when a
+/// second launch is rejected — hence `show()` + `unminimize()` before focus,
+/// since the tray-resident tongue may be hidden or minimized at that point.
+fn focus_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
+/// Open the diagnostic-logs directory in the OS file manager (issue #13) so a
+/// user hitting an error can attach the logs to a bug report without hunting
+/// through `%LOCALAPPDATA%`. Wired to the tray / context-menu "Open logs
+/// folder" item.
+fn open_logs_folder(app: &tauri::AppHandle) {
+    use tauri_plugin_opener::OpenerExt;
+    let Some(dir) = logs_dir(app) else {
+        tracing::warn!("could not resolve the logs directory to open");
+        return;
+    };
+    if let Err(err) = app
+        .opener()
+        .open_path(dir.to_string_lossy().to_string(), None::<&str>)
+    {
+        tracing::warn!("could not open the logs directory: {err:#}");
     }
 }
 
@@ -693,11 +737,114 @@ fn stt_device_from_tier(app: &tauri::App) -> Option<&'static str> {
     Some(tier.stt_device())
 }
 
-fn init_tracing() {
-    use tracing_subscriber::EnvFilter;
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
-        )
+/// The per-user directory Lashon writes rolling diagnostic logs to:
+/// `app_local_data_dir()/logs/` — beside the `models/` and `cuda/` dirs
+/// `configure_sidecar_env` resolves. Created on demand. `None` only when the
+/// platform data directory cannot be resolved at all.
+fn logs_dir(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
+    let dir = app.path().app_local_data_dir().ok()?.join("logs");
+    if let Err(err) = std::fs::create_dir_all(&dir) {
+        // Pre-subscriber (or a broken data dir): fall back to stderr.
+        eprintln!(
+            "lashon: could not create the logs directory {}: {err}",
+            dir.display()
+        );
+        return None;
+    }
+    Some(dir)
+}
+
+/// Initialize `tracing`: a rolling on-disk log for shipped builds, plus a
+/// console layer in development.
+///
+/// The file layer (issue #13) is the diagnostic surface a user can send us.
+/// Release builds have no console — `main.rs` sets
+/// `windows_subsystem = "windows"` — so without an on-disk log a field error
+/// leaves the user nothing to report. The log is written **synchronously** (no
+/// `tracing_appender::non_blocking`): the dictation heap-corruption crash aborts
+/// the process *without* a Rust panic, and an async buffered writer would lose
+/// exactly the final lines we most need. Retention is bounded to the last seven
+/// daily files so it never grows unbounded.
+///
+/// Privacy invariant (`.claude/rules/security.md`): the log must never contain
+/// transcript text, audio, prompts, or model output — only structural
+/// diagnostic events. This layer merely persists what `tracing` already emits,
+/// which is held to that rule at every call site.
+fn init_tracing(app: &tauri::AppHandle) {
+    use tracing_appender::rolling::{Builder, Rotation};
+    use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+
+    // Console only in dev — in release there is no console to read it, and
+    // skipping the layer avoids formatting every event a second time.
+    let console_layer = if cfg!(debug_assertions) {
+        Some(fmt::layer())
+    } else {
+        None
+    };
+
+    // Daily-rolling file, last seven days retained. On failure fall back to
+    // console-only — logging setup must never abort start-up.
+    let log_dir = logs_dir(app);
+    let file_layer = log_dir.as_ref().and_then(|dir| {
+        match Builder::new()
+            .rotation(Rotation::DAILY)
+            .filename_prefix("lashon")
+            .filename_suffix("log")
+            .max_log_files(7)
+            .build(dir)
+        {
+            Ok(appender) => Some(fmt::layer().with_ansi(false).with_writer(appender)),
+            Err(err) => {
+                eprintln!("lashon: could not initialize the rolling log: {err}");
+                None
+            }
+        }
+    });
+
+    let logging_to_file = file_layer.is_some();
+    tracing_subscriber::registry()
+        .with(env_filter)
+        .with(file_layer)
+        .with(console_layer)
         .init();
+
+    if logging_to_file {
+        if let Some(dir) = log_dir {
+            tracing::info!(path = %dir.display(), "diagnostic log directory");
+        }
+    }
+}
+
+/// Install a panic hook that records the panic message, location, and a
+/// backtrace to the log before the process unwinds (issue #13) — a Rust panic
+/// would otherwise vanish in a release build with no console. Chains to the
+/// previous hook so `tauri dev` still prints the standard panic output.
+///
+/// Note: the heap-corruption crash under investigation aborts the process
+/// *without* a Rust panic, so this hook does not fire for it — the synchronous
+/// rolling log in `init_tracing` is what captures that case.
+fn install_panic_hook() {
+    let previous_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let backtrace = std::backtrace::Backtrace::force_capture();
+        let location = info
+            .location()
+            .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
+            .unwrap_or_else(|| "unknown".to_string());
+        let message = info
+            .payload()
+            .downcast_ref::<&str>()
+            .map(|s| s.to_string())
+            .or_else(|| info.payload().downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "<non-string panic payload>".to_string());
+        tracing::error!(
+            target: "lashon::panic",
+            location = %location,
+            %backtrace,
+            "panic: {message}"
+        );
+        previous_hook(info);
+    }));
 }
