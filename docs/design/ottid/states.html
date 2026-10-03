@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ottid · state map</title>
+<style>
+:root{--bg:#0e1216;--card:#151b21;--line:rgba(221,228,233,.12);--text:#dde4e9;--mute:rgba(221,228,233,.62);--peach:#f7c8a3}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Heebo,'Segoe UI',system-ui,sans-serif;padding:20px 16px 40px}
+h1{font-size:20px;font-weight:600;margin:0 0 4px}
+.sub{color:var(--mute);font-size:14px;margin:0 0 12px;line-height:1.55;max-width:960px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.lbl{color:var(--mute);font-size:13px;min-width:52px}
+button{background:transparent;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font:inherit;font-size:14px;cursor:pointer}
+button.on{border-color:var(--peach);color:var(--peach)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:12px}
+.cell{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.cell canvas{width:100%;height:175px;display:block;cursor:pointer}
+.info{padding:8px 12px 12px}
+.info h2{font-size:15px;margin:0 0 4px;font-weight:600;display:flex;gap:8px;align-items:center}
+.chip{width:12px;height:12px;border-radius:50%;flex:none}
+.code{font:12px ui-monospace,Consolas,monospace;color:var(--mute);margin-inline-start:auto;direction:ltr}
+.info p{margin:0;font-size:13px;line-height:1.5;color:var(--mute)}
+#nogl{display:none;color:#e8625a}
+</style>
+</head>
+<body>
+<h1>Ottid · מפת המצבים</h1>
+<p class="sub">כל מצב בנוי מארבעה דברים: צבע ומנורה, עיניים, ידיים ותנועת גוף. הגוף הוא צללית כהה אחת, ולכן יד שעוברת לפניו נעלמת בתוכו. בגלל זה כל המחוות קורות על קו המתאר: בצדדים, מעל הראש או על הרצפה. בהכתבה ובפקודה עוצמת הקול מזיזה את הגוף ואת המנורה. מצבים שהם אירוע (מילת השכמה, שגיאה, סיום) חוזרים כאן בלולאה כדי שיהיה אפשר לראות אותם. מהתקרה, יד אחת תמיד מחזיקה, והשנייה עושה את המחווה.</p>
+<div class="bar"><span class="lbl">איפה</span><button data-m="task" class="on">על שורת המשימות</button><button data-m="float">צף</button><button data-m="hang">מהתקרה</button>
+  <span class="lbl" style="margin-inline-start:10px">Windows</span><button id="tDark" class="on">כהה</button><button id="tLight">בהיר</button></div>
+<p id="nogl">WebGL לא זמין בדפדפן הזה.</p>
+<div class="grid" id="grid"></div>
+
+<script>
+const BEZ = 7, TASK = 22, R = 22, RX = 29, RY = 20.2, FLAT = 11, EYE_Y = -1.3, CORE_Y = 5.5, Z = 1.5;
+const PEACH = '247,200,163', SAFFRON = '232,177,74', COBALT = '77,141,240', CLOUD = '122,133,144', ROSE = '232,98,90', AQUA = '63,203,192', GREEN = '95,184,135';
+const DEF = [
+  ['idle', 'מנוחה', PEACH, 'נושם ומסתכל סביב. מדי פעם מנפנף לשלום. המנורה עמומה.'],
+  ['prep', 'מתכונן', SAFFRON, 'מתמתח עם שתי ידיים למעלה בזמן שהמודל נטען. המנורה הזעפרנית נדלקת בהדרגה.'],
+  ['dict', 'הכתבה', SAFFRON, 'רושם בפנקס עם עיפרון זעפרני, ומהר יותר כשמדברים חזק. כשהדף מתמלא הוא מדפדף. העיניים על הפנקס, והגוף רוטט עם הקול.'],
+  ['cmd', 'פקודה', COBALT, 'בתוך הגוף יורד גשם קוד של אותיות עבריות ומספרים, כמו במטריקס, מהר יותר כשמדברים חזק. שתי ידיים מורמות, "מוכן לבצע".'],
+  ['transcribe', 'מתמלל', CLOUD, 'יד אחת "כותבת" בצד והעיניים עליה. אפור זורם.'],
+  ['think', 'חושב', CLOUD, 'מגרד בראש ומסתכל למעלה. אפור שפועם לאט.'],
+  ['tool', 'מבצע', COBALT, 'שתי הידיים עובדות לסירוגין, כמו פטיש. כחול מתקתק.'],
+  ['confirm', 'מחכה לאישור', PEACH, 'ידיים פרושות ("הנה, מאשר?") ועיניים מבקשות. אפרסק יציב, ליד כרטיס האישור.'],
+  ['wake', 'מילת השכמה', SAFFRON, 'קופץ בבהלה עם הידיים למעלה ועובר להקשבה. הבזק בצבע המצב.'],
+  ['error', 'שגיאה', ROSE, 'נרתע ומתכווץ, הידיים נשמטות והעיניים עצובות. הבזק אדום שדועך.'],
+  ['claude', 'Claude צריך אותך', AQUA, 'מנפנף שוב ושוב וקופץ. טורקיז שפועם מהר.'],
+  ['done', 'Claude סיים', GREEN, 'מריע עם שתי הידיים וקופץ, העיניים מחייכות. הבזק ירוק שדועך.'],
+];
+const PER = { idle: 7, prep: 2.6, wake: 2.8, error: 3, claude: 1.5, done: 3 };
+const LEVEL = new Set(['dict', 'cmd']);
+// dictation prop: a notepad held at the right side (body-local units), written line by line
+const PAD = { cx: 23, cy: -1, w: 17, h: 21, rot: .12, lines: 5 };
+const PEN_DIR = [Math.cos(-.95), Math.sin(-.95)];
+const PEN_OFF = [PEN_DIR[0] * 5.6, PEN_DIR[1] * 5.6];   // the palm grips the pencil this far up from its tip
+const GLYPHS = 'אבגדהוזחטיכלמנסעפצקרשת0123456789';
+const RAIN = document.createElement('canvas');
+function padPoint(u, v) {
+  const x = (u - .5) * PAD.w, y = (v - .5) * PAD.h, c = Math.cos(PAD.rot), s = Math.sin(PAD.rot);
+  return [PAD.cx + x * c - y * s, PAD.cy + x * s + y * c];
+}
+function penCursor(s, T) {
+  const line = Math.min(PAD.lines - 1, Math.floor(s.write)), frac = s.flip > 0 ? 0 : s.write - Math.floor(s.write);
+  return padPoint(.16 + .68 * frac + .012 * Math.sin(T * 31), .32 + line * .13 + .012 * Math.sin(T * 23));
+}
+function drawPad(g, s, light, k, palm) {
+  const p = s.flip > 0 ? 1 - s.flip / .35 : 1, fold = s.flip > 0 ? Math.max(.06, Math.abs(Math.cos(Math.PI * p))) : 1;
+  g.save(); g.translate(PAD.cx, PAD.cy); g.rotate(PAD.rot);
+  g.translate(0, -PAD.h / 2); g.scale(1, fold); g.translate(0, PAD.h / 2);
+  g.shadowColor = 'rgba(0,0,0,.35)'; g.shadowBlur = 3 * k; g.shadowOffsetY = .8 * k;
+  g.fillStyle = '#efe7da'; g.beginPath(); g.roundRect(-PAD.w / 2, -PAD.h / 2, PAD.w, PAD.h, 1.2); g.fill();
+  g.shadowColor = 'transparent'; g.shadowBlur = 0; g.shadowOffsetY = 0;
+  g.fillStyle = '#2a3036'; g.fillRect(-PAD.w / 2, -PAD.h / 2, PAD.w, 2.6);
+  g.fillStyle = '#8a939c'; for (let i = 0; i < 5; i++) { g.beginPath(); g.arc(-PAD.w / 2 + 3 + i * 2.8, -PAD.h / 2 + 1.3, .7, 0, 7); g.fill(); }
+  if (s.flip <= 0) {
+    g.strokeStyle = 'rgba(38,42,48,.85)'; g.lineWidth = .6; g.lineCap = 'round';
+    const line = Math.min(PAD.lines - 1, Math.floor(s.write)), frac = s.write - Math.floor(s.write);
+    for (let i = 0; i <= line; i++) {
+      const end = i < line ? 1 : frac; if (end <= 0) continue;
+      const n = Math.max(2, Math.ceil(end * 24)); g.beginPath();
+      for (let q = 0; q <= n; q++) { const uu = q / n * end, x = (-.5 + .16 + .68 * uu) * PAD.w, y = (-.5 + .32 + i * .13) * PAD.h + .55 * Math.sin(uu * 38 + i * 2.1) * (.6 + .4 * Math.sin(uu * 7 + i)); q ? g.lineTo(x, y) : g.moveTo(x, y); }
+      g.stroke();
+    }
+  }
+  g.restore();
+  // the pencil (saffron, the dictation colour) gripped by the palm, drawn over the paper
+  const tip = [palm[0] - PEN_OFF[0], palm[1] - PEN_OFF[1]], at = t => [tip[0] + PEN_DIR[0] * t, tip[1] + PEN_DIR[1] * t];
+  const seg = (a, b, col) => { const A = at(a), B = at(b); g.beginPath(); g.moveTo(A[0], A[1]); g.lineTo(B[0], B[1]); g.strokeStyle = col; g.stroke(); };
+  g.lineWidth = 2.3; g.lineCap = 'butt';
+  seg(0, 1.8, '#3a2f22'); seg(1.8, 15.5, '#e8b14a'); seg(15.5, 17, '#e89a8a');
+  g.beginPath(); g.arc(palm[0], palm[1], 4.6, 0, 7); g.fillStyle = '#14181c'; g.fill();
+  g.strokeStyle = light ? 'rgba(255,255,255,.1)' : `rgba(${PEACH},.3)`; g.lineWidth = 1.1 / Z; g.stroke();
+}
+let MODE = 'task', LIGHT = false, NOW = 0;
+
+function spring(x, r, d) { return { x, v: 0, t: x, w: 2 * Math.PI / r, z: d }; }
+function step(s, dt) { const n = Math.max(1, Math.ceil(dt * 240)), h = dt / n; for (let i = 0; i < n; i++) { const a = -s.w * s.w * (s.x - s.t) - 2 * s.z * s.w * s.v; s.v += a * h; s.x += s.v * h; } }
+function mic(T) { return Math.max(0, Math.min(1, .55 * Math.sin(T * 8.3) + .35 * Math.sin(T * 3.1 + 1) + .2 * Math.sin(T * 13.7) + .15)); }
+
+// ── GPU renderer: the whole body (ellipse ∪ two dough arms ∪ ceiling, floor-clipped) is one signed-distance field ──
+const GL = (() => {
+  const cv = document.createElement('canvas');
+  const gl = cv.getContext('webgl', { premultipliedAlpha: true, preserveDrawingBuffer: true, antialias: false, alpha: true });
+  if (!gl) return null;
+  const VS = 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }';
+  const FS = `precision highp float;
+uniform vec2 uRes; uniform mat3 uInv; uniform float uPxl; uniform vec2 uRad; uniform float uWob; uniform vec3 uPh;
+uniform float uFlat; uniform float uHang; uniform vec3 uCeilRow; uniform vec4 uArmA; uniform vec4 uArmB;
+uniform vec3 uBody; uniform vec3 uLamp; uniform float uLampA; uniform float uCoreY; uniform vec3 uRim; uniform float uRimA;
+float smin(float a, float b, float k){ float h = max(k - abs(a - b), 0.) / k; return min(a, b) - h * h * k * .25; }
+float smax(float a, float b, float k){ return -smin(-a, -b, k); }
+float capsule(vec2 p, vec2 a, vec2 b, float r){ vec2 pa = p - a, ba = b - a; float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0., 1.); return length(pa - ba * h) - r; }
+void main(){
+  vec2 dp = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
+  vec2 p = (uInv * vec3(dp, 1.)).xy;
+  float k0 = length(p / uRad), k1 = max(length(p / (uRad * uRad)), 1e-6);
+  float d = k0 * (k0 - 1.) / k1;
+  float a = atan(p.y / uRad.y, p.x / uRad.x);
+  d -= uWob * (.6 * sin(2. * a + uPh.x) + .5 * sin(3. * a + uPh.y) + .3 * sin(5. * a + uPh.z));
+  d = smin(d, capsule(p, uArmA.xy, uArmA.zw, 2.6), 4.5); d = smin(d, length(p - uArmA.zw) - 4.6, 2.5);
+  d = smin(d, capsule(p, uArmB.xy, uArmB.zw, 2.6), 4.5); d = smin(d, length(p - uArmB.zw) - 4.6, 2.5);
+  if (uHang > .5) d = smin(d, dot(uCeilRow, vec3(dp, 1.)), 5.);
+  d = smax(d, p.y - uFlat, 3.);
+  float cov = clamp(.5 - d / uPxl, 0., 1.);
+  float t = length(p - vec2(0., uCoreY)) / 25.;
+  float lg = t < .6 ? uLampA * (1. - t / .6 * .65) : uLampA * .35 * max(0., 1. - (t - .6) / .4);
+  vec3 col = mix(uBody, uLamp, lg);
+  col = mix(col, uRim, uRimA * clamp(1. - abs(d / uPxl + .9) / .9, 0., 1.));
+  gl_FragColor = vec4(col * cov, cov);
+}`;
+  const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
+  const prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  gl.useProgram(prog);
+  const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const U = {}; for (const n of ['uRes', 'uInv', 'uPxl', 'uRad', 'uWob', 'uPh', 'uFlat', 'uHang', 'uCeilRow', 'uArmA', 'uArmB', 'uBody', 'uLamp', 'uLampA', 'uCoreY', 'uRim', 'uRimA']) U[n] = gl.getUniformLocation(prog, n);
+  return { cv, gl, U };
+})();
+if (!GL) document.getElementById('nogl').style.display = 'block';
+
+function withLids(g, px, py, rw, rh, side, lt, tilt, lb, draw) {
+  const top = py - rh, full = rh * 2, X = rw * 2.4, base = top + lt * full, y = xr => base + tilt * rh * 2 * (xr / rw) * side;
+  g.save();
+  g.beginPath(); g.moveTo(px - X, y(-X)); g.lineTo(px + X, y(X)); g.lineTo(px + X, py + rh + 30); g.lineTo(px - X, py + rh + 30); g.closePath(); g.clip();
+  if (lb > .01) { const cy = py + rh + rh * 1.25 - lb * full * .78, erx = rw * 2.1; g.beginPath(); g.rect(px - X, top - 30, 2 * X, full + 90); g.moveTo(px + erx, cy); g.ellipse(px, cy, erx, rh * 1.3, 0, 0, Math.PI * 2); g.clip('evenodd'); }
+  draw(); g.restore();
+}
+function drawEyes(g, s, k) {
+  const lt = Math.max(s.lt.x, s.blink > 0 ? 1 - Math.abs(Math.cos(s.blink * Math.PI)) : 0);
+  const gx = Math.sin(s.gx.x * .9), gy = Math.sin(s.gy.x * .9), ER = 3.3, EH = 5, SEP = 8;
+  for (const side of [-1, 1]) {
+    const er = ER * s.sc.x, eh = EH * s.sc.x, px = side * SEP + .72 * ER * gx, py = .4 * EH * gy;
+    const rw = er * (1 - .22 * Math.abs(gx)), rh = eh * (1 - .15 * Math.abs(gy));
+    withLids(g, px, py, rw, rh, side, lt, s.tilt.x, s.lb.x, () => { g.shadowColor = `rgba(${PEACH},.85)`; g.shadowBlur = 4 * k; g.fillStyle = '#f7c8a3'; g.beginPath(); g.ellipse(px, py, rw, rh, 0, 0, 7); g.fill(); g.shadowBlur = 0; });
+  }
+}
+
+// ── poses ──
+function geom(T, ph) { const hang = MODE === 'hang', ry = hang ? RY * 1.08 : RY; return { hang, ry, ceil: -(ry + 11 + 3 * Math.sin(T * 1.3 + ph)), flat: MODE === 'task' ? FLAT : null }; }
+const shoulder = (sd, hang, ry) => hang ? [sd * 21, -ry * .35] : [sd * 24, 1];
+const reach = (sd, e, L, hang, ry) => { const [x, y] = shoulder(sd, hang, ry); return [x + sd * L * Math.cos(e), y - L * Math.sin(e)]; };
+function rest(sd, T, G, ph) {
+  if (G.hang) return [sd * 31, G.ceil + 2];
+  if (MODE === 'float') return reach(sd, -.2 + .25 * Math.sin(T * 2.2 + sd * .8 + ph), 14, false, G.ry);
+  return reach(sd, -.6, 13, false, G.ry);
+}
+function poke(c, k = 1, happy = true) {
+  const s = c.sim;
+  if (MODE === 'hang') s.sq.v += 2.6 * k; else { s.hop.v -= 150 * k; s.sq.v += 1.6 * k; }
+  s.jig.v += 3 * k; if (happy) s.happyUntil = NOW + .9;
+}
+
+function updateCell(c, T, dt) {
+  const s = c.sim, k = c.key, hang = MODE === 'hang', G = geom(T, s.ph);
+  const per = PER[k] || 0, u = per ? ((T + s.ph) % per) / per : 0, wrap = per > 0 && u < s.lastU; s.lastU = u;
+  const lvl = LEVEL.has(k) ? mic(T + s.ph * 3) : 0; s.lvl = lvl;
+  const GS = 1;  // the gesturing hand; when hanging the other one keeps holding the edge
+  let glow = 0, lt = .12, lb = 0, tilt = 0, sc = 1, gaze = null, sq = 1 + .02 * Math.sin(T * 1.6 + s.ph);
+  let rot = hang ? .06 * (.75 * Math.sin(T * 1.25 + s.ph) + .25 * Math.sin(T * 2.9 + 1 + s.ph)) : .025 * Math.sin(T * .9 + s.ph);
+  const H = {};
+  const both = f => { for (const sd of [-1, 1]) if (!hang || sd === GS) H[sd] = f(sd); };
+  const one = f => { H[GS] = f(GS); };
+  const at = (sd, e, L) => reach(sd, e, L, hang, G.ry);
+  switch (k) {
+    case 'idle': if (u < .22) { one(sd => at(sd, .95 + .4 * Math.sin(T * 9), 20)); lb = .62; } break;
+    case 'prep': glow = .12 + .5 * u; lt = .05; sc = 1.05; if (u < .55) { both(sd => at(sd, 1.05 + .06 * Math.sin(T * 20), 17)); sq = 1.07; } break;
+    case 'dict': {
+      glow = .3 + .7 * lvl; lt = 0; sc = 1.08; gaze = [.65, .45]; sq += .07 * lvl;
+      if (s.flip > 0) s.flip = Math.max(0, s.flip - dt);
+      else { s.write += dt * (.25 + 1.1 * lvl); if (s.write >= PAD.lines) { s.write = 0; s.flip = .35; } }
+      const tip = penCursor(s, T); H[GS] = [tip[0] + PEN_OFF[0], tip[1] + PEN_OFF[1]];
+      break;
+    }
+    case 'cmd': glow = .3 + .7 * lvl; lt = .06; sc = 1.08; tilt = .08; gaze = [0, .1]; both(sd => at(sd, .35 + .1 * lvl, 15)); sq += .07 * lvl;
+      s.rainPhase += dt * (1 + 2.5 * lvl); break;
+    case 'transcribe': glow = .35 + .25 * Math.sin(T * 4); lt = .22; gaze = [.6, .55];
+      one(sd => { const [x, y] = shoulder(sd, hang, G.ry); return [x + sd * 9 + 2.2 * Math.cos(T * 11), y + 5 + 1.6 * Math.sin(T * 14)]; }); sq += .015 * Math.sin(T * 9); break;
+    case 'think': glow = .3 + .3 * (.5 + .5 * Math.sin(T * 2.6)); lt = .28; lb = .1; gaze = [.45, -.85];
+      one(sd => [sd * (11 + 1.5 * Math.sin(T * 10)), -G.ry - 4 + 1.2 * Math.cos(T * 10)]); if (!hang) rot += .05; break;
+    case 'tool': glow = .45 + .2 * Math.sin(T * 10); lt = .2; gaze = [.4 * Math.sin(T * 6), .6];
+      both(sd => at(sd, -.25 + .45 * Math.sin(T * 12 + (sd > 0 ? 0 : Math.PI)), 13)); sq += .015 * Math.sin(T * 14); break;
+    case 'confirm': glow = .6 + .1 * Math.sin(T * 2); lt = 0; sc = 1.06; tilt = -.14; gaze = [0, .1]; both(sd => at(sd, .1 + .06 * Math.sin(T * 3), 18)); break;
+    case 'wake': { if (wrap) poke(c, .9, false); const startled = u < .4; glow = startled ? 1 - u * 1.2 : .45; lt = 0; sc = startled ? 1.25 : 1.12; gaze = [0, .1];
+      if (startled) both(sd => at(sd, 1.3, 18)); else one(sd => at(sd, .95, 14)); break; }
+    case 'error': if (wrap) { s.sq.v -= 3.5; s.jig.v += 3; } glow = Math.max(.3, 1 - u * 2.5); lt = .42; tilt = .32; lb = .22; sc = .95; gaze = [0, .75];
+      both(sd => at(sd, -1.15, 12)); if (u < .15) sq = .82; break;
+    case 'claude': if (wrap) poke(c, .6, false); glow = .55 + .45 * Math.sin(T * 6.5); lt = 0; sc = 1.2; tilt = -.06; one(sd => at(sd, .95 + .4 * Math.sin(T * 9), 20)); break;
+    case 'done': if (wrap) poke(c, .9, false); glow = Math.max(.25, 1 - u * 1.6); lb = u < .8 ? .62 : 0; sc = 1.05;
+      if (u < .5) both(sd => at(sd, 1.25 + .15 * Math.sin(T * 16 + sd), 18)); break;
+  }
+  if (NOW < s.happyUntil) lb = .62;
+  for (const sd of [-1, 1]) {
+    const a = s.arms[sd], [shx, shy] = shoulder(sd, hang, G.ry), t = H[sd] || rest(sd, T, G, s.ph);
+    a.sx.t = shx; a.sy.t = shy; a.hx.t = t[0]; a.hy.t = t[1];
+  }
+  s.glow += (glow - s.glow) * Math.min(1, dt * 10);
+  s.lt.t = lt; s.lb.t = lb; s.tilt.t = tilt; s.sc.t = sc; s.sq.t = sq; s.rot.t = rot;
+  if (gaze) { s.gx.t = gaze[0]; s.gy.t = gaze[1]; } else { s.gx.t = .4 * Math.sin(T * .55 + s.ph); s.gy.t = .15 * Math.sin(T * .8 + s.ph); }
+  for (const n of ['rot', 'sq', 'hop', 'jig', 'lt', 'lb', 'tilt', 'sc', 'gx', 'gy']) step(s[n], dt);
+  for (const sd of [-1, 1]) for (const n of ['sx', 'sy', 'hx', 'hy']) step(s.arms[sd][n], dt);
+  s.nextBlink -= dt; if (s.nextBlink <= 0) { s.blink = 1; s.nextBlink = 2.4 + Math.random() * 3.6; }
+  s.blink = Math.max(0, s.blink - dt * 7);
+}
+
+function drawCell(c, T) {
+  const cv = c.cv, dpr = devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight, W = Math.round(w * dpr), Hh = Math.round(h * dpr);
+  if (cv.width !== W || cv.height !== Hh) { cv.width = W; cv.height = Hh; }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const bg = g.createLinearGradient(0, 0, w, h);
+  if (LIGHT) { bg.addColorStop(0, '#e9eef3'); bg.addColorStop(1, '#dce4ec'); } else { bg.addColorStop(0, '#1e2328'); bg.addColorStop(1, '#15191d'); }
+  g.fillStyle = bg; g.fillRect(0, 0, w, h);
+  g.fillStyle = LIGHT ? 'rgba(243,245,247,.97)' : 'rgba(32,35,39,.97)'; g.fillRect(0, h - TASK, w, TASK);
+  g.fillStyle = LIGHT ? 'rgba(0,0,0,.08)' : 'rgba(255,255,255,.06)'; g.fillRect(0, h - TASK, w, 1);
+  if (!GL) return;
+  const s = c.sim, G = geom(T, s.ph), ax = w * .5;
+  let ay, anchor;
+  if (G.hang) { ay = BEZ; anchor = G.ceil; }
+  else if (MODE === 'task') { ay = h - TASK + Math.min(0, s.hop.x) * Z; anchor = FLAT; }
+  else { ay = (BEZ + h - TASK) / 2 + 4 + (2.6 * Math.sin(T * 1.8 + s.ph) + s.hop.x) * Z; anchor = 0; }
+  const sy = s.sq.x, sx = 1 / Math.sqrt(sy), rot = s.rot.x, cr = Math.cos(rot), sr = Math.sin(rot), sc = 1 / (dpr * Z);
+  // device px → local units (inverse of translate · rotate · scale · anchor)
+  const a = cr * sc / sx, b = sr * sc / sx, cc = -(cr * ax + sr * ay) / (Z * sx);
+  const d = -sr * sc / sy, e = cr * sc / sy, f = (sr * ax - cr * ay) / (Z * sy) + anchor;
+  const { cv: gcv, gl, U } = GL;
+  if (gcv.width !== W || gcv.height !== Hh) { gcv.width = W; gcv.height = Hh; }
+  gl.viewport(0, 0, W, Hh); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+  const L = DEF_BY[c.key][2].split(',').map(n => +n / 255), idle = c.key === 'idle';
+  gl.uniform2f(U.uRes, W, Hh);
+  gl.uniformMatrix3fv(U.uInv, false, [a, d, 0, b, e, 0, cc, f, 1]);
+  gl.uniform1f(U.uPxl, sc);
+  gl.uniform2f(U.uRad, RX, G.ry);
+  gl.uniform1f(U.uWob, (.022 + .07 * s.lvl + .05 * Math.max(0, s.jig.x)) * R);
+  gl.uniform3f(U.uPh, 1.3 * T + s.ph, -1.9 * T + 1, 2.7 * T + 2);
+  gl.uniform1f(U.uFlat, G.flat === null ? 1e4 : G.flat);
+  gl.uniform1f(U.uHang, G.hang ? 1 : 0);
+  gl.uniform3f(U.uCeilRow, 0, sc, -ay / Z);
+  const A = s.arms[-1], B = s.arms[1];
+  gl.uniform4f(U.uArmA, A.sx.x, A.sy.x, A.hx.x, A.hy.x);
+  gl.uniform4f(U.uArmB, B.sx.x, B.sy.x, B.hx.x, B.hy.x);
+  gl.uniform3f(U.uBody, 20 / 255, 24 / 255, 28 / 255);
+  gl.uniform3f(U.uLamp, L[0], L[1], L[2]);
+  gl.uniform1f(U.uLampA, idle ? .18 : .3 + .55 * s.glow);
+  gl.uniform1f(U.uCoreY, CORE_Y);
+  gl.uniform3f(U.uRim, ...(LIGHT ? [1, 1, 1] : [247 / 255, 200 / 255, 163 / 255]));
+  gl.uniform1f(U.uRimA, LIGHT ? .1 : .3);
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  g.save();
+  if (LIGHT) { g.shadowColor = 'rgba(10,14,18,.3)'; g.shadowBlur = 8 * Z * dpr; g.shadowOffsetY = 1.6 * Z * dpr; }
+  else { g.shadowColor = `rgba(${DEF_BY[c.key][2]},${.14 + .32 * s.glow})`; g.shadowBlur = (5 + 9 * s.glow) * Z * dpr; }
+  g.drawImage(gcv, 0, 0, w, h);
+  g.restore();
+  const toLocal = ctx => { ctx.translate(ax, ay); ctx.rotate(rot); ctx.scale(Z * sx, Z * sy); ctx.translate(0, -anchor); };
+  if (c.key === 'cmd') {
+    // code rain, masked to the body silhouette by the GL image's alpha, added on top as light
+    if (RAIN.width !== W || RAIN.height !== Hh) { RAIN.width = W; RAIN.height = Hh; }
+    const r = RAIN.getContext('2d');
+    r.setTransform(1, 0, 0, 1, 0, 0); r.globalCompositeOperation = 'source-over'; r.clearRect(0, 0, W, Hh);
+    r.setTransform(dpr, 0, 0, dpr, 0, 0); r.save(); toLocal(r);
+    r.font = 'bold 4.2px Consolas, monospace'; r.textAlign = 'center'; r.textBaseline = 'middle';
+    // two drops per column over a span just taller than the body, so the inside is always busy
+    const top = -G.ry - 4, span = (G.flat === null ? G.ry : G.flat) - top + 12, bright = .45 + .55 * s.glow, n = GLYPHS.length, TR = 10;
+    for (let j = 0; j < 15; j++) {
+      const x = -32.2 + j * 4.6, sp = 13 + (j * 7.3) % 9;
+      for (const off of [0, span / 2]) {
+        const head = top + ((s.rainPhase * sp + j * 13.7 + off) % span);
+        for (let q = 0; q < TR; q++) {
+          const y = head - q * 4.2, ch = GLYPHS[(((j * 31 + q * 17 + Math.floor(T * 6 + j * .7 + off) * 13) % n) + n) % n];
+          r.fillStyle = q === 0 ? `rgba(215,230,255,${bright})` : `rgba(${COBALT},${bright * (1 - q / TR) * .85})`;
+          r.fillText(ch, x, y);
+        }
+      }
+    }
+    r.restore();
+    r.setTransform(1, 0, 0, 1, 0, 0); r.globalCompositeOperation = 'destination-in'; r.drawImage(gcv, 0, 0); r.globalCompositeOperation = 'source-over';
+    g.save(); g.globalCompositeOperation = 'lighter'; g.drawImage(RAIN, 0, 0, w, h); g.restore();
+  }
+  g.save(); g.translate(ax, ay); g.rotate(rot); g.scale(Z * sx, Z * sy); g.translate(0, -anchor + EYE_Y); drawEyes(g, s, Z * dpr); g.restore();
+  if (c.key === 'dict') { g.save(); toLocal(g); drawPad(g, s, LIGHT, Z * dpr, [s.arms[1].hx.x, s.arms[1].hy.x]); g.restore(); }
+  g.fillStyle = '#030405'; g.fillRect(0, 0, w, BEZ);
+}
+
+// ── build ──
+const DEF_BY = Object.fromEntries(DEF.map(x => [x[0], x]));
+const grid = document.getElementById('grid'), cells = [];
+const arm = () => ({ sx: spring(0, .3, .6), sy: spring(0, .3, .6), hx: spring(0, .22, .5), hy: spring(0, .22, .5) });
+DEF.forEach(([key, name, rgb, txt], i) => {
+  const el = document.createElement('div'); el.className = 'cell';
+  el.innerHTML = `<canvas></canvas><div class="info"><h2><span class="chip" style="background:rgb(${rgb})"></span>${name}<span class="code">${key}</span></h2><p>${txt}</p></div>`;
+  grid.appendChild(el);
+  const c = { key, cv: el.querySelector('canvas'), sim: { ph: i * 1.37, rot: spring(0, 1.1, .45), sq: spring(1, .38, .25), hop: spring(0, .42, .38), jig: spring(0, .5, .3),
+    lt: spring(.12, .12, .9), lb: spring(0, .18, .9), tilt: spring(0, .18, .9), sc: spring(1, .25, .7), gx: spring(0, .22, .85), gy: spring(0, .22, .85),
+    arms: { '-1': arm(), '1': arm() }, glow: 0, blink: 0, nextBlink: 1 + Math.random() * 3, lastU: 0, lvl: 0, happyUntil: -1, write: 0, flip: 0, rainPhase: 0 } };
+  for (const sd of [-1, 1]) { const G = geom(0, c.sim.ph), [x, y] = shoulder(sd, false, G.ry), t = rest(sd, 0, G, c.sim.ph), A = c.sim.arms[sd]; A.sx.x = x; A.sy.x = y; A.hx.x = t[0]; A.hy.x = t[1]; }
+  c.cv.addEventListener('click', () => poke(c));
+  cells.push(c);
+});
+const $ = id => document.getElementById(id);
+document.querySelectorAll('button[data-m]').forEach(b => b.onclick = () => { MODE = b.dataset.m; document.querySelectorAll('button[data-m]').forEach(x => x.classList.toggle('on', x === b)); });
+$('tDark').onclick = () => { LIGHT = false; $('tDark').classList.add('on'); $('tLight').classList.remove('on'); };
+$('tLight').onclick = () => { LIGHT = true; $('tLight').classList.add('on'); $('tDark').classList.remove('on'); };
+
+let last = performance.now(), t0 = last;
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now; const T = (now - t0) / 1000; NOW = T;
+  for (const c of cells) { updateCell(c, T, dt); drawCell(c, T); }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
