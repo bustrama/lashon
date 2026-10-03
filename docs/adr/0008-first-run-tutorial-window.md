@@ -6,6 +6,12 @@
 - **Context source:** GitHub issue #9 (Tutorial); `docs/roadmap.md` §1.8
   (Onboarding); `docs/design-system.md` ("Onboarding Overlay" surface)
 
+> **Amended 2026-10-04 by [ADR-0040](0040-the-overlay-becomes-a-living-creature.md):**
+> the overlay is no longer shape-locked. It is now Ottid, a creature that
+> changes pose with state. The decision below still stands: instructional UI
+> lives in its own window, because the overlay still has no room for it. Read
+> "shape-locked" and "never changes shape, only how it is lit" below as history.
+
 ## Context
 
 A first-time user installs Lashon and is met by a 104×104 chromeless,
