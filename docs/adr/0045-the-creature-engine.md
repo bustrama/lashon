@@ -61,7 +61,9 @@ The frontend had no unit-test framework.
      (`x-ottid-eye-motion` on `Eyes`);
    - the eyes sit inside the body;
    - `write` is used only in dictation, the one state with the notepad;
-   - names are plain text, with no control or bidi-override characters.
+   - names are plain text: no control characters, line breaks or characters
+     Unicode makes invisible (Default_Ignorable_Code_Point, such as zero-width
+     spaces, bidi overrides and tag characters), except the two direction marks.
 
    It reports every problem at once, in Hebrew and English. It lives in Rust
    because the schema's source, the MCP server, the CLI and hot reload all live

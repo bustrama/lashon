@@ -20,6 +20,9 @@
 
 use std::fmt;
 
+use icu_properties::props::DefaultIgnorableCodePoint;
+use icu_properties::CodePointSetData;
+
 use super::schema::{
     Bounds, Creature, Eyes, Gesture, Lamp, ARM_RADIUS, ARM_SOFTNESS, BODY_RADIUS_X, BODY_RADIUS_Y,
     BODY_WOBBLE, EYE_GAZE_BEND, EYE_RADIUS_X, EYE_RADIUS_Y, EYE_SCALE_MAX, EYE_SHIFT_X,
@@ -38,8 +41,11 @@ const EYES_INNER: f64 = 0.85;
 pub enum NameProblem {
     Empty,
     TooLong,
-    /// A control character, or a bidi embedding, override or isolate.
-    ControlCharacter,
+    /// A character that doesn't show as itself: a control character, a line
+    /// or paragraph separator, or one Unicode makes invisible by default (a
+    /// zero-width space, a bidi embedding, override or isolate, a tag
+    /// character, a filler).
+    HiddenCharacter,
 }
 
 /// One specific complaint about a creature file.
@@ -99,8 +105,9 @@ impl CreatureIssue {
                 NameProblem::TooLong => {
                     format!("name.{lang} is longer than {} characters", NAME_CHARS.max)
                 }
-                NameProblem::ControlCharacter => format!(
-                    "name.{lang} contains a control character or a bidi override; use plain text"
+                NameProblem::HiddenCharacter => format!(
+                    "name.{lang} contains an invisible or control character (such as a \
+                     zero-width space, a line break or a bidi override); use plain text"
                 ),
             },
             OutOfRange {
@@ -148,8 +155,9 @@ impl CreatureIssue {
                 NameProblem::TooLong => {
                     format!("השם name.{lang} ארוך מ-{} תווים", NAME_CHARS.max)
                 }
-                NameProblem::ControlCharacter => format!(
-                    "השם name.{lang} מכיל תו בקרה או תו כיווניות. כתבו טקסט רגיל"
+                NameProblem::HiddenCharacter => format!(
+                    "השם name.{lang} מכיל תו בלתי נראה או תו בקרה (כמו רווח ברוחב אפס, ירידת \
+                     שורה או תו כיווניות). כתבו טקסט רגיל"
                 ),
             },
             OutOfRange {
@@ -323,13 +331,30 @@ fn name_problem(name: &str) -> Option<NameProblem> {
     if name.chars().count() as f64 > NAME_CHARS.max {
         return Some(NameProblem::TooLong);
     }
-    // Explicit embeddings, overrides and isolates can make a name display as
-    // something else. The marks (U+200E, U+200F) are harmless and allowed.
-    let spoofing = |c: char| matches!(c, '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}');
-    if name.chars().any(|c| c.is_control() || spoofing(c)) {
-        return Some(NameProblem::ControlCharacter);
+    if name.chars().any(is_hidden) {
+        return Some(NameProblem::HiddenCharacter);
     }
     None
+}
+
+/// A character a name may not hold, because it doesn't show as itself.
+///
+/// - Control characters, and the line and paragraph separators, which break
+///   a name across lines.
+/// - Unicode's Default_Ignorable_Code_Point characters, which render as
+///   nothing: zero-width spaces and joiners, the bidi embeddings, overrides
+///   and isolates that make a name display as something else, the Arabic
+///   letter mark, variation selectors, tag characters and fillers. That also
+///   rules out emoji joined into one with a zero-width joiner.
+///
+/// The left-to-right and right-to-left marks (U+200E, U+200F) are allowed:
+/// they are how a Hebrew name with an English word in it reads right.
+fn is_hidden(c: char) -> bool {
+    const MARKS: [char; 2] = ['\u{200E}', '\u{200F}'];
+    let invisible = CodePointSetData::new::<DefaultIgnorableCodePoint>();
+    c.is_control()
+        || matches!(c, '\u{2028}' | '\u{2029}')
+        || (invisible.contains(c) && !MARKS.contains(&c))
 }
 
 /// Whether an eye can cover the lamp's centre anywhere the engine moves it:
@@ -479,7 +504,7 @@ mod tests {
                 },
                 CreatureIssue::InvalidName {
                     lang: "en",
-                    problem: NameProblem::ControlCharacter
+                    problem: NameProblem::HiddenCharacter
                 },
             ]
         );
@@ -488,6 +513,54 @@ mod tests {
         let mut v = default_value();
         v["name"]["he"] = serde_json::json!("בלובי \u{200F}Blob");
         assert!(validate_value(&v).is_ok());
+    }
+
+    #[test]
+    fn names_hold_no_invisible_characters() {
+        let hidden = [
+            ("zero-width space", "אוטי\u{200B}ד"),
+            ("zero-width joiner", "Ot\u{200D}tid"),
+            ("word joiner", "Ot\u{2060}tid"),
+            ("byte order mark", "\u{FEFF}Ottid"),
+            ("soft hyphen", "Ot\u{00AD}tid"),
+            ("line separator", "Ot\u{2028}tid"),
+            ("paragraph separator", "Ottid\u{2029}"),
+            ("arabic letter mark", "אוטיד\u{061C}"),
+            ("isolate", "\u{2067}Ottid\u{2069}"),
+            ("tag characters", "Ottid\u{E0041}\u{E007F}"),
+            ("variation selector", "Ottid\u{FE0F}"),
+            ("hangul filler", "\u{3164}"),
+            ("only invisible", "\u{200B}\u{200B}"),
+            ("control", "Ot\u{0007}tid"),
+        ];
+        for (what, name) in hidden {
+            let mut v = default_value();
+            v["name"]["en"] = serde_json::json!(name);
+            assert_eq!(
+                issues_of(&v),
+                vec![CreatureIssue::InvalidName {
+                    lang: "en",
+                    problem: NameProblem::HiddenCharacter
+                }],
+                "{what}"
+            );
+        }
+    }
+
+    #[test]
+    fn names_keep_what_hebrew_and_english_text_needs() {
+        let plain = [
+            "אוֹטִיד",                // niqqud: combining marks that show
+            "\u{200E}Ottid אוטיד",  // a left-to-right mark
+            "בלובי \u{200F}Blob",   // a right-to-left mark
+            "Ottid 2 — the Otter!", // punctuation and spaces
+            "Ottid 🦦",             // an emoji on its own
+        ];
+        for name in plain {
+            let mut v = default_value();
+            v["name"]["he"] = serde_json::json!(name);
+            assert!(validate_value(&v).is_ok(), "{name:?}");
+        }
     }
 
     #[test]

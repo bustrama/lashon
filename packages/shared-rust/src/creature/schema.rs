@@ -100,8 +100,10 @@ pub struct Creature {
     pub poses: Poses,
 }
 
-/// A display name in each UI language. Plain text: no control characters
-/// and no bidi embedding, override or isolate characters.
+/// A display name in each UI language. Plain text: no control characters,
+/// line breaks or invisible characters (Unicode's default-ignorable ones,
+/// such as zero-width spaces, bidi overrides and tag characters). The
+/// left-to-right and right-to-left marks are allowed.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CreatureName {
