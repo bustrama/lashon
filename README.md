@@ -47,19 +47,21 @@ without explicit consent.
 Download the installer from the
 [latest release](https://github.com/bustrama/ottid/releases/latest): the file
 ending in `_x64-setup.exe`. If you'd rather not install, the release also has
-a portable `.zip`.
+a portable `.zip`. Releases up to v1.1 carry Ottid's old name, Lashon
+(`Lashon_1.1.0_x64-setup.exe`).
 
 - **Windows only, for v1.x.** There are no macOS or Linux builds yet.
-- **Unsigned, for now.** The installer isn't code-signed yet, so Windows
-  SmartScreen stops it with "Windows protected your PC". Click **More info**,
-  then **Run anyway**. A signed build is on the way. Until then you can read
-  the source, or build it yourself (below).
+- **Code signing.** Releases up to v1.1 aren't code-signed, so Windows
+  SmartScreen stops them with "Windows protected your PC". Click **More
+  info**, then **Run anyway**. Later releases are signed
+  ([ADR-0043](docs/adr/0043-sign-windows-releases-with-azure-artifact-signing.md)).
+  You can always read the source, or build it yourself (below).
 - **The free dictation edition.** The published build does dictation only.
   Command mode and recipes are left out of it; a build from source includes
   them.
-- **Upgrading from Lashon?** That was Ottid's old name. Run the Ottid
-  installer: it removes the old app and keeps your settings, history and
-  downloaded models.
+- **Upgrading from Lashon?** The first release under the Ottid name installs
+  over it: its installer removes the old app and keeps your settings, history
+  and downloaded models.
 
 On **first run** Ottid downloads the ~1.6 GB Hebrew speech model; on an NVIDIA
 GPU it also fetches the CUDA runtime for faster transcription. After that it
