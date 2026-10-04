@@ -286,6 +286,13 @@
 			"colSourceAction": "מקור · פעולה",
 			"loading": "טוען מתכונים…",
 			"noMatch": "אין מתכונים תואמים לסינון.",
+			"empty": {
+				"title": "עדיין אין לך מתכונים",
+				"leadGuide": "אפשר לחבר את Claude Desktop אל אוטיד דרך ottid-mcp ולכתוב מתכונים בשיחה. המדריך באתר מסביר איך.",
+				"leadBundled": "אפשר גם לדפדף בעשרת המתכונים הראשונים שמצורפים לתוכנה.",
+				"browseBundled": "עיין במובנים",
+				"openGuide": "מדריך החיבור ל-Claude Desktop"
+			},
 			"footer": {
 				"count": "{n} מתכונים",
 				"user": "{n} שלי",

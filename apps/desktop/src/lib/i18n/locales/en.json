@@ -286,6 +286,13 @@
 			"colSourceAction": "Source · action",
 			"loading": "Loading recipes…",
 			"noMatch": "No recipes match the current filters.",
+			"empty": {
+				"title": "You have no recipes yet",
+				"leadGuide": "Connect Claude Desktop to Ottid through ottid-mcp and write recipes by chatting. The guide on the website shows how.",
+				"leadBundled": "You can also browse the first ten recipes that ship with the app.",
+				"browseBundled": "Browse bundled",
+				"openGuide": "Claude Desktop setup guide"
+			},
 			"footer": {
 				"count": "{n} recipes",
 				"user": "{n} mine",
