@@ -1,4 +1,4 @@
-/* ---------- Lashon · single-screen landing ---------- */
+/* ---------- Ottid · single-screen landing ---------- */
 
 :root {
   --bg:        oklch(0.155 0.014 245);
@@ -85,7 +85,7 @@ a { color: inherit; text-decoration: none; }
   border: 1px solid var(--line);
   margin-bottom: 12px;
 }
-.mark svg { width: 56px; height: 56px; }
+.mark img { display: block; width: 56px; height: 56px; }
 
 h1 {
   margin: 0;
@@ -94,12 +94,12 @@ h1 {
   letter-spacing: -0.03em;
 }
 
+/* The lowercase wordmark under the name. */
 .en-name {
   margin: 4px 0 0;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 0.32em;
-  text-transform: uppercase;
   color: var(--muted);
 }
 
@@ -137,6 +137,19 @@ h1 {
   color: var(--text-soft);
   font-size: clamp(15px, 1.2vw, 17px);
   line-height: 1.6;
+}
+
+.name-story {
+  margin: 10px 0 0;
+  max-width: 400px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.name-story .word {
+  font-family: var(--font-mono);
+  color: var(--accent);
+  letter-spacing: 0.04em;
 }
 
 .actions {
@@ -182,50 +195,11 @@ h1 {
   color: var(--muted);
 }
 
-/* ---------- Showcase (right, desktop only) ---------- */
+/* ---------- Showcase (right) ---------- */
 .showcase {
   display: flex;
   flex-direction: column;
   gap: 22px;
-}
-
-.video {
-  position: relative;
-  aspect-ratio: 16 / 9;
-  border-radius: 18px;
-  border: 1px solid var(--line);
-  background:
-    radial-gradient(60% 80% at 50% 35%, var(--surface-2) 0%, var(--surface) 70%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  overflow: hidden;
-}
-.video video,
-.video img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.play {
-  width: 56px;
-  height: 56px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--accent);
-  color: var(--accent-ink);
-}
-.play svg { width: 24px; height: 24px; margin-inline-start: 2px; }
-.video-label {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.04em;
-  color: var(--muted);
 }
 
 .highlights {
