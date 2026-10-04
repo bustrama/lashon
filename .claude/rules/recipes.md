@@ -63,6 +63,25 @@ the gating is incidental, not architectural. If a non-MCP caller
 needs storage, fold the dir resolution into a shared module
 rather than splitting the feature.
 
+## Bundled starters and `ottid-mcp` in a packaged build
+
+The full edition's installer ships `ottid-mcp` and `recipes/starters/` as
+`bundle.resources`; the free edition ships neither
+([ADR-0049](../../docs/adr/0049-bundle-ottid-mcp-and-the-starters-in-the-full-edition.md)).
+
+- `recipe_tools::bundled_recipes_dir()` resolves
+  `OTTID_BUNDLED_RECIPES_DIR` → the starters beside an installed `ottid-mcp`
+  → the compile-time checkout path. That last path exists only on the build
+  machine: it serves `cargo run` and tests, and a shipped build must never
+  rely on it. The packaged app sets the variable itself
+  (`configure_recipes_env`); `ottid-mcp` reads its own location.
+- A resource that only the full edition ships goes in `tauri.conf.json` and
+  stays out of `tauri.free.conf.json`, whose array replaces the base one when
+  merged. `tests/bundle_layout.rs` fails when the two lists drift or the install
+  paths in `recipe_tools` stop matching the entries.
+- `scripts/stage-ottid-mcp.sh` builds and stages `ottid-mcp` before a full
+  `tauri build`, and before signing.
+
 ## Recipe authoring
 
 When adding a new recipe under `recipes/starters/`:

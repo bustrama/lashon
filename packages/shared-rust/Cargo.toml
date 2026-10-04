@@ -16,8 +16,9 @@ name = "ottid_core"
 # `ottid-core` rather than the Tauri shell because it depends only on
 # the GUI-independent tool catalogue + recipes module + rmcp; avoiding
 # the Tauri runtime keeps the binary small (~5 MB stripped, vs ~80 MB
-# if it linked Tauri). The Tauri shell bundles it as a resource so the
-# installer ships a single `ottid-mcp.exe`.
+# if it linked Tauri). The full edition's installer bundles it as a Tauri
+# resource, `binaries/ottid-mcp/ottid-mcp.exe`, staged by
+# `scripts/stage-ottid-mcp.sh`; the free edition does not (ADR-0049).
 [[bin]]
 name = "ottid-mcp"
 path = "src/bin/ottid_mcp.rs"
