@@ -511,8 +511,20 @@ pub fn run() {
 /// with the identifier. Bases that coincide on an OS (Roaming data and
 /// config on Windows) are visited once. Returns a line per base that had
 /// something to move, to log once tracing is up.
+///
+/// A debug build leaves the old dirs alone unless the developer opts in
+/// (ADR-0046), and says so in the one line it returns.
 fn adopt_legacy_app_dirs(identifier: &str) -> Vec<String> {
-    use ottid_core::legacy::{adopt_dir, Adopted, LEGACY_IDENTIFIER};
+    use ottid_core::legacy::{
+        adopt_dir, carry_over_enabled, Adopted, ADOPT_LEGACY_ENV, LEGACY_IDENTIFIER,
+    };
+
+    if !carry_over_enabled() {
+        return vec![format!(
+            "pre-rename carry-over is off in debug builds: {LEGACY_IDENTIFIER} data, \
+             keychain keys and recipes stay put (set {ADOPT_LEGACY_ENV}=1 to adopt them)"
+        )];
+    }
 
     let mut seen = Vec::new();
     let mut report = Vec::new();
