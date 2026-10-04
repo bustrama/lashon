@@ -647,10 +647,10 @@ fn handle_menu_event(app: &tauri::AppHandle, id: &str) {
             handback.settle(false);
         }
         // Explorer opens in its own time, after this returns: keep the front
-        // so it may take it.
+        // so it may take it. If the folder couldn't be opened, nothing will.
         "logs" => {
-            handback.settle(true);
-            run_menu_item(app, id);
+            let opened = open_logs_folder(app);
+            handback.settle(opened);
         }
         // Anything else hands the front back before it runs (hiding the
         // overlay first would leave Windows to pick the next window).
@@ -686,7 +686,9 @@ fn run_menu_item(app: &tauri::AppHandle, id: &str) {
         }
         "tutorial" => show_tutorial(app, true),
         "settings" => show_hub(app),
-        "logs" => open_logs_folder(app),
+        "logs" => {
+            open_logs_folder(app);
+        }
         "quit" => app.exit(0),
         _ => {}
     }
@@ -707,19 +709,21 @@ fn focus_main_window(app: &tauri::AppHandle) {
 /// Open the diagnostic-logs directory in the OS file manager (issue #13) so a
 /// user hitting an error can attach the logs to a bug report without hunting
 /// through `%LOCALAPPDATA%`. Wired to the tray / context-menu "Open logs
-/// folder" item.
-fn open_logs_folder(app: &tauri::AppHandle) {
+/// folder" item. Returns whether the file manager was asked to open it.
+fn open_logs_folder(app: &tauri::AppHandle) -> bool {
     use tauri_plugin_opener::OpenerExt;
     let Some(dir) = logs_dir(app) else {
         tracing::warn!("could not resolve the logs directory to open");
-        return;
+        return false;
     };
     if let Err(err) = app
         .opener()
         .open_path(dir.to_string_lossy().to_string(), None::<&str>)
     {
         tracing::warn!("could not open the logs directory: {err:#}");
+        return false;
     }
+    true
 }
 
 /// Point `ottid-core` at the bundled STT sidecar and the per-user model
