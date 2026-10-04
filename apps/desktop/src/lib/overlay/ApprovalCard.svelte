@@ -30,6 +30,7 @@
 		fill,
 		nextPage,
 		pieces,
+		seenNudges,
 		type ApprovalCard,
 		type ApprovalDecision,
 		type ApprovalNudge,
@@ -77,7 +78,9 @@
 	let armTimer: ReturnType<typeof setTimeout> | undefined;
 	let hintTimer: ReturnType<typeof setTimeout> | undefined;
 	let keyHintTimer: ReturnType<typeof setTimeout> | undefined;
-	let lastNudge = 0;
+	// Set before the nudge effect first runs, so a nudge already there when
+	// the card mounts isn't taken for this card's.
+	let lastNudge = untrack(() => seenNudges(nudge, card.id));
 
 	const toolQuestion = $derived($t('approval.question.tool').split('{tool}'));
 
@@ -184,7 +187,6 @@
 	}
 
 	onMount(() => {
-		lastNudge = nudge?.n ?? 0;
 		const expiresAt = performance.now() + card.expires_in_ms;
 		const countDown = () =>
 			(secondsLeft = Math.max(0, Math.ceil((expiresAt - performance.now()) / 1000)));

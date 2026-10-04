@@ -43,6 +43,16 @@ export interface ApprovalNudge {
 	kind: 'early' | 'hold' | 'short';
 }
 
+/**
+ * The nudge count a card for request `id` starts from. A nudge already
+ * there when the card mounts is old news: the previous card's, whose count
+ * says nothing about this one's (the island counts each request from 1),
+ * or this card's own from before it was mounted again.
+ */
+export function seenNudges(nudge: ApprovalNudge | null, id: number): number {
+	return nudge?.id === id ? nudge.n : 0;
+}
+
 /** A run of ordinary text, or one character shown by its code point. */
 export type Segment = { kind: 'text'; text: string } | { kind: 'hidden'; code: string };
 

@@ -12,11 +12,29 @@ import {
 	pieces,
 	question,
 	runs,
+	seenNudges,
 	segments,
 	spoken,
 	type ApprovalCard,
 	type Scroll
 } from './approval';
+
+describe('seenNudges', () => {
+	it("ignores the previous card's nudges", () => {
+		// The previous card ended on its first nudge, and the island counts
+		// the next card's from 1 again: that one must still be taken.
+		expect(seenNudges({ id: 7, n: 1, kind: 'short' }, 8)).toBe(0);
+		expect(seenNudges({ id: 7, n: 4, kind: 'hold' }, 8)).toBe(0);
+	});
+
+	it("skips this card's own nudge from before it mounted", () => {
+		expect(seenNudges({ id: 8, n: 2, kind: 'early' }, 8)).toBe(2);
+	});
+
+	it('starts from nothing without a nudge', () => {
+		expect(seenNudges(null, 8)).toBe(0);
+	});
+});
 
 function card(over: Partial<ApprovalCard> = {}): ApprovalCard {
 	return {
