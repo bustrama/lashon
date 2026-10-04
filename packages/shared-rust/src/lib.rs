@@ -1,4 +1,4 @@
-//! Lashon core — provider clients and shared logic.
+//! Ottid core — provider clients and shared logic.
 //!
 //! This crate deliberately does **not** depend on `tauri`. The GUI lives in
 //! `apps/desktop/src-tauri`; keeping the testable logic here means its tests

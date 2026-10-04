@@ -12,8 +12,8 @@ from pathlib import Path
 
 import numpy as np
 
-from lashon_stt.model_registry import DEFAULT_MODEL_ID, DETECTOR_MODEL_ID, model_dir
-from lashon_stt.postprocess import sanitize
+from ottid_stt.model_registry import DEFAULT_MODEL_ID, DETECTOR_MODEL_ID, model_dir
+from ottid_stt.postprocess import sanitize
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ def _register_cuda_dll_dirs() -> None:
     PATH but not os.add_dll_directory entries — so both are registered here.
 
     - Packaged app: the CUDA runtime is downloaded on first run (see
-      cuda_download) into $LASHON_CUDA_ROOT; register nvidia/*/bin beneath it.
+      cuda_download) into $OTTID_CUDA_ROOT; register nvidia/*/bin beneath it.
     - From source: the nvidia-*-cu12 packages ship the DLLs under
       site-packages/nvidia/<lib>/bin.
 
@@ -34,7 +34,7 @@ def _register_cuda_dll_dirs() -> None:
     if sys.platform != "win32":
         return
 
-    cuda_root = os.environ.get("LASHON_CUDA_ROOT")
+    cuda_root = os.environ.get("OTTID_CUDA_ROOT")
     if cuda_root:
         roots = [d for d in sorted(Path(cuda_root).glob("nvidia/*/bin")) if d.is_dir()]
     else:

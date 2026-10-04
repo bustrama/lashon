@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissions for the Lashon tongue window (Milestone M0).",
+  "description": "Permissions for the Ottid tongue window (Milestone M0).",
   "windows": ["main"],
   "permissions": [
     "core:default",

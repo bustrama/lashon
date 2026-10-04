@@ -10,7 +10,7 @@
 //! 4. Pick a `ConfirmHandler` — `EventBasedConfirm` that emits
 //!    `command:confirm` and awaits a `command:confirm:reply` event from
 //!    the tongue.
-//! 5. Spawn `lashon_core::command_mode::dispatch` on the Tauri async
+//! 5. Spawn `ottid_core::command_mode::dispatch` on the Tauri async
 //!    runtime; emit the result as a `command:result` event the tongue
 //!    flashes.
 //!
@@ -27,12 +27,12 @@ use tauri::{AppHandle, Emitter, Listener, Manager};
 use tauri_plugin_store::StoreExt;
 use tokio::sync::oneshot;
 
-use lashon_core::command_mode::{dispatch, AlwaysAllow, CommandProgressHandler, ConfirmHandler};
-use lashon_core::recipes::{
+use ottid_core::command_mode::{dispatch, AlwaysAllow, CommandProgressHandler, ConfirmHandler};
+use ottid_core::recipes::{
     storage::collect_recipes, try_recipe_cascade, CascadeMatcher, CommandRoute,
     ConfirmHandler as RecipeConfirmHandler,
 };
-use lashon_core::llm::{
+use ottid_core::llm::{
     anthropic::{
         AnthropicLlmProvider, AVAILABLE_MODELS as ANTHROPIC_MODELS,
         DEFAULT_MODEL as ANTHROPIC_DEFAULT_MODEL,
@@ -41,8 +41,8 @@ use lashon_core::llm::{
     openai_compat::{OpenAiCompatConfig, OpenAiCompatLlmProvider, ALL_VENDORS},
     LLMProvider,
 };
-use lashon_core::tool::ConfirmDecision;
-use lashon_core::tools::phase_one_registry;
+use ottid_core::tool::ConfirmDecision;
+use ottid_core::tools::phase_one_registry;
 
 /// Payload of the `command:result` event the tongue listens for.
 #[derive(Debug, Clone, Serialize)]
@@ -220,7 +220,7 @@ async fn run(app: &AppHandle, transcript: String) -> anyhow::Result<()> {
     let transcript = if aliases.is_empty() {
         transcript
     } else {
-        let corrected = lashon_core::transcript::apply_aliases(&transcript, &aliases);
+        let corrected = ottid_core::transcript::apply_aliases(&transcript, &aliases);
         if corrected != transcript {
             tracing::info!(
                 aliases_total = aliases.len(),
@@ -488,7 +488,7 @@ fn build_llm_provider(
     }
     if id == LOCAL_LLM_ID {
         // Local-LLM (docs/adr/0025) — `base_url_override` carries the
-        // loopback URL of the Lashon-managed llama-server (already
+        // loopback URL of the Ottid-managed llama-server (already
         // spawned by `run`'s `ensure_local_llm_base_url`). The model
         // id is informational (the server serves whichever GGUF it
         // was launched against; we forward it for log clarity).

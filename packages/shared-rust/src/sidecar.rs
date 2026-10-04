@@ -2,7 +2,7 @@
 //!
 //! The sidecar is a Python gRPC server (`services/stt-sidecar`). It binds an
 //! ephemeral loopback port and prints a two-line stdout handshake —
-//! `LASHON_STT_TOKEN=<hex>` then `LASHON_STT_PORT=<n>`. We parse both, connect
+//! `OTTID_STT_TOKEN=<hex>` then `OTTID_STT_PORT=<n>`. We parse both, connect
 //! a `tonic` client, and attach the token to every call so the sidecar can
 //! reject any other local process. See `docs/adr/0002` and `docs/adr/0010`.
 
@@ -26,14 +26,14 @@ use crate::stt_proto::stt;
 use stt::stt_client::SttClient;
 
 /// Prefix the sidecar prints with its per-process auth token, before the port.
-const TOKEN_LINE_PREFIX: &str = "LASHON_STT_TOKEN=";
+const TOKEN_LINE_PREFIX: &str = "OTTID_STT_TOKEN=";
 
 /// Prefix the sidecar prints once its gRPC server is listening.
-const PORT_LINE_PREFIX: &str = "LASHON_STT_PORT=";
+const PORT_LINE_PREFIX: &str = "OTTID_STT_PORT=";
 
 /// gRPC metadata key the auth token rides in. Must match `_AUTH_METADATA_KEY`
-/// in `services/stt-sidecar/src/lashon_stt/server.py`.
-const AUTH_METADATA_KEY: &str = "x-lashon-auth";
+/// in `services/stt-sidecar/src/ottid_stt/server.py`.
+const AUTH_METADATA_KEY: &str = "x-ottid-auth";
 
 /// Max gRPC message size for the STT transport, in bytes. The gRPC default is
 /// 4 MB, which caps a `TranscribeBytes` request at ~65 s of 16 kHz f32 PCM
@@ -47,7 +47,7 @@ const MAX_GRPC_MESSAGE_BYTES: usize = 64 * 1024 * 1024;
 /// How long to wait for the sidecar to announce its port.
 const PORT_WAIT: Duration = Duration::from_secs(8);
 
-/// Parse a `LASHON_STT_PORT=<n>` line from the sidecar's stdout.
+/// Parse an `OTTID_STT_PORT=<n>` line from the sidecar's stdout.
 ///
 /// Pure — the parsing contract is unit-tested below.
 pub fn parse_port_line(line: &str) -> Option<u16> {
@@ -57,7 +57,7 @@ pub fn parse_port_line(line: &str) -> Option<u16> {
         .filter(|&port| port != 0)
 }
 
-/// Parse a `LASHON_STT_TOKEN=<hex>` line from the sidecar's stdout.
+/// Parse an `OTTID_STT_TOKEN=<hex>` line from the sidecar's stdout.
 ///
 /// The token is rejected unless it is non-empty and purely ASCII alphanumeric
 /// — the sidecar mints it with `secrets.token_hex`. Pure; unit-tested below.
@@ -123,7 +123,7 @@ impl Interceptor for AuthInterceptor {
 ///
 /// On Windows, [`Sidecar`] also owns a Win32 [`JobHandle`](job_object::JobHandle).
 /// The sidecar process is assigned to the job at spawn time; the job carries
-/// `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, so when the parent Lashon process
+/// `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, so when the parent Ottid process
 /// terminates — even abruptly, without running `Drop` — Windows kills the
 /// sidecar with it. Without this, `kill_on_drop(true)` is best-effort and a
 /// hard Ctrl+C of `cargo run` (or a Tauri panic) leaves the PyInstaller-frozen
@@ -224,29 +224,29 @@ fn resolve_in_path(
 }
 
 /// Resolve an absolute path to the Python interpreter that runs the STT
-/// sidecar from source. `LASHON_PYTHON` overrides the choice; otherwise
+/// sidecar from source. `OTTID_PYTHON` overrides the choice; otherwise
 /// `python`, then `python3`, are looked up on `PATH`.
 fn resolve_python() -> Result<PathBuf> {
     let path = std::env::var_os("PATH");
-    if let Some(explicit) = std::env::var("LASHON_PYTHON")
+    if let Some(explicit) = std::env::var("OTTID_PYTHON")
         .ok()
         .filter(|value| !value.is_empty())
     {
         return resolve_in_path(&explicit, path.as_deref(), EXE_EXTS, |p| p.is_file())
-            .ok_or_else(|| anyhow!("LASHON_PYTHON=\"{explicit}\" was not found"));
+            .ok_or_else(|| anyhow!("OTTID_PYTHON=\"{explicit}\" was not found"));
     }
     ["python", "python3"]
         .into_iter()
         .find_map(|name| resolve_in_path(name, path.as_deref(), EXE_EXTS, |p| p.is_file()))
-        .ok_or_else(|| anyhow!("no 'python' interpreter found on PATH — set LASHON_PYTHON"))
+        .ok_or_else(|| anyhow!("no 'python' interpreter found on PATH — set OTTID_PYTHON"))
 }
 
 /// Build the command that launches the STT sidecar.
 fn sidecar_command() -> Result<Command> {
-    // `LASHON_STT_SIDECAR` overrides with a direct executable path (a frozen
+    // `OTTID_STT_SIDECAR` overrides with a direct executable path (a frozen
     // build, or an integration test). Otherwise run the Python module from
     // source, resolving the interpreter to an absolute path first.
-    let mut command = match std::env::var_os("LASHON_STT_SIDECAR") {
+    let mut command = match std::env::var_os("OTTID_STT_SIDECAR") {
         Some(path) => Command::new(path),
         None => {
             let python =
@@ -254,7 +254,7 @@ fn sidecar_command() -> Result<Command> {
             let mut command = Command::new(python);
             command
                 .arg("-m")
-                .arg("lashon_stt.server")
+                .arg("ottid_stt.server")
                 .env("PYTHONPATH", sidecar_src_dir());
             command
         }
@@ -327,7 +327,7 @@ pub(crate) fn attach_to_kill_on_close_job(child: &Child) -> Result<job_object::J
 }
 
 /// Win32 Job Object wrapper — on Windows, every spawned sidecar is assigned to
-/// one so the OS kills it if the parent Lashon process exits without running
+/// one so the OS kills it if the parent Ottid process exits without running
 /// destructors. `kill_on_drop` is best-effort; the job is the durable
 /// guarantee. See [`Sidecar`]. Shared with `crate::llama_server` (and any
 /// future subprocess that needs the same posture).
@@ -500,38 +500,38 @@ mod tests {
 
     #[test]
     fn parse_port_line_accepts_the_contract_line() {
-        assert_eq!(parse_port_line("LASHON_STT_PORT=44676"), Some(44676));
-        assert_eq!(parse_port_line("LASHON_STT_PORT=44676\n"), Some(44676));
-        assert_eq!(parse_port_line("  LASHON_STT_PORT=1420  "), Some(1420));
+        assert_eq!(parse_port_line("OTTID_STT_PORT=44676"), Some(44676));
+        assert_eq!(parse_port_line("OTTID_STT_PORT=44676\n"), Some(44676));
+        assert_eq!(parse_port_line("  OTTID_STT_PORT=1420  "), Some(1420));
     }
 
     #[test]
     fn parse_port_line_rejects_everything_else() {
         assert_eq!(parse_port_line("starting up..."), None);
-        assert_eq!(parse_port_line("LASHON_STT_PORT="), None);
-        assert_eq!(parse_port_line("LASHON_STT_PORT=0"), None);
-        assert_eq!(parse_port_line("LASHON_STT_PORT=99999999"), None);
+        assert_eq!(parse_port_line("OTTID_STT_PORT="), None);
+        assert_eq!(parse_port_line("OTTID_STT_PORT=0"), None);
+        assert_eq!(parse_port_line("OTTID_STT_PORT=99999999"), None);
         assert_eq!(parse_port_line("PORT=8080"), None);
     }
 
     #[test]
     fn parse_token_line_accepts_a_hex_token() {
         assert_eq!(
-            parse_token_line("LASHON_STT_TOKEN=deadbeef00"),
+            parse_token_line("OTTID_STT_TOKEN=deadbeef00"),
             Some("deadbeef00".to_string())
         );
         assert_eq!(
-            parse_token_line("  LASHON_STT_TOKEN=abc123\n"),
+            parse_token_line("  OTTID_STT_TOKEN=abc123\n"),
             Some("abc123".to_string())
         );
     }
 
     #[test]
     fn parse_token_line_rejects_everything_else() {
-        assert_eq!(parse_token_line("LASHON_STT_TOKEN="), None);
-        assert_eq!(parse_token_line("LASHON_STT_TOKEN=has space"), None);
-        assert_eq!(parse_token_line("LASHON_STT_TOKEN=bad/char"), None);
-        assert_eq!(parse_token_line("LASHON_STT_PORT=44676"), None);
+        assert_eq!(parse_token_line("OTTID_STT_TOKEN="), None);
+        assert_eq!(parse_token_line("OTTID_STT_TOKEN=has space"), None);
+        assert_eq!(parse_token_line("OTTID_STT_TOKEN=bad/char"), None);
+        assert_eq!(parse_token_line("OTTID_STT_PORT=44676"), None);
     }
 
     #[test]
@@ -542,11 +542,11 @@ mod tests {
             .expect("noise is ignored")
             .is_none());
         assert!(reader
-            .push("LASHON_STT_TOKEN=cafe1234")
+            .push("OTTID_STT_TOKEN=cafe1234")
             .expect("token line")
             .is_none());
         let handshake = reader
-            .push("LASHON_STT_PORT=51000")
+            .push("OTTID_STT_PORT=51000")
             .expect("port line completes the handshake")
             .expect("handshake is ready");
         assert_eq!(handshake.port, 51000);
@@ -557,7 +557,7 @@ mod tests {
     fn handshake_rejects_a_port_before_its_token() {
         let mut reader = HandshakeReader::default();
         assert!(
-            reader.push("LASHON_STT_PORT=51000").is_err(),
+            reader.push("OTTID_STT_PORT=51000").is_err(),
             "a port line with no preceding token must be a contract violation"
         );
     }

@@ -10,10 +10,10 @@ the lamp's colour tells you what it is doing. Peach is the only warm note in the
 room. It is the locked brand tone, the colour of Ottid's eyes and of its resting
 lamp.
 
-The product is being renamed from Lashon to Ottid
-([ADR-0042](adr/0042-rename-the-product-to-ottid.md)). Until the rename PR
-lands, the code still says Lashon. The overlay is the `main` window, drawn today
-by `Tongue.svelte`; older docs call it "the tongue". The creature itself is
+The product was called Lashon until v1.1
+([ADR-0042](adr/0042-rename-the-product-to-ottid.md)). The overlay is the
+`main` window, drawn today by `Tongue.svelte`; older docs call it "the tongue".
+The creature itself is
 [ADR-0040](adr/0040-the-overlay-becomes-a-living-creature.md), and user-made
 creatures are [ADR-0041](adr/0041-user-authored-creatures-are-data.md).
 

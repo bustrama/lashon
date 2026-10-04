@@ -1,6 +1,6 @@
-# Train your own wake word for Lashon
+# Train your own wake word for Ottid
 
-Lashon's wake-word detector runs [openWakeWord](https://github.com/dscripka/openWakeWord) —
+Ottid's wake-word detector runs [openWakeWord](https://github.com/dscripka/openWakeWord) —
 a small ONNX classifier that listens for one specific spoken phrase. Each
 phrase needs its own classifier file. To use a custom wake word
 (**"Hey Lashon"**, your own name, anything you like), train one in Google
@@ -23,9 +23,9 @@ very end.
 
 Open this link:
 
-> **[Open Lashon's training notebook in Colab](https://colab.research.google.com/drive/1zzKpSnqVkUDD3FyZ-Yxw3grF7L0R1rlk#scrollTo=step1_preview)**
+> **[Open Ottid's training notebook in Colab](https://colab.research.google.com/drive/1zzKpSnqVkUDD3FyZ-Yxw3grF7L0R1rlk#scrollTo=step1_preview)**
 
-It's a Colab notebook prepared for Lashon — the openWakeWord training pipeline
+It's a Colab notebook prepared for Ottid — the openWakeWord training pipeline
 with sensible defaults for a Hebrew wake phrase.
 
 > **Note — the notebook is still being polished.** Expect a couple of cells
@@ -39,9 +39,9 @@ with sensible defaults for a Hebrew wake phrase.
 If you'd rather not train at all, the openWakeWord project ships a small
 library of ready-to-use classifiers ("Hey Jarvis", "Alexa", "Hey Mycroft",
 "Hey Rhasspy" and others) at **<https://openwakeword.com/library>**. The four
-listed above are also offered as one-click opt-in downloads in Lashon's
+listed above are also offered as one-click opt-in downloads in Ottid's
 Settings Hub → **Wake word** → **More wake words** — they're
-[CC-BY-NC-4.0](https://creativecommons.org/licenses/by-nc/4.0/), so Lashon
+[CC-BY-NC-4.0](https://creativecommons.org/licenses/by-nc/4.0/), so Ottid
 shows a "Non-commercial" badge before installing them.
 
 ### 2. Switch to a GPU runtime
@@ -79,15 +79,15 @@ When training finishes the notebook produces a file named after your phrase,
 e.g. `hey_lashon.onnx`. In Colab's left sidebar **Files** panel, right-click
 the file and choose **Download**.
 
-### 6. Install it in Lashon
+### 6. Install it in Ottid
 
-Drop the downloaded `.onnx` into Lashon's wake-words folder:
+Drop the downloaded `.onnx` into Ottid's wake-words folder:
 
 | OS | Path |
 |---|---|
-| **Windows** | `%LOCALAPPDATA%\dev.lashon.desktop\models\wakewords\` |
-| **macOS** | `~/Library/Application Support/dev.lashon.desktop/models/wakewords/` |
-| **Linux** | `~/.local/share/dev.lashon.desktop/models/wakewords/` |
+| **Windows** | `%LOCALAPPDATA%\app.ottid.desktop\models\wakewords\` |
+| **macOS** | `~/Library/Application Support/app.ottid.desktop/models/wakewords/` |
+| **Linux** | `~/.local/share/app.ottid.desktop/models/wakewords/` |
 
 The Hub picker reads filename stems from this folder and turns them into
 friendly names — `hey_lashon.onnx` shows up as **Hey Lashon**, `my_dragon.onnx`
@@ -96,7 +96,7 @@ is capitalised).
 
 ### 7. Pick it in the Settings Hub
 
-In Lashon, double-click the tongue → **Settings Hub** → **Wake word**:
+In Ottid, double-click the tongue → **Settings Hub** → **Wake word**:
 - Toggle **Enable** on.
 - Select your model from the dropdown.
 
@@ -141,9 +141,9 @@ choose (Hugging Face is a common host). Others can drop them into their own
 
 ## Technical note
 
-The Lashon wake-word engine ([ADR-0016](adr/0016-wake-word-engine.md)) expects
+The Ottid wake-word engine ([ADR-0016](adr/0016-wake-word-engine.md)) expects
 classifiers with an input shape of `[1, 16, 96]` — 16 audio embeddings of 96
 dimensions each. openWakeWord's automated training produces exactly that shape
 by default, so there is nothing extra to configure. A classifier trained with
-a different framework or window size won't load — `lashon_core::wake::CLASSIFIER_WINDOW`
+a different framework or window size won't load — `ottid_core::wake::CLASSIFIER_WINDOW`
 would need adjusting in code.

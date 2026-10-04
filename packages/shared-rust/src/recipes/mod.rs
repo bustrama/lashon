@@ -2,7 +2,7 @@
 //!
 //! A **recipe** is a pre-recorded parameterised desktop workflow stored as
 //! `recipe.yaml` in its own directory under either the per-user recipes
-//! directory (`%APPDATA%\lashon\recipes\`, `~/.config/lashon/recipes/`) or
+//! directory (`%APPDATA%\ottid\recipes\`, `~/.config/ottid/recipes/`) or
 //! the bundled `recipes/starters/` tree. The dispatcher's intent cascade
 //! (Phase 1c) routes natural-language commands to a matching recipe
 //! whenever one is available, short-circuiting the LLM full-planner path
@@ -24,7 +24,7 @@
 //! |---|---|---|
 //! | Identity envelope | Anthropic Agent Skills `SKILL.md` | `id`, `name`, `description`, `tags`, `permissions` |
 //! | Parameter schema | Goose Recipes (`block/goose`, now AAIF) | `parameters[]` with `key`, `input_type`, `requirement`, `description`, `default` |
-//! | OS-UI primitives | Lashon-specific | `os_steps:` per-OS step list — `key_chord`, `type_unicode`, `click_label`, `focus_window`, `wait_for_window`, `wait_ms`, `screenshot_to_clipboard`, `clipboard_set`, `clipboard_get_into`, `run_shell`, `open_url`, `open_app` |
+//! | OS-UI primitives | Ottid-specific | `os_steps:` per-OS step list — `key_chord`, `type_unicode`, `click_label`, `focus_window`, `wait_for_window`, `wait_ms`, `screenshot_to_clipboard`, `clipboard_set`, `clipboard_get_into`, `run_shell`, `open_url`, `open_app` |
 //!
 //! No vendor crate is depended on; the schema is reconstructed from public
 //! documentation so we can extend the OS-step set freely.

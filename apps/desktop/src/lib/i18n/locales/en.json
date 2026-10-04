@@ -1,7 +1,7 @@
 {
 	"tongue": {
-		"idle": "Lashon ready",
-		"preparing": "Lashon getting ready",
+		"idle": "Ottid ready",
+		"preparing": "Ottid getting ready",
 		"capturing": "Listening",
 		"transcribing": "Transcribing",
 		"error": "Something went wrong"
@@ -16,23 +16,23 @@
 		"steps": {
 			"welcome": {
 				"kicker": "Welcome",
-				"title": "Lashon listens in Hebrew",
-				"lead": "Lashon turns your speech into text — in any app, locally on your machine, with nothing uploaded to the cloud."
+				"title": "Ottid listens in Hebrew",
+				"lead": "Ottid turns your speech into text — in any app, locally on your machine, with nothing uploaded to the cloud."
 			},
 			"microphone": {
 				"kicker": "Microphone",
-				"title": "So Lashon can hear you",
-				"lead": "Lashon needs microphone access to transcribe your speech. Let's check it works."
+				"title": "So Ottid can hear you",
+				"lead": "Ottid needs microphone access to transcribe your speech. Let's check it works."
 			},
 			"hardware": {
 				"kicker": "Your hardware",
-				"title": "Lashon tunes itself to your machine",
-				"lead": "Lashon checks how powerful your machine is and picks models that will run well on it. You can change the choice any time."
+				"title": "Ottid tunes itself to your machine",
+				"lead": "Ottid checks how powerful your machine is and picks models that will run well on it. You can change the choice any time."
 			},
 			"tongue": {
-				"kicker": "The tongue",
+				"kicker": "Ottid",
 				"title": "The small mark floating on your screen",
-				"lead": "This is the tongue. It breathes quietly at rest, blooms into sound waves as it listens, and settles to dots while transcribing. Drag it to any corner."
+				"lead": "This is Ottid. It breathes quietly at rest, blooms into sound waves as it listens, and settles to dots while transcribing. Drag it to any corner."
 			},
 			"hotkey": {
 				"kicker": "How to dictate",
@@ -42,30 +42,30 @@
 			"practice": {
 				"kicker": "Practice",
 				"title": "Try it now",
-				"lead": "Press Ctrl+Space and say a short sentence in Hebrew — I'll show you here exactly what Lashon heard."
+				"lead": "Press Ctrl+Space and say a short sentence in Hebrew — I'll show you here exactly what Ottid heard."
 			},
 			"done": {
 				"kicker": "Ready",
-				"title": "That's it — you know how to use Lashon",
+				"title": "That's it — you know how to use Ottid",
 				"lead": "You can always reopen this tutorial from the tray menu, next to the clock."
 			}
 		},
 		"warmup": {
-			"label": "Lashon is getting ready for first use",
+			"label": "Ottid is getting ready for first use",
 			"hint": "A one-time download — the next launch is instant."
 		},
 		"mic": {
 			"checking": "Checking the microphone…",
-			"ready": "Excellent — Lashon can hear your microphone.",
+			"ready": "Excellent — Ottid can hear your microphone.",
 			"noDevice": "No microphone found. Connect one and check again.",
-			"blocked": "Lashon couldn't open the microphone. Grant microphone access in your system settings, then check again.",
+			"blocked": "Ottid couldn't open the microphone. Grant microphone access in your system settings, then check again.",
 			"recheck": "Check again",
 			"hint": "Recording stays on your machine — no audio is sent anywhere."
 		},
 		"hardware": {
 			"detecting": "Checking your hardware…",
 			"redetect": "Detect again",
-			"override": "Lashon picked the marked tier. You can choose a different one:"
+			"override": "Ottid picked the marked tier. You can choose a different one:"
 		},
 		"window": {
 			"title": "first run"
@@ -74,7 +74,7 @@
 			"idle": "At rest — the mark breathes gently",
 			"listening": "Listening — the mark blooms into sound waves",
 			"transcribing": "Transcribing — the mark settles to dots",
-			"hint": "The colour stays constant — only the shape changes with what Lashon is doing.",
+			"hint": "The colour stays constant — only the shape changes with what Ottid is doing.",
 			"dictate": "dictate",
 			"dictateBlurb": "What you say is typed wherever the cursor is.",
 			"command": "command",
@@ -84,27 +84,27 @@
 		},
 		"howto": {
 			"combo": "Control plus Space",
-			"step1": "Press once — the tongue starts listening.",
+			"step1": "Press once — Ottid starts listening.",
 			"step2": "Speak Hebrew in a normal voice.",
 			"step3": "Stop speaking, or press again — and the text is dictated.",
 			"fineprint": "These are the three chords. We'll only practise the first one for now."
 		},
 		"practice": {
 			"tryToSay": "Try saying:",
-			"phrase": "Hello Lashon, it's cold outside",
-			"or": "Or anything else you like — Lashon listens to it all.",
-			"heard": "What Lashon heard:",
+			"phrase": "Hello Ottid, it's cold outside",
+			"or": "Or anything else you like — Ottid listens to it all.",
+			"heard": "What Ottid heard:",
 			"hint": "You don't have to practise to continue — but it's much more fun to see it work.",
 			"holdPrefix": "Hold",
 			"holdSuffix": "say something, release.",
 			"holdHint": "Hold until you're done",
-			"heardHint": "This is what Lashon heard. In real use it would be typed wherever your cursor is."
+			"heardHint": "This is what Ottid heard. In real use it would be typed wherever your cursor is."
 		},
 		"done": {
 			"chordLabel": "dictation chord"
 		},
 		"live": {
-			"preparing": "Lashon is still getting ready. One moment…",
+			"preparing": "Ottid is still getting ready. One moment…",
 			"error": "Something went wrong. Try again — press Ctrl+Space.",
 			"done": "Excellent — your text was dictated. You can continue.",
 			"capturing": "Listening… speak Hebrew now.",
@@ -112,7 +112,7 @@
 			"waiting": "Waiting. Press Ctrl+Space and say a sentence."
 		},
 		"tips": {
-			"drag": "Drag the tongue to a screen corner — it snaps to the edge.",
+			"drag": "Drag Ottid to a screen corner — it snaps to the edge.",
 			"debug": "Ctrl+Shift+D opens the debug surface.",
 			"reopen": "This tutorial is always available from the tray menu."
 		},
@@ -141,18 +141,18 @@
 		"general": {
 			"title": "General",
 			"language": "Interface language",
-			"languageHint": "Choose the language Lashon's interface is shown in. The change applies to every window immediately.",
+			"languageHint": "Choose the language Ottid's interface is shown in. The change applies to every window immediately.",
 			"langHe": "עברית",
 			"langEn": "English"
 		},
 		"hardware": {
 			"title": "Hardware",
-			"intro": "The hardware tier sets how Lashon runs speech recognition — probing the GPU, or staying on the CPU. Lashon never changes it silently; the choice is yours.",
+			"intro": "The hardware tier sets how Ottid runs speech recognition — probing the GPU, or staying on the CPU. Ottid never changes it silently; the choice is yours.",
 			"detecting": "Checking your hardware…",
 			"detect": "Detect again",
 			"sttDeviceGpu": "On this tier, speech recognition uses the GPU when one is available.",
 			"sttDeviceCpu": "On this tier, speech recognition runs on the CPU.",
-			"restartToApply": "Restart Lashon for this change to take effect.",
+			"restartToApply": "Restart Ottid for this change to take effect.",
 			"restartButton": "Restart now"
 		},
 		"shortcuts": {
@@ -174,9 +174,9 @@
 		},
 		"wakeword": {
 			"title": "Wake words",
-			"intro": "Lashon listens for two independent wake words — one starts hands-free dictation, the other runs a Command-mode tool chain. Pick a different classifier for each slot.",
+			"intro": "Ottid listens for two independent wake words — one starts hands-free dictation, the other runs a Command-mode tool chain. Pick a different classifier for each slot.",
 			"enable": "Enable",
-			"enableHint": "When on, Lashon listens in the background for this wake word.",
+			"enableHint": "When on, Ottid listens in the background for this wake word.",
 			"off": "Off",
 			"on": "On",
 			"model": "Wake-word model",
@@ -206,7 +206,7 @@
 		},
 		"llm": {
 			"title": "Language models",
-			"intro": "Lashon can call a language model for two different modes — Command mode (M8) and Chat mode (M8). The cloud is always opt-in and badged, and your API keys never touch settings.json.",
+			"intro": "Ottid can call a language model for two different modes — Command mode (M8) and Chat mode (M8). The cloud is always opt-in and badged, and your API keys never touch settings.json.",
 			"command": "Command mode",
 			"commandHint": "The model that turns voice commands into PC actions.",
 			"chat": "Chat mode",
@@ -226,7 +226,7 @@
 			"apiKeyClear": "Clear",
 			"model": "Model",
 			"recommended": "recommended",
-			"recommendedHint": "Fastest and most accurate model for Command mode — Lashon picks {model} by default.",
+			"recommendedHint": "Fastest and most accurate model for Command mode — Ottid picks {model} by default.",
 			"refreshModels": "Refresh model list",
 			"refreshing": "Refreshing…",
 			"modelsFromProvider": "{count} models from provider",
@@ -265,7 +265,7 @@
 		},
 		"recipes": {
 			"title": "Recipes",
-			"intro": "Stored desktop workflows. Say the trigger and Lashon runs the recipe deterministically — no LLM in the loop.",
+			"intro": "Stored desktop workflows. Say the trigger and Ottid runs the recipe deterministically — no LLM in the loop.",
 			"searchPlaceholder": "Search recipes…",
 			"filterAll": "All",
 			"filterBundled": "Bundled",
@@ -354,7 +354,7 @@
 			"downloading": "Downloading update {version}…",
 			"installing": "Installing update…",
 			"installed": "Update installed — restart to finish.",
-			"upToDate": "Lashon is up to date.",
+			"upToDate": "Ottid is up to date.",
 			"updateError": "Update check failed",
 			"restartToFinish": "Restart to finish update",
 			"updateAvailableVersion": "Version {version} available"
@@ -362,7 +362,7 @@
 		"voice": {
 			"title": "Voice corrections",
 			"intro": "Token-level substitutions applied to the STT transcript before either the recipe cascade or the LLM planner sees it. Useful for proper nouns Whisper keeps mishearing (\"cloud\" instead of \"claude\"), contact-name homonyms, and any word that consistently lands wrong.",
-			"colFrom": "If Lashon hears",
+			"colFrom": "If Ottid hears",
 			"colTo": "Treat as",
 			"fromPlaceholder": "cloud",
 			"toPlaceholder": "claude",
@@ -379,14 +379,14 @@
 	},
 	"command": {
 		"confirm": {
-			"question": "Lashon wants to run `{tool}`. Allow?",
+			"question": "Ottid wants to run `{tool}`. Allow?",
 			"requires": "Requires confirmation",
 			"allow": "Allow",
 			"deny": "Deny",
 			"cwd": "Working directory"
 		},
 		"progress": {
-			"thinking": "Lashon is thinking…"
+			"thinking": "Ottid is thinking…"
 		},
 		"transcript": {
 			"heard": "Heard",

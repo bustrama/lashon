@@ -1,10 +1,10 @@
 //! OS-keychain access for the cloud-provider API keys M7 introduces
 //! (docs/adr/0020). A thin wrapper over the `keyring` crate that:
 //!
-//! - Stores keys under the service name `"lashon"` with a
+//! - Stores keys under the service name `"ottid"` with a
 //!   `"<stage>.<provider>"` key name — `"stt.groq"`, `"llm.anthropic"`, …
 //! - Never logs the secret value, only the key name.
-//! - Reads from a `LASHON_<STAGE>_<PROVIDER>_KEY` environment variable
+//! - Reads from an `OTTID_<STAGE>_<PROVIDER>_KEY` environment variable
 //!   first (the headless / CI fallback for environments without a
 //!   running Secret Service daemon).
 //! - Returns `Option<String>` so callers can distinguish "no key stored"
@@ -13,16 +13,16 @@
 //! The Tauri shell exposes `save_api_key`, `has_api_key`, and `delete_api_key`
 //! commands. **There is intentionally no `get_api_key` Tauri command** — the
 //! raw key never crosses the JS bridge. Provider construction inside
-//! `lashon-core` calls `read_key` directly when it needs the value.
+//! `ottid-core` calls `read_key` directly when it needs the value.
 
 use anyhow::{Context, Result};
 use keyring::Entry;
 
-/// The service name every Lashon credential is grouped under in the OS
+/// The service name every Ottid credential is grouped under in the OS
 /// credential store. A fixed string, not configurable — so users can find
-/// and clear Lashon's stored keys from the OS UI ("Lashon" in Credential
-/// Manager / "lashon" in Keychain Access / the GNOME Keyring tree).
-pub const SERVICE: &str = "lashon";
+/// and clear Ottid's stored keys from the OS UI ("Ottid" in Credential
+/// Manager / "ottid" in Keychain Access / the GNOME Keyring tree).
+pub const SERVICE: &str = "ottid";
 
 /// Build the keyring entry handle for a `<stage>.<provider>` key name. A
 /// `keyring::Entry` is cheap to construct — it just stores the service and
@@ -32,12 +32,12 @@ fn entry(key_name: &str) -> Result<Entry> {
 }
 
 /// Translate a `"<stage>.<provider>"` key name into its env-var fallback.
-/// `"llm.anthropic"` → `"LASHON_LLM_ANTHROPIC_KEY"`. Hyphens in provider ids
+/// `"llm.anthropic"` → `"OTTID_LLM_ANTHROPIC_KEY"`. Hyphens in provider ids
 /// (`"opencode-go"`, `"ollama-local"`) are normalised to underscores —
 /// POSIX requires env-var names to be `[A-Z_][A-Z0-9_]*`, and Windows
 /// `cmd /set` rejects the hyphen too.
 fn env_fallback_name(key_name: &str) -> String {
-    let mut out = String::from("LASHON_");
+    let mut out = String::from("OTTID_");
     for ch in key_name.chars() {
         match ch {
             '.' | '-' => out.push('_'),
@@ -118,12 +118,12 @@ mod tests {
     fn env_fallback_name_uppercases_and_underscores() {
         assert_eq!(
             env_fallback_name("llm.anthropic"),
-            "LASHON_LLM_ANTHROPIC_KEY"
+            "OTTID_LLM_ANTHROPIC_KEY"
         );
-        assert_eq!(env_fallback_name("stt.groq"), "LASHON_STT_GROQ_KEY");
+        assert_eq!(env_fallback_name("stt.groq"), "OTTID_STT_GROQ_KEY");
         assert_eq!(
             env_fallback_name("llm.openai_compat"),
-            "LASHON_LLM_OPENAI_COMPAT_KEY"
+            "OTTID_LLM_OPENAI_COMPAT_KEY"
         );
     }
 
@@ -131,19 +131,19 @@ mod tests {
     fn env_fallback_name_normalises_hyphens_in_provider_ids() {
         // POSIX env-var names can't carry hyphens, so `opencode-go` /
         // `ollama-local` / `ollama-remote` need to map to underscored
-        // forms. Without this, `LASHON_LLM_OPENCODE-GO_KEY` is unsettable
+        // forms. Without this, `OTTID_LLM_OPENCODE-GO_KEY` is unsettable
         // from a shell and the env-var fallback is silently broken.
         assert_eq!(
             env_fallback_name("llm.opencode-go"),
-            "LASHON_LLM_OPENCODE_GO_KEY"
+            "OTTID_LLM_OPENCODE_GO_KEY"
         );
         assert_eq!(
             env_fallback_name("llm.ollama-local"),
-            "LASHON_LLM_OLLAMA_LOCAL_KEY"
+            "OTTID_LLM_OLLAMA_LOCAL_KEY"
         );
         assert_eq!(
             env_fallback_name("llm.ollama-remote"),
-            "LASHON_LLM_OLLAMA_REMOTE_KEY"
+            "OTTID_LLM_OLLAMA_REMOTE_KEY"
         );
     }
 
@@ -178,7 +178,7 @@ mod tests {
 
     // Keychain integration tests — gated by `#[ignore]` so CI runners on
     // Linux without a Secret Service daemon pass cleanly. Run locally with
-    // `cargo test -p lashon-core keychain -- --ignored`.
+    // `cargo test -p ottid-core keychain -- --ignored`.
     #[test]
     #[ignore = "needs a running OS keychain (Credential Manager / Keychain / libsecret)"]
     fn store_read_delete_round_trip() {

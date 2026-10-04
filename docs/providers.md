@@ -4,7 +4,7 @@ Every stage — speech-to-text, language model, text-to-speech — sits behind a
 common trait, so the user picks a provider per stage. No code path is hardcoded
 to a vendor, and no path defaults to cloud. See
 [`architecture.md`](architecture.md) for the trait contracts; this document is
-the catalog of providers Lashon ships or intends to support.
+the catalog of providers Ottid ships or intends to support.
 
 Local providers are the default at every stage. Cloud providers are opt-in
 adapters, each surfaced with a clear "cloud" badge.
@@ -38,7 +38,7 @@ transcribes with that language forced. See
 | **Qwen3-1.7B** Q8_0 GGUF | 1.83 GB | Basic (unbenchmarked) | Yes (native) | **Default built-in pick** — smallest variant the upstream `Qwen/Qwen3-1.7B-GGUF` repo publishes |
 | Qwen3-4B Q4_K_M GGUF | 2.5 GB | Basic (unbenchmarked) | Yes (native) | "Best balance" toggle — higher accuracy on 2–3 chained tool calls |
 
-The user downloads one at first use from the Hub; both are Apache-2.0 and ship in the per-user `local-llm/` directory. Inference runs through a Lashon-managed `llama-server` subprocess (the prebuilt ggml release, ~80 MB bundled in the installer, Vulkan-enabled so it runs on any modern GPU and falls back to CPU when none is present). The Tauri shell spawns the server on first chat and kills it on app exit via a Win32 Job Object — same posture as the STT sidecar. See [ADR-0025](adr/0025-in-process-local-llm.md) for the architectural choice and verification scheme.
+The user downloads one at first use from the Hub; both are Apache-2.0 and ship in the per-user `local-llm/` directory. Inference runs through an Ottid-managed `llama-server` subprocess (the prebuilt ggml release, ~80 MB bundled in the installer, Vulkan-enabled so it runs on any modern GPU and falls back to CPU when none is present). The Tauri shell spawns the server on first chat and kills it on app exit via a Win32 Job Object — same posture as the STT sidecar. See [ADR-0025](adr/0025-in-process-local-llm.md) for the architectural choice and verification scheme.
 
 **Local — via a separately-installed Ollama (the legacy local path):**
 
@@ -68,7 +68,7 @@ The user downloads one at first use from the Hub; both are Apache-2.0 and ship i
 
 ## External agent providers (PC operation, delegated)
 
-These are spawned as subprocesses in a PTY. Lashon hands them a transcribed
+These are spawned as subprocesses in a PTY. Ottid hands them a transcribed
 prompt and renders their TUI output in the Agent panel. Used for heavy
 coding/research tasks where the user's spoken intent maps to a session, not a
 one-shot.
@@ -81,11 +81,11 @@ one-shot.
 | **Aider** | Mature git-aware code editor | Multi-provider |
 | **Goose** (Block) | Multi-provider agent, MCP-first | Local + cloud |
 
-Lashon ships no agent of its own at this level — it orchestrates. Each agent
+Ottid ships no agent of its own at this level — it orchestrates. Each agent
 runs in its own PTY; users switch via a tab strip.
 
 Agents are installed by the user separately and detected on `PATH` at runtime;
-Lashon only exposes the ones it finds:
+Ottid only exposes the ones it finds:
 
 - `claude-code` (Anthropic) — `npm i -g @anthropic-ai/claude-code`
 - `opencode` (Go binary) — `brew/scoop install sst/tap/opencode` or direct download

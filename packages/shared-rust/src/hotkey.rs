@@ -1,9 +1,9 @@
 //! Validation for global-shortcut accelerator strings.
 //!
-//! The Settings Hub lets the user rebind Lashon's dictation hotkey; the chord
+//! The Settings Hub lets the user rebind Ottid's dictation hotkey; the chord
 //! it captures becomes a Tauri accelerator string such as `Control+Space`.
 //! Deciding whether such a string is acceptable is real logic, so it lives
-//! here in `lashon-core` with its tests rather than in the GUI shell — the
+//! here in `ottid-core` with its tests rather than in the GUI shell — the
 //! Tauri crate only wraps `validate_accelerator` in a command.
 
 /// Why an accelerator string was rejected. Each variant has a stable `code`
@@ -45,7 +45,7 @@ const RESERVED: &[&str] = &["super+l", "alt+ctrl+delete"];
 
 /// Map a modifier token (any accepted spelling) to its canonical name, or
 /// `None` if the token is not a modifier. `CommandOrControl` collapses to
-/// `ctrl`: on Windows — Lashon's target — it resolves to Control.
+/// `ctrl`: on Windows — Ottid's target — it resolves to Control.
 fn canonical_modifier(token: &str) -> Option<&'static str> {
     match token.to_ascii_lowercase().as_str() {
         "control" | "ctrl" | "commandorcontrol" | "cmdorctrl" => Some("ctrl"),

@@ -6,7 +6,7 @@ long_description: |
   Opens (or focuses) Discord, hits the Ctrl+K quick switcher, types the
   recipient name, selects the first hit, types the message body, and
   presses Enter to send. Designed for the Discord desktop client.
-author: Lashon contributors
+author: Ottid contributors
 recipe_version: 1.0.0
 tags:
   - messaging

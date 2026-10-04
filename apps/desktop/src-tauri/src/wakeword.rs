@@ -1,6 +1,6 @@
 //! Wake-word detection worker with two independent slots.
 //!
-//! Lashon hosts up to **two** wake-word engines simultaneously:
+//! Ottid hosts up to **two** wake-word engines simultaneously:
 //!
 //! - **Dictation slot** — when its classifier fires, the dictation
 //!   worker starts an `Inject` take (transcript types into the focused
@@ -30,8 +30,8 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_store::StoreExt;
 
-use lashon_core::wake::{Trigger, WakeWord, CHUNK_SAMPLES};
-use lashon_core::{audio, model};
+use ottid_core::wake::{Trigger, WakeWord, CHUNK_SAMPLES};
+use ottid_core::{audio, model};
 
 use crate::dictation::DictationChannel;
 use crate::Gates;
@@ -306,7 +306,7 @@ impl WakeController {
         let running = Arc::new(AtomicBool::new(true));
         self.running = running.clone();
         if let Err(err) = thread::Builder::new()
-            .name("lashon-wakeword".into())
+            .name("ottid-wakeword".into())
             .spawn(move || run_worker(app, gates, running))
         {
             tracing::error!("wake word: could not spawn the worker thread: {err}");
@@ -379,7 +379,7 @@ fn run_worker(app: AppHandle, gates: Gates, running: Arc<AtomicBool>) {
             Ok(chunk) => {
                 // Suspend while dictation is capturing — or, from M10,
                 // while TTS is speaking — so wake never fires on
-                // Lashon's own audio. Same gate suspends ALL slots
+                // Ottid's own audio. Same gate suspends ALL slots
                 // (we don't want Command-mode-wake firing during a
                 // dictation take either).
                 if gates.is_capturing.load(Ordering::Relaxed)

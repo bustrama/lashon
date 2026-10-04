@@ -6,7 +6,7 @@ long_description: |
   Opens (or focuses) Slack, hits Ctrl+K to summon the channel switcher,
   types the recipient, selects the first hit, types the body, and sends
   with Enter. Works with the Slack desktop app.
-author: Lashon contributors
+author: Ottid contributors
 recipe_version: 1.0.0
 tags:
   - messaging

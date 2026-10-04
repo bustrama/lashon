@@ -14,7 +14,7 @@ use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 /// Default timeout when the LLM doesn't specify one. Conservative —
 /// covers warm Spotify / Chrome / Slack starts on any laptop.
@@ -43,7 +43,7 @@ impl Default for WaitForWindow {
     }
 }
 
-impl LashonTool for WaitForWindow {
+impl OttidTool for WaitForWindow {
     fn name(&self) -> &str {
         "wait_for_window"
     }

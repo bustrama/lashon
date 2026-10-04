@@ -1,4 +1,4 @@
-# Releasing Lashon
+# Releasing Ottid
 
 The end-to-end runbook for cutting a release. `v0.1.0` was the first; the
 packaging design behind it is [ADR-0006](adr/0006-release-packaging-and-signing.md).
@@ -6,9 +6,9 @@ packaging design behind it is [ADR-0006](adr/0006-release-packaging-and-signing.
 ## What a release is
 
 Two Windows artifacts published on
-[GitHub Releases](https://github.com/bustrama/lashon/releases): an NSIS
-installer (`Lashon-X.Y.Z-windows-x64-setup.exe`, ~66 MB) and a portable zip
-(`Lashon-X.Y.Z-windows-x64-portable.zip`) —
+[GitHub Releases](https://github.com/bustrama/ottid/releases): an NSIS
+installer (`Ottid-X.Y.Z-windows-x64-setup.exe`, ~66 MB) and a portable zip
+(`Ottid-X.Y.Z-windows-x64-portable.zip`) —
 [ADR-0012](adr/0012-portable-distribution-and-all-users-install.md). The STT
 model (~1.6 GB) and, on NVIDIA machines, the CUDA runtime (~1.2 GB) are
 **downloaded on first run** — never bundled, never uploaded to GitHub.
@@ -36,13 +36,13 @@ Run `cargo check --workspace` once to refresh `Cargo.lock`, and refresh the
 ## 2. Freeze the sidecar, build the installer and the portable zip
 
 Follow [packaging-windows.md](packaging-windows.md): freeze the sidecar, copy it
-to `apps/desktop/src-tauri/binaries/lashon-stt/`, then `npm run tauri build`.
+to `apps/desktop/src-tauri/binaries/ottid-stt/`, then `npm run tauri build`.
 
 Rename the installer for the release asset:
 
 ```sh
 cd target/release/bundle/nsis
-mv Lashon_X.Y.Z_x64-setup.exe Lashon-X.Y.Z-windows-x64-setup.exe
+mv Ottid_X.Y.Z_x64-setup.exe Ottid-X.Y.Z-windows-x64-setup.exe
 ```
 
 Then package the portable zip — `packaging-windows.md` §3. It is assembled from
@@ -54,18 +54,18 @@ runtime-downloaded CUDA cannot leak into the artifact.
 Install to a scratch directory and check it:
 
 ```sh
-Lashon-X.Y.Z-windows-x64-setup.exe /S /D=C:\lashon-check
+Ottid-X.Y.Z-windows-x64-setup.exe /S /D=C:\ottid-check
 ```
 
-- `C:\lashon-check\lashon.exe` and `binaries\lashon-stt\lashon-stt.exe` exist.
-- `binaries\lashon-stt\_internal\nvidia` does **not** exist — CUDA is fetched at
+- `C:\ottid-check\ottid.exe` and `binaries\ottid-stt\ottid-stt.exe` exist.
+- `binaries\ottid-stt\_internal\nvidia` does **not** exist — CUDA is fetched at
   runtime, never bundled.
 - Launch it: the tongue appears, shows the dim "preparing" pulse while it
   downloads the model on first run, then settles to idle.
 - Speak a Hebrew passage and an English one — both should paste correctly.
 
-Then extract `Lashon-X.Y.Z-windows-x64-portable.zip` to a fresh folder and
-launch `lashon.exe` from it — the tongue should behave identically, with no
+Then extract `Ottid-X.Y.Z-windows-x64-portable.zip` to a fresh folder and
+launch `ottid.exe` from it — the tongue should behave identically, with no
 install step.
 
 ## 4. Commit, push, open the PR
@@ -81,10 +81,10 @@ gh pr merge <PR-number> --merge
 gh release create vX.Y.Z \
   --target main \
   --prerelease \
-  --title "Lashon vX.Y.Z — <summary>" \
+  --title "Ottid vX.Y.Z — <summary>" \
   --notes-file <notes.md> \
-  "target/release/bundle/nsis/Lashon-X.Y.Z-windows-x64-setup.exe" \
-  "target/release/Lashon-X.Y.Z-windows-x64-portable.zip"
+  "target/release/bundle/nsis/Ottid-X.Y.Z-windows-x64-setup.exe" \
+  "target/release/Ottid-X.Y.Z-windows-x64-portable.zip"
 ```
 
 The release notes should tell users: download and run, the SmartScreen
@@ -97,13 +97,13 @@ The release workflow signs the installer and
 `latest.json` manifest with a minisign keypair so in-app auto-update can
 verify authenticity. The public key is committed in `tauri.conf.json`
 (`plugins.updater.pubkey`). The private key lives **only** in the developer's
-`~/.tauri/lashon.key` and in GitHub Actions secrets — never committed.
+`~/.tauri/ottid.key` and in GitHub Actions secrets — never committed.
 
 Before pushing the **first signed release tag**, run once:
 
 ```sh
 # Store the private key (generated with `npm run tauri signer generate`):
-gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/lashon.key
+gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/ottid.key
 
 # Set the password (empty string if the key has no password):
 gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD

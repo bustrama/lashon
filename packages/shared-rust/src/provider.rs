@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 pub enum Confidence {
     /// The provider rejects Hebrew or has no Hebrew language support.
     None,
-    /// Hebrew is accepted but the quality has not been verified by Lashon.
+    /// Hebrew is accepted but the quality has not been verified by Ottid.
     /// Drives the `~ Hebrew (unverified)` Hub badge.
     Basic,
     /// Hebrew is usable — verified by informal testing or vendor documentation
@@ -56,7 +56,7 @@ pub struct ProviderMeta {
     /// Whether the provider supports vendor tool/function calling.
     pub supports_tool_use: bool,
     /// Optional pointer into `available_models` marking one as the
-    /// fastest-yet-accurate pick for Lashon's Command-mode workload. The
+    /// fastest-yet-accurate pick for Ottid's Command-mode workload. The
     /// Hub renders the matching dropdown entry with a "מומלץ /
     /// recommended" suffix. `None` means the provider has no opinion.
     pub recommended_model: Option<String>,

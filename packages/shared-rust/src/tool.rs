@@ -1,8 +1,8 @@
 //! The Command-mode tool abstraction (`docs/roadmap.md §2.2`).
 //!
-//! Each native action Lashon can take in Command mode — opening an app,
+//! Each native action Ottid can take in Command mode — opening an app,
 //! typing text, copying to the clipboard, opening a URL — implements
-//! `LashonTool`. The registry collects them; `command_mode` serialises
+//! `OttidTool`. The registry collects them; `command_mode` serialises
 //! their schemas into the `llm::Tool` shape the active LLM provider
 //! expects and dispatches the tool calls the model emits.
 //!
@@ -85,11 +85,11 @@ pub enum ConfirmDecision {
     Deny,
 }
 
-/// A tool Lashon can call in Command mode. Concrete impls live under
-/// `lashon-core::tools::*` (`open_app`, `type_text`, `press_keys`,
+/// A tool Ottid can call in Command mode. Concrete impls live under
+/// `ottid-core::tools::*` (`open_app`, `type_text`, `press_keys`,
 /// `clipboard_get`, `clipboard_set`, `open_url`, `web_search`,
 /// `focus_window`).
-pub trait LashonTool: Send + Sync {
+pub trait OttidTool: Send + Sync {
     /// The wire name the LLM uses to invoke this tool. Conventions:
     /// snake_case, English, stable across versions (the model picks
     /// tools by name).
@@ -123,7 +123,7 @@ pub trait LashonTool: Send + Sync {
 /// stateless across calls so concurrent dispatches share the registry.
 #[derive(Default)]
 pub struct ToolRegistry {
-    tools: HashMap<String, Arc<dyn LashonTool>>,
+    tools: HashMap<String, Arc<dyn OttidTool>>,
 }
 
 impl ToolRegistry {
@@ -136,7 +136,7 @@ impl ToolRegistry {
     /// Register a tool. Panics if the name collides — caller is
     /// configuring the registry at startup and should catch duplicates
     /// at review time.
-    pub fn register(&mut self, tool: Arc<dyn LashonTool>) {
+    pub fn register(&mut self, tool: Arc<dyn OttidTool>) {
         let name = tool.name().to_string();
         if self.tools.contains_key(&name) {
             panic!("duplicate tool registration: {name}");
@@ -145,13 +145,13 @@ impl ToolRegistry {
     }
 
     /// Look up a tool by the name the LLM emitted.
-    pub fn get(&self, name: &str) -> Option<Arc<dyn LashonTool>> {
+    pub fn get(&self, name: &str) -> Option<Arc<dyn OttidTool>> {
         self.tools.get(name).cloned()
     }
 
     /// Every registered tool, in name-sorted order.
-    pub fn all(&self) -> Vec<Arc<dyn LashonTool>> {
-        let mut tools: Vec<Arc<dyn LashonTool>> = self.tools.values().cloned().collect();
+    pub fn all(&self) -> Vec<Arc<dyn OttidTool>> {
+        let mut tools: Vec<Arc<dyn OttidTool>> = self.tools.values().cloned().collect();
         tools.sort_by(|a, b| a.name().cmp(b.name()));
         tools
     }
@@ -213,7 +213,7 @@ pub(crate) mod test_support {
         }
     }
 
-    impl LashonTool for MockTool {
+    impl OttidTool for MockTool {
         fn name(&self) -> &str {
             self.name_value
         }

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Lashon",
+  "productName": "Ottid",
   "version": "1.1.0",
-  "identifier": "dev.lashon.desktop",
+  "identifier": "app.ottid.desktop",
   "build": {
     "frontendDist": "../build",
     "devUrl": "http://localhost:1735",
@@ -15,7 +15,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Lashon",
+        "title": "Ottid",
         "url": "/",
         "width": 104,
         "height": 104,
@@ -31,7 +31,7 @@
       },
       {
         "label": "tutorial",
-        "title": "Lashon · מדריך",
+        "title": "Ottid · מדריך",
         "url": "/tutorial",
         "width": 880,
         "height": 600,
@@ -46,7 +46,7 @@
       },
       {
         "label": "hub",
-        "title": "Lashon · הגדרות",
+        "title": "Ottid · הגדרות",
         "url": "/hub",
         "width": 960,
         "height": 640,
@@ -76,7 +76,7 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "binaries/lashon-stt/**/*",
+      "binaries/ottid-stt/**/*",
       "binaries/llama-server/**/*",
       "../../../models/wake/wakewords/hey_lashon.onnx",
       "../../../models/wake/openwakeword/embedding_model.onnx",
@@ -100,7 +100,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERDM0MyQTUyOUYzNDMzOUEKUldTYU16U2ZVaW84M0JYNmxuT05ZWEtFb2VMRk9jVGNINmxrMm1uNm5SQ0xMczY4RGtzNi96c2YK",
       "endpoints": [
-        "https://github.com/bustrama/lashon/releases/latest/download/latest.json"
+        "https://github.com/bustrama/ottid/releases/latest/download/latest.json"
       ],
       "dialog": false
     }

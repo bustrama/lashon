@@ -28,7 +28,7 @@ const LOCAL_LLM_JSON: &str = include_str!("../../../models/manifests/local-llm.j
 
 /// A packaged build sets this to the per-user model directory; it is absent
 /// when running from a source checkout (see apps/desktop/src-tauri/src/lib.rs).
-const MODELS_ROOT_ENV: &str = "LASHON_MODELS_ROOT";
+const MODELS_ROOT_ENV: &str = "OTTID_MODELS_ROOT";
 
 /// SHA-256 placeholder used in `models/manifests/local-llm.json` when the
 /// upstream LFS hash has not yet been mirrored into the manifest. A file
@@ -109,7 +109,7 @@ fn find_entry(model_id: &str) -> Result<ModelEntry> {
 
 /// The directory a model's files live in — whether or not they are present.
 ///
-/// Packaged build: `$LASHON_MODELS_ROOT/<dir-name>`. From a source checkout:
+/// Packaged build: `$OTTID_MODELS_ROOT/<dir-name>`. From a source checkout:
 /// the repo's `models/` tree, resolved relative to this crate. A packaged
 /// build always sets the env var, so the build-machine source path baked in
 /// here is never consulted off the build machine.
@@ -192,7 +192,7 @@ pub fn verified_dir(model_id: &str) -> Result<PathBuf> {
 
 /// The directory wake-word classifier ONNX files live in.
 ///
-/// Packaged build: `$LASHON_MODELS_ROOT/wakewords`; from a source checkout: the
+/// Packaged build: `$OTTID_MODELS_ROOT/wakewords`; from a source checkout: the
 /// repo's `models/wake/wakewords/` tree.
 fn wake_models_dir() -> PathBuf {
     if let Some(root) = std::env::var_os(MODELS_ROOT_ENV) {
@@ -308,7 +308,7 @@ pub async fn install_wake_classifier(id: &str) -> Result<String> {
         .with_context(|| format!("creating the wake-words directory {}", dir.display()))?;
 
     let client = reqwest::Client::builder()
-        .user_agent(concat!("lashon/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("ottid/", env!("CARGO_PKG_VERSION")))
         .build()
         .context("building the HTTP client")?;
 
@@ -358,7 +358,7 @@ pub async fn install_wake_classifier(id: &str) -> Result<String> {
 /// per-user wake-words directory, returning how many files were copied.
 ///
 /// The Tauri shell calls this on every launch with the bundle's wake-classifier
-/// directory as the source and `$LASHON_MODELS_ROOT/wakewords` as the target:
+/// directory as the source and `$OTTID_MODELS_ROOT/wakewords` as the target:
 /// the MIT "Hey Lashon" classifier ships in the installer
 /// (docs/adr/0016-wake-word-engine.md) but lives where the wake engine looks
 /// for it only after this copy. Idempotent — a file already present at the
@@ -437,7 +437,7 @@ fn parse_local_llm() -> Result<LocalLlmManifest> {
 
 /// The directory the local-LLM GGUF files live in.
 ///
-/// Packaged build: `$LASHON_MODELS_ROOT/local-llm`. From a source checkout:
+/// Packaged build: `$OTTID_MODELS_ROOT/local-llm`. From a source checkout:
 /// the repo's `models/local-llm/` tree.
 fn local_llm_dir() -> PathBuf {
     if let Some(root) = std::env::var_os(MODELS_ROOT_ENV) {
@@ -564,7 +564,7 @@ where
         .with_context(|| format!("creating the local-llm directory {}", dir.display()))?;
 
     let client = reqwest::Client::builder()
-        .user_agent(concat!("lashon/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("ottid/", env!("CARGO_PKG_VERSION")))
         // A 1 GB GGUF over a slow link can take many minutes — disable
         // the per-request timeout entirely; the per-read timeout on the
         // socket guards against a stalled connection.
@@ -744,7 +744,7 @@ mod tests {
 
     #[test]
     fn sha256_file_matches_a_known_vector() {
-        let path = std::env::temp_dir().join(format!("lashon-sha256-test-{}", std::process::id()));
+        let path = std::env::temp_dir().join(format!("ottid-sha256-test-{}", std::process::id()));
         std::fs::write(&path, b"abc").expect("write the test file");
         let got = sha256_file(&path);
         let _ = std::fs::remove_file(&path);
@@ -813,7 +813,7 @@ mod tests {
     /// collide when `cargo test` runs them in parallel.
     fn bundle_test_dirs(label: &str) -> (PathBuf, PathBuf, PathBuf) {
         let root = std::env::temp_dir().join(format!(
-            "lashon-bundled-wake-{}-{}",
+            "ottid-bundled-wake-{}-{}",
             label,
             std::process::id()
         ));
@@ -893,10 +893,10 @@ mod tests {
         // tauri dev path — no bundle on disk. The function must not fail and
         // must not create the target directory uselessly.
         let absent =
-            std::env::temp_dir().join(format!("lashon-bundled-wake-absent-{}", std::process::id()));
+            std::env::temp_dir().join(format!("ottid-bundled-wake-absent-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&absent);
         let target = std::env::temp_dir().join(format!(
-            "lashon-bundled-wake-absent-target-{}",
+            "ottid-bundled-wake-absent-target-{}",
             std::process::id()
         ));
         let _ = std::fs::remove_dir_all(&target);
@@ -1003,7 +1003,7 @@ mod tests {
         // edition-2021 toolchain (rust-toolchain.toml) keeps `set_var` /
         // `remove_var` safe.
         let scratch =
-            std::env::temp_dir().join(format!("lashon-local-llm-delete-{}", std::process::id()));
+            std::env::temp_dir().join(format!("ottid-local-llm-delete-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&scratch);
         std::fs::create_dir_all(&scratch).unwrap();
         std::env::set_var(MODELS_ROOT_ENV, &scratch);

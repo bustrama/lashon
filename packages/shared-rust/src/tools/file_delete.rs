@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 
 use super::path_safety::resolve_safe_path;
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 pub struct FileDelete;
 
@@ -24,7 +24,7 @@ impl Default for FileDelete {
     }
 }
 
-impl LashonTool for FileDelete {
+impl OttidTool for FileDelete {
     fn name(&self) -> &str {
         "file_delete"
     }
@@ -139,7 +139,7 @@ mod tests {
 
     #[test]
     fn refuses_directories() {
-        let dir = std::env::temp_dir().join("lashon-file_delete-dir-test");
+        let dir = std::env::temp_dir().join("ottid-file_delete-dir-test");
         let _ = std::fs::create_dir_all(&dir);
         let result = rt()
             .block_on(FileDelete.execute(&json!({"path": dir.to_str().unwrap()})))
@@ -151,7 +151,7 @@ mod tests {
 
     #[test]
     fn deletes_a_temp_file() {
-        let path = std::env::temp_dir().join("lashon-file_delete-target.txt");
+        let path = std::env::temp_dir().join("ottid-file_delete-target.txt");
         std::fs::write(&path, "to-go").unwrap();
         let result = rt()
             .block_on(FileDelete.execute(&json!({"path": path.to_str().unwrap()})))

@@ -1,11 +1,11 @@
-Lashon — third-party notices
+Ottid — third-party notices
 ============================
 
-This file lists third-party material redistributed within the Lashon source
+This file lists third-party material redistributed within the Ottid source
 tree or the release installer. Build-time dependencies (Cargo crates, npm
 packages, Python packages) retain their own licenses and are not reproduced
 here; the CI license-scan job (cargo-deny, pip-licenses) enforces that none
-carry an AGPL or CC-BY-NC license. (Lashon's own code is GPL-3.0-only as of
+carry an AGPL or CC-BY-NC license. (Ottid's own code is GPL-3.0-only as of
 docs/adr/0032; permissively-licensed dependencies remain GPLv3-compatible.)
 
 --------------------------------------------------------------------------------
@@ -34,7 +34,7 @@ non-commercial badge, never bundled. See docs/providers.md (bundle policy).
 --------------------------------------------------------------------------------
 File:    models/wake/wakewords/hey_lashon.onnx
 License: MIT
-Origin:  Trained by the Lashon project using the openWakeWord training
+Origin:  Trained by the Ottid project using the openWakeWord training
          pipeline on speech synthesised by Piper TTS (MIT). The procedure
          is documented at docs/wake-word-training.md so users can train
          alternative wake words; the training script and synthesised
@@ -46,7 +46,7 @@ may install them at their own discretion as a non-commercial opt-in.
 --------------------------------------------------------------------------------
 Bundled llama-server (local LLM runtime)
 --------------------------------------------------------------------------------
-Lashon bundles a prebuilt llama-server from llama.cpp / ggml as a Tauri resource
+Ottid bundles a prebuilt llama-server from llama.cpp / ggml as a Tauri resource
 (apps/desktop/src-tauri/binaries/llama-server/, see docs/adr/0025), mirrored from
 the ggml.llamacpp release.
 License: MIT
@@ -89,5 +89,5 @@ license:
                                         libraries, LGPL-2.1-or-later)
 
 The NVIDIA cuBLAS and cuDNN runtime libraries are NOT bundled. On a machine with
-an NVIDIA GPU, Lashon downloads them from PyPI on first run, under NVIDIA's own
+an NVIDIA GPU, Ottid downloads them from PyPI on first run, under NVIDIA's own
 license terms — the same wheels `pip install` would fetch.

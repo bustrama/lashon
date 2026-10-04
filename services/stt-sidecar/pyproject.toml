@@ -1,10 +1,10 @@
 [project]
-name = "lashon-stt"
+name = "ottid-stt"
 version = "1.1.0"
-description = "Lashon speech-to-text sidecar — gRPC service over faster-whisper."
+description = "Ottid speech-to-text sidecar — gRPC service over faster-whisper."
 requires-python = ">=3.11,<3.13"
 license = "GPL-3.0-only"
-authors = [{ name = "Lashon contributors" }]
+authors = [{ name = "Ottid contributors" }]
 
 # Versions pinned exactly. The faster-whisper / ctranslate2 / numpy trio is the
 # CUDA-matched set described in docs/tech-stack.md — bumping any of them is a
@@ -45,7 +45,7 @@ build = [
 ]
 
 [project.scripts]
-lashon-stt = "lashon_stt.server:main"
+ottid-stt = "ottid_stt.server:main"
 
 [build-system]
 requires = ["setuptools==80.10.2"]

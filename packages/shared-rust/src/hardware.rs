@@ -1,6 +1,6 @@
 //! Hardware-tier detection.
 //!
-//! Lashon classifies the host into one of four capability tiers (A–D); the
+//! Ottid classifies the host into one of four capability tiers (A–D); the
 //! tier picks the default STT / LLM / TTS models encoded in
 //! `apps/desktop/src-tauri/tiers.json`. The thresholds are the ones in
 //! `docs/tech-stack.md`. Detection runs once at onboarding and the user may
@@ -29,11 +29,11 @@ pub enum Tier {
 }
 
 /// STT device mode — probe the GPU first, fall back to CPU (hardware tiers
-/// A/B). The value of `LASHON_STT_DEVICE` for those tiers.
+/// A/B). The value of `OTTID_STT_DEVICE` for those tiers.
 pub const STT_DEVICE_AUTO: &str = "auto";
 
 /// STT device mode — run on the CPU, skipping the CUDA runtime entirely
-/// (hardware tiers C/D). The value of `LASHON_STT_DEVICE` for those tiers.
+/// (hardware tiers C/D). The value of `OTTID_STT_DEVICE` for those tiers.
 pub const STT_DEVICE_CPU: &str = "cpu";
 
 impl Tier {

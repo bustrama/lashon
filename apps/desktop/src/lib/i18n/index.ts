@@ -1,4 +1,4 @@
-// Lashon's interface localization — a small, dependency-free i18n store.
+// Ottid's interface localization — a small, dependency-free i18n store.
 //
 // Two locales, both bundled as static JSON; every UI string is a plain key
 // lookup, so a compact store covers it without an i18n library — and without

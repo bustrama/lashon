@@ -1,13 +1,13 @@
 //! `show_notification` — fire a desktop notification via `notify-rust`
 //! (Win32 toast / macOS NSUserNotification / Linux libnotify). Lives in
-//! lashon-core for parity with the rest of the catalogue — the Tauri
+//! ottid-core for parity with the rest of the catalogue — the Tauri
 //! shell stays thin per `.claude/rules/architecture.md`.
 
 use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 pub struct ShowNotification;
 
@@ -23,7 +23,7 @@ impl Default for ShowNotification {
     }
 }
 
-impl LashonTool for ShowNotification {
+impl OttidTool for ShowNotification {
     fn name(&self) -> &str {
         "show_notification"
     }

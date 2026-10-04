@@ -5,7 +5,7 @@ globs: ["**/*"]
 
 # Security & privacy
 
-Lashon is local-first and privacy-respecting by construction. These are hard
+Ottid is local-first and privacy-respecting by construction. These are hard
 invariants — never trade them for convenience.
 
 ## Never
@@ -14,9 +14,9 @@ invariants — never trade them for convenience.
   keychain (`keyring`); `.env` files are git-ignored.
 - Never log transcript content, audio, or PII — not even at debug level.
   - **Documented exception:** the Command-mode dispatcher honours
-    `LASHON_DEBUG_TOOL_ARGS=1` to log tool arg values + result content
+    `OTTID_DEBUG_TOOL_ARGS=1` to log tool arg values + result content
     for debugging "the model said it worked but nothing happened"
-    failures (see `lashon_core::command_mode::debug_tool_args_enabled`).
+    failures (see `ottid_core::command_mode::debug_tool_args_enabled`).
     The flag is off by default and must stay off in shipped builds. A
     new tool that wants similar opt-in verbosity should reuse this flag
     rather than inventing its own — one knob, one risk surface.
@@ -31,7 +31,7 @@ invariants — never trade them for convenience.
 
 ## Licensing
 
-- Lashon's own code is **GPL-3.0-only** (the open-core relicense — see
+- Ottid's own code is **GPL-3.0-only** (the open-core relicense — see
   [ADR-0032](../../docs/adr/0032-ship-as-open-core-product.md) and
   [`NOTICE`](../../NOTICE)). The paid binary is a signed build of this same
   GPLv3 source; the value is signing + notarization + auto-update + support,

@@ -16,14 +16,14 @@
 
 use std::sync::{Arc, Mutex};
 
-use lashon_core::command_mode::{dispatch, AlwaysAllow, AlwaysDeny, ConfirmHandler, NoOpProgress};
-use lashon_core::llm::{
+use ottid_core::command_mode::{dispatch, AlwaysAllow, AlwaysDeny, ConfirmHandler, NoOpProgress};
+use ottid_core::llm::{
     BoxFuture, Completion, ContentBlock, LLMProvider, Msg, MsgContent, Token, TokenStream,
     Tool as LlmTool, Usage,
 };
-use lashon_core::provider::Confidence;
-use lashon_core::tool::ToolRegistry;
-use lashon_core::tools::phase_one_registry;
+use ottid_core::provider::Confidence;
+use ottid_core::tool::ToolRegistry;
+use ottid_core::tools::phase_one_registry;
 
 /// A scripted LLM provider that returns one canned `Completion` per
 /// `chat()` call, in script order. Mirrors the `ScriptedLlm` in
@@ -128,7 +128,7 @@ fn build_registry() -> Arc<ToolRegistry> {
 
 #[tokio::test]
 async fn always_allow_lets_file_delete_remove_the_file() {
-    let path = std::env::temp_dir().join("lashon-int-allow-delete.txt");
+    let path = std::env::temp_dir().join("ottid-int-allow-delete.txt");
     let _ = std::fs::remove_file(&path);
     std::fs::write(&path, "to-be-deleted").expect("seed file");
 
@@ -167,7 +167,7 @@ async fn always_allow_lets_file_delete_remove_the_file() {
 
 #[tokio::test]
 async fn always_deny_short_circuits_destructive_call() {
-    let path = std::env::temp_dir().join("lashon-int-deny-delete.txt");
+    let path = std::env::temp_dir().join("ottid-int-deny-delete.txt");
     let _ = std::fs::remove_file(&path);
     std::fs::write(&path, "should survive").expect("seed file");
 

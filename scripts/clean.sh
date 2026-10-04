@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Reclaim disk space by deleting Lashon's build artifacts and (optionally)
+# Reclaim disk space by deleting Ottid's build artifacts and (optionally)
 # language environments and downloaded model weights.
 #
 # Three tiers, from safest to most aggressive:
@@ -129,7 +129,7 @@ remove_orphan_worktree_dirs() {
 }
 
 before_mb="$(repo_total_mb)"
-printf "\nLashon repo cleanup -- tier: %s%s\n" "$level" "$([[ $dry_run -eq 1 ]] && echo ' (dry-run)')"
+printf "\nOttid repo cleanup -- tier: %s%s\n" "$level" "$([[ $dry_run -eq 1 ]] && echo ' (dry-run)')"
 printf "Repo total before: %s MB\n\n" "$before_mb"
 
 echo "Build artefacts:"
@@ -159,7 +159,7 @@ if [[ "$level" == "medium" || "$level" == "aggressive" ]]; then
 
     # Tauri-side bundled binaries — preserve .gitkeep (and README.md for llama).
     for bin_dir in \
-        "apps/desktop/src-tauri/binaries/lashon-stt:.gitkeep" \
+        "apps/desktop/src-tauri/binaries/ottid-stt:.gitkeep" \
         "apps/desktop/src-tauri/binaries/llama-server:.gitkeep,README.md"; do
         path="${bin_dir%%:*}"
         keep="${bin_dir##*:}"

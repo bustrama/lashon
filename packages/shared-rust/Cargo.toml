@@ -1,43 +1,43 @@
 [package]
-name = "lashon-core"
+name = "ottid-core"
 version = "1.1.0"
-description = "Lashon core — provider clients and shared logic, independent of the GUI."
-authors = ["Lashon contributors"]
+description = "Ottid core — provider clients and shared logic, independent of the GUI."
+authors = ["Ottid contributors"]
 edition = "2021"
 rust-version = "1.95"
 license = "GPL-3.0-only"
 publish = false
 
 [lib]
-name = "lashon_core"
+name = "ottid_core"
 
 # M9 Phase 1g (ADR-0028) — the stdio MCP server binary Claude Desktop
-# (and any other MCP client) spawns to talk to Lashon. Lives in
-# `lashon-core` rather than the Tauri shell because it depends only on
+# (and any other MCP client) spawns to talk to Ottid. Lives in
+# `ottid-core` rather than the Tauri shell because it depends only on
 # the GUI-independent tool catalogue + recipes module + rmcp; avoiding
 # the Tauri runtime keeps the binary small (~5 MB stripped, vs ~80 MB
 # if it linked Tauri). The Tauri shell bundles it as a resource so the
-# installer ships a single `lashon-mcp.exe`.
+# installer ships a single `ottid-mcp.exe`.
 [[bin]]
-name = "lashon-mcp"
-path = "src/bin/lashon_mcp.rs"
+name = "ottid-mcp"
+path = "src/bin/ottid_mcp.rs"
 required-features = ["mcp-server"]
 
 # M9 Phase 1b — CLI driver for the recipe runtime. Lets a user run a
-# recipe by id (`lashon-recipe send-discord-message --recipient=kuki
+# recipe by id (`ottid-recipe send-discord-message --recipient=kuki
 # --body=hi`) without going through Hub or voice — the testing surface
 # for authored recipes until Phase 1c (intent cascade) and Phase 1d
 # (Hub Recipes tab) land. Requires `command-mode` — the recipe runtime is
 # part of the paid command-mode tier (ADR-0034).
 [[bin]]
-name = "lashon-recipe"
-path = "src/bin/lashon_recipe.rs"
+name = "ottid-recipe"
+path = "src/bin/ottid_recipe.rs"
 required-features = ["command-mode"]
 
 # Cargo features (docs/adr/0025).
 #
 # `local-llm` enables the `LocalLlmProvider` — a thin OpenAI-compat
-# shim over a Lashon-managed `llama-server` subprocess (the prebuilt
+# shim over an Ottid-managed `llama-server` subprocess (the prebuilt
 # ggml binary, bundled as a Tauri resource). The feature is **on by
 # default** so every CI run exercises the path (a fork can opt out
 # with `--no-default-features`). When the feature is off, the
@@ -58,9 +58,9 @@ default = ["command-mode"]
 # build ships dictation only, with command mode compiled out of the binary.
 command-mode = ["local-llm", "mcp-server"]
 local-llm = []
-# `mcp-server` enables the `lashon_core::mcp` module + the `lashon-mcp`
+# `mcp-server` enables the `ottid_core::mcp` module + the `ottid-mcp`
 # stdio binary (ADR-0028). The feature gates the `rmcp` dep so a
-# library-only consumer of `lashon-core` doesn't pull the MCP transport
+# library-only consumer of `ottid-core` doesn't pull the MCP transport
 # stack. On by default so every CI run exercises the path; a downstream
 # fork can opt out via `--no-default-features --features local-llm`.
 mcp-server = ["dep:rmcp", "dep:tracing-subscriber"]
@@ -139,7 +139,7 @@ open = "=5.3.4"
 glob = "=0.3.3"
 # Desktop notifications for the M8.2 `show_notification` tool. Cross-platform
 # (Win32 toast, macOS NSUserNotification, Linux libnotify) so the tool ships
-# the same surface on all three OS targets. Lives in lashon-core for
+# the same surface on all three OS targets. Lives in ottid-core for
 # parity with the rest of the tool catalogue (the tool pattern is "tools live
 # in core, the Tauri shell stays thin" — `.claude/rules/architecture.md`).
 notify-rust = "=4.17.0"
@@ -150,7 +150,7 @@ chrono = { version = "=0.4.44", default-features = false, features = ["clock"] }
 # M9 Phase 1a — recipe YAML parser. `serde_yaml_ng` is dtolnay's official
 # continuation of the archived `serde_yaml`; the alternative `serde_yml` fork
 # carries RUSTSEC-2025-0068 (unsound + unmaintained) and is avoided. Recipes
-# live in `lashon_core::recipes`.
+# live in `ottid_core::recipes`.
 serde_yaml_ng = "=0.10.0"
 # M9 Phase 1a — JSON Schema generation for `recipe.yaml`. Auto-derived from
 # the Rust types via `#[derive(JsonSchema)]` so the in-repo schema can never
@@ -165,12 +165,12 @@ schemars = "=1.2.1"
 regex-lite = "=0.1.9"
 # M9 Phase 1g — official Anthropic Rust SDK for the Model Context Protocol
 # (`rmcp`, ADR-0028). Optional under the `mcp-server` feature; the
-# `lashon-mcp` stdio binary is the consumer. Features:
+# `ottid-mcp` stdio binary is the consumer. Features:
 #   - `server`        the `ServerHandler` trait + serve/waiting loop
 #   - `macros`        `#[tool]` / `#[tool_router]` derive macros
 #   - `transport-io`  stdin/stdout transport for the Claude Desktop launcher
 # The crate has its own bundled schemars dep (separate semver from
-# Lashon's `schemars = "=1.2.1"` recipes schema export) — Cargo resolves
+# Ottid's `schemars = "=1.2.1"` recipes schema export) — Cargo resolves
 # both versions side-by-side; we don't share `JsonSchema` impls across
 # the two trees.
 rmcp = { version = "=1.7.0", default-features = false, features = [
@@ -178,7 +178,7 @@ rmcp = { version = "=1.7.0", default-features = false, features = [
     "macros",
     "transport-io",
 ], optional = true }
-# `tracing-subscriber` for the `lashon-mcp` stdio binary (under the
+# `tracing-subscriber` for the `ottid-mcp` stdio binary (under the
 # `mcp-server` feature). Library code stays subscriber-agnostic — the
 # Tauri shell installs its own subscriber — but the standalone binary
 # needs one of its own to surface tracing on stderr. Pinned to the
@@ -186,7 +186,7 @@ rmcp = { version = "=1.7.0", default-features = false, features = [
 # tree.
 tracing-subscriber = { version = "=0.3.23", features = ["env-filter"], optional = true }
 
-# Win32 Job Object wrapper for the STT sidecar — if the parent Lashon process
+# Win32 Job Object wrapper for the STT sidecar — if the parent Ottid process
 # exits abruptly (panic, hard Ctrl+C of `cargo run`), `kill_on_drop(true)`
 # doesn't always reach the sidecar grandchild and the orphan holds file locks
 # on its PyInstaller `_internal\*.pyd` files, breaking the next build.
@@ -216,7 +216,7 @@ windows = { version = "=0.61.3", features = [
 ] }
 
 # M9 Phase 1d storage-module unit tests need disposable directories under
-# the `LASHON_BUNDLED_RECIPES_DIR` / `LASHON_USER_RECIPES_DIR` env vars.
+# the `OTTID_BUNDLED_RECIPES_DIR` / `OTTID_USER_RECIPES_DIR` env vars.
 # `tempfile` is the standard Rust dev-dep for that and is already pulled
 # in transitively by `keyring`; pinning it here makes the dependency
 # explicit for the test build.

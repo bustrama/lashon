@@ -12,7 +12,7 @@ re-decode cadence and confirm CPU viability.
 
   * Are partials timely? (target: <1 s lag behind audio on a Tier-A GPU)
   * Do they refine smoothly, or do early hypotheses flicker as more context
-    arrives? (LocalAgreement-2 in `lashon-core` removes the flicker; this script
+    arrives? (LocalAgreement-2 in `ottid-core` removes the flicker; this script
     shows the raw, pre-committer hypotheses.)
   * Does the final text match a clean batch decode?
 
@@ -69,7 +69,7 @@ SAMPLE_RATE = 16_000
 
 # Min audio before the first decode. Sub-second decodes are garbage (the model
 # has too little context) and waste a decode slot — the dictation worker gates
-# on the same threshold (`MIN_DECODE_SAMPLES` in lashon-core).
+# on the same threshold (`MIN_DECODE_SAMPLES` in ottid-core).
 MIN_DECODE_S = 1.0
 
 
@@ -115,9 +115,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--model",
-        default=os.environ.get("LASHON_STT_MODEL_ID"),
+        default=os.environ.get("OTTID_STT_MODEL_ID"),
         help="Transcription model id to benchmark (default: the shipped model, "
-             "or $LASHON_STT_MODEL_ID). Pass the non-turbo large-v3 id to "
+             "or $OTTID_STT_MODEL_ID). Pass the non-turbo large-v3 id to "
              "compare re-decode latency against turbo (see ADR-0036).",
     )
     parser.add_argument(
@@ -134,7 +134,7 @@ def main(argv: list[str] | None = None) -> int:
         0,
         str(Path(__file__).resolve().parent.parent / "services" / "stt-sidecar" / "src"),
     )
-    from lashon_stt.engines.faster_whisper_engine import load_engine
+    from ottid_stt.engines.faster_whisper_engine import load_engine
 
     print("loading engine... ", end="", flush=True)
     t0 = time.monotonic()

@@ -6,7 +6,7 @@ long_description: |
   Focuses Spotify, opens the search bar (Ctrl+L), types the query, waits
   for results to render, then double-clicks the first result row to start
   playback. Works with the Spotify desktop app.
-author: Lashon contributors
+author: Ottid contributors
 recipe_version: 1.0.0
 tags:
   - media

@@ -3,13 +3,13 @@
 //! Marked `#[ignore]`: it needs a working microphone. Run explicitly:
 //!
 //! ```text
-//! cargo test -p lashon-core --test capture -- --ignored
+//! cargo test -p ottid-core --test capture -- --ignored
 //! ```
 
 use std::thread;
 use std::time::Duration;
 
-use lashon_core::audio::{AudioCapture, TARGET_RATE};
+use ottid_core::audio::{AudioCapture, TARGET_RATE};
 
 #[test]
 #[ignore = "requires a microphone"]

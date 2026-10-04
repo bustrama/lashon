@@ -11,7 +11,7 @@ use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 /// Hard cap on the total snapshot. 4 KB matches the per-tool result
 /// budget the rest of the OS-control tranche uses; bigger snapshots
@@ -39,7 +39,7 @@ impl Default for ReadScreen {
     }
 }
 
-impl LashonTool for ReadScreen {
+impl OttidTool for ReadScreen {
     fn name(&self) -> &str {
         "read_screen"
     }

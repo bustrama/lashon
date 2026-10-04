@@ -111,7 +111,7 @@ impl OpenAiCompatLlmProvider {
 
 fn build_client() -> Client {
     Client::builder()
-        .user_agent(concat!("lashon/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("ottid/", env!("CARGO_PKG_VERSION")))
         .build()
         .expect("reqwest client construction never fails for our config")
 }
@@ -768,7 +768,7 @@ pub const OPENCODE_GO: OpenAiCompatConfig = OpenAiCompatConfig {
     supports_tool_use: true,
     is_local: false,
     requires_api_key: true,
-    // **Recommended model for Lashon's Command-mode workload.**
+    // **Recommended model for Ottid's Command-mode workload.**
     //
     // Picked from the eight Go-tier models on three signals:
     //
@@ -776,7 +776,7 @@ pub const OPENCODE_GO: OpenAiCompatConfig = OpenAiCompatConfig {
     //    of the open-weight tool-calling benchmarks (Berkeley FCL,
     //    Tool-Use-Hard) through 2025 — GLM 4.6 is close behind, but
     //    Kimi consistently edges it on multi-turn chains, which is
-    //    Lashon's bread and butter (open_app → wait_for_window →
+    //    Ottid's bread and butter (open_app → wait_for_window →
     //    focus → press_keys → … → click_element).
     // 2. **Latency.** Kimi K2 is a Mixture-of-Experts model (1 T total
     //    params, ~32 B active per token), so it serves at the speed
@@ -823,7 +823,7 @@ pub const OLLAMA_LOCAL: OpenAiCompatConfig = OpenAiCompatConfig {
     default_base_url: "http://127.0.0.1:11434/v1",
     default_model: "llama3.2",
     available_models: &["llama3.2", "qwen2.5", "dictalm3"],
-    // Without knowing the loaded model, Lashon cannot promise quality. The
+    // Without knowing the loaded model, Ottid cannot promise quality. The
     // Hub upgrades the badge to Good when the picked model name contains
     // `dicta` or `hebrew` (docs/stories/m7-provider-mux.md Phase 5).
     supports_hebrew: Confidence::Basic,
@@ -890,7 +890,7 @@ struct OllamaTag {
 }
 
 /// Probe an Ollama daemon. The `base_url` argument is the OpenAI-compatible
-/// endpoint Lashon talks to (`http://127.0.0.1:11434/v1`); the probe
+/// endpoint Ottid talks to (`http://127.0.0.1:11434/v1`); the probe
 /// switches to `/api/tags` at the same host since that lives at the root,
 /// not under `/v1`.
 ///
@@ -1009,12 +1009,12 @@ mod tests {
 
     #[test]
     fn build_request_serialises_a_simple_user_message() {
-        let messages = [Msg::system("you are Lashon"), Msg::user("שלום")];
+        let messages = [Msg::system("you are Ottid"), Msg::user("שלום")];
         let request = build_request("gpt-4.1", &messages, &[]);
         let json_value = serde_json::to_value(&request).unwrap();
         assert_eq!(json_value["model"], "gpt-4.1");
         assert_eq!(json_value["messages"][0]["role"], "system");
-        assert_eq!(json_value["messages"][0]["content"], "you are Lashon");
+        assert_eq!(json_value["messages"][0]["content"], "you are Ottid");
         assert_eq!(json_value["messages"][1]["role"], "user");
         assert_eq!(json_value["messages"][1]["content"], "שלום");
     }
@@ -1193,7 +1193,7 @@ mod tests {
 
     // Live integration tests — all `#[ignore]` so CI skips them.
     #[test]
-    #[ignore = "needs LASHON_LLM_GROQ_KEY"]
+    #[ignore = "needs OTTID_LLM_GROQ_KEY"]
     fn live_groq_round_trip() {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()

@@ -7,7 +7,7 @@ long_description: |
   behind the `shell.run` permission and the standard confirmation modal:
   the user sees the literal command before it runs. Pattern is a Windows
   glob (`*.txt`, `report*.csv`); find / replace are literal strings.
-author: Lashon contributors
+author: Ottid contributors
 recipe_version: 1.0.0
 tags:
   - files

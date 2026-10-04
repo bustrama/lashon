@@ -3,7 +3,7 @@
   "bundle": {
     "createUpdaterArtifacts": false,
     "resources": [
-      "binaries/lashon-stt/**/*",
+      "binaries/ottid-stt/**/*",
       "../../../models/wake/wakewords/hey_lashon.onnx",
       "../../../models/wake/openwakeword/embedding_model.onnx",
       "../../../models/wake/openwakeword/melspectrogram.onnx",

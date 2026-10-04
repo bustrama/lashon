@@ -5,7 +5,7 @@ use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 /// Default scroll amount in wheel clicks. Three matches the OS default
 /// scroll-velocity used by hands-on testers — small enough not to skip
@@ -27,7 +27,7 @@ impl Default for Scroll {
     }
 }
 
-impl LashonTool for Scroll {
+impl OttidTool for Scroll {
     fn name(&self) -> &str {
         "scroll"
     }

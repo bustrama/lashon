@@ -1,8 +1,8 @@
-# Contributing to Lashon
+# Contributing to Ottid
 
 ## External contributions
 
-**Lashon is a solo-maintained project, and external pull requests are not
+**Ottid is a solo-maintained project, and external pull requests are not
 accepted — they will not be reviewed or merged.** This isn't about the quality
 of any given change; it's that a single maintainer keeps the design, the Hebrew
 behaviour, and the release process coherent. Please don't invest effort in a PR,
@@ -10,17 +10,17 @@ because it won't be merged, and I'd rather not waste your time.
 
 **Bug reports and issues are genuinely welcome.** If something is broken,
 behaves incorrectly, or mishandles Hebrew (or mixed Hebrew/English) text, please
-[open an issue](https://github.com/bustrama/lashon/issues) with steps to
+[open an issue](https://github.com/bustrama/ottid/issues) with steps to
 reproduce — that's the most useful thing you can contribute, and it's read and
-appreciated. Lashon is GPL-3.0-only, so you are of course also free to fork the
+appreciated. Ottid is GPL-3.0-only, so you are of course also free to fork the
 project and adapt it for your own use under the terms of that license.
 
 The rest of this document describes the **internal** development workflow used
-to build Lashon; it is reference for the maintainer, not a contribution guide.
+to build Ottid; it is reference for the maintainer, not a contribution guide.
 
 ---
 
-Lashon is built milestone by milestone. The spec is a set of focused, living
+Ottid is built milestone by milestone. The spec is a set of focused, living
 docs under [`docs/`](docs/) — [`architecture.md`](docs/architecture.md),
 [`providers.md`](docs/providers.md), [`design-system.md`](docs/design-system.md)
 and the rest — and the build plan is [`docs/roadmap.md`](docs/roadmap.md). Each
@@ -45,7 +45,7 @@ not "looks done", not "passes locally". Before opening a milestone PR:
 
 1. Every DoD bullet for the milestone is demonstrably satisfied.
 2. CI is green on `windows-2022`, `macos-14`, and `ubuntu-24.04`.
-3. The license-scan job passes — no AGPL or CC-BY-NC contamination. (Lashon is
+3. The license-scan job passes — no AGPL or CC-BY-NC contamination. (Ottid is
    GPL-3.0-only as of [ADR-0032](docs/adr/0032-ship-as-open-core-product.md);
    dependencies stay GPLv3-compatible — prefer permissive.)
 4. No secrets, no model weights, and no audio fixtures larger than 5 MB are in
@@ -86,7 +86,7 @@ Any architectural decision, trade-off, or reversal is recorded as an ADR in
   defaults to cloud.
 - **Privacy.** No transcripts, audio, or PII leave the machine without explicit
   opt-in. No telemetry by default. API keys live only in the OS keychain.
-- Testable Rust logic lives in `packages/shared-rust` (the `lashon-core`
+- Testable Rust logic lives in `packages/shared-rust` (the `ottid-core`
   crate); every module there carries `#[test]`s. `apps/desktop/src-tauri` is a
   thin Tauri shell and is not unit-tested — see
   [ADR-0003](docs/adr/0003-core-logic-in-a-tauri-independent-crate.md).
@@ -102,10 +102,10 @@ Any architectural decision, trade-off, or reversal is recorded as an ADR in
 | Build the frontend | `cd apps/desktop && npm run build` |
 | Check Rust | `cd apps/desktop/src-tauri && cargo check` |
 | Test Rust | `cd apps/desktop/src-tauri && cargo test` |
-| Run the STT sidecar standalone | `cd services/stt-sidecar && python -m lashon_stt.server` |
-| List bundled M9 recipes | `cargo run -p lashon-core --bin lashon-recipe -- --list` |
-| Run a recipe by id (smoke-test authoring) | `cargo run -p lashon-core --bin lashon-recipe -- <recipe-id> --param=value` |
-| Run the Lashon-as-MCP stdio server | `cargo run -p lashon-core --bin lashon-mcp` |
+| Run the STT sidecar standalone | `cd services/stt-sidecar && python -m ottid_stt.server` |
+| List bundled M9 recipes | `cargo run -p ottid-core --bin ottid-recipe -- --list` |
+| Run a recipe by id (smoke-test authoring) | `cargo run -p ottid-core --bin ottid-recipe -- <recipe-id> --param=value` |
+| Run the Ottid-as-MCP stdio server | `cargo run -p ottid-core --bin ottid-mcp` |
 
 See [`docs/architecture.md`](docs/architecture.md) for how the pieces fit
 together.

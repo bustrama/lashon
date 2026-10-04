@@ -537,7 +537,7 @@ mod tests {
     /// The recipe-dir env vars are process-wide globals; the storage
     /// tests must not run in parallel or they'd race each other's
     /// fixtures. The `mcp::server` integration tests in
-    /// `tests/lashon_mcp_stdio.rs` use the same env vars but run in a
+    /// `tests/ottid_mcp_stdio.rs` use the same env vars but run in a
     /// separate process — they don't share this lock.
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 

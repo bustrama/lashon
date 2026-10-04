@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 
 use crate::inject::inject_text;
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 pub struct TypeText;
 
@@ -24,7 +24,7 @@ impl Default for TypeText {
     }
 }
 
-impl LashonTool for TypeText {
+impl OttidTool for TypeText {
     fn name(&self) -> &str {
         "type_text"
     }

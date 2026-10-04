@@ -3,7 +3,7 @@
 	// the *focused button itself* receives every keydown — a reliable surface,
 	// unlike a window listener — shows the modifiers building up live, and on a
 	// complete combination validates it through the `validate_hotkey` command
-	// (the rule lives in lashon-core). A valid chord is handed back via
+	// (the rule lives in ottid-core). A valid chord is handed back via
 	// `onchange`; an invalid one shows a localized reason and capture stays open.
 	import { t } from '$lib/i18n';
 	import { invoke } from '@tauri-apps/api/core';
@@ -57,7 +57,7 @@
 			onchange(accelerator);
 		} catch (code) {
 			// `validate_hotkey` rejects with a HotkeyError code string
-			// (lashon-core::hotkey). A non-string rejection would be a
+			// (ottid-core::hotkey). A non-string rejection would be a
 			// framework failure, not a bad chord — fall back to a generic
 			// reason. Capture stays open so the user can try another chord.
 			errorCode = typeof code === 'string' ? code : 'malformed';

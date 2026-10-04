@@ -4,10 +4,10 @@
 //! downloaded STT model. Run it explicitly:
 //!
 //! ```text
-//! cargo test -p lashon-core --test transcribe -- --ignored
+//! cargo test -p ottid-core --test transcribe -- --ignored
 //! ```
 
-use lashon_core::stt::{FasterWhisperProvider, SttProvider, TranscribeOptions};
+use ottid_core::stt::{FasterWhisperProvider, SttProvider, TranscribeOptions};
 
 #[tokio::test]
 #[ignore = "requires the Python STT sidecar environment and the STT model"]

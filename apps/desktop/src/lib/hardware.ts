@@ -1,5 +1,5 @@
-// Hardware-tier types — the frontend mirror of `lashon_core::hardware` and the
-// `MicProbe` of `lashon_core::audio`. The `detect_hardware` and
+// Hardware-tier types — the frontend mirror of `ottid_core::hardware` and the
+// `MicProbe` of `ottid_core::audio`. The `detect_hardware` and
 // `probe_microphone` Tauri commands return these shapes (docs/adr/0013).
 
 /** A hardware capability tier. See docs/tech-stack.md for the model map. */

@@ -1,6 +1,6 @@
 # Roadmap
 
-Lashon is built in three phases, milestone by milestone. This document is the
+Ottid is built in three phases, milestone by milestone. This document is the
 forward-looking plan: scope, the milestone list, and the per-phase workstream
 detail. Active, picked-up work lives as a story in [`stories/`](stories/);
 architecture and design specs live in the sibling docs
@@ -45,7 +45,7 @@ architecture and design specs live in the sibling docs
 - Cloud-by-default routing.
 - Telemetry on transcript content.
 - Signing up users / accounts / sync servers.
-- A Wispr Flow visual clone — Lashon is aesthetically distinct.
+- A Wispr Flow visual clone — Ottid is aesthetically distinct.
 
 ## Milestones
 
@@ -55,7 +55,7 @@ Definition of Done is met and CI is green on all three runners (see
 
 | Milestone | Scope | Status |
 |---|---|---|
-| **M0** — Bootstrap | Repo scaffold, CI green on three OSes, "Hello Lashon" Tauri window with a Hebrew greeting | ✓ Done |
+| **M0** — Bootstrap | Repo scaffold, CI green on three OSes, "Hello Ottid" Tauri window with a Hebrew greeting | ✓ Done |
 | **M1** — Hebrew STT pipeline | Hebrew sample WAV → transcript on disk, WER ≤ 12% on the test corpus | ✓ Done |
 | **M2** — Hotkey + injection | From any app, push-to-talk Hebrew → text at the cursor with correct RTL ordering; clipboard preserved | ✓ Done |
 | **M3** — Tongue UI minimum | Always-on-top tongue with idle / listening / transcribing / error states at 60 fps; drag-to-snap | ✓ Done |
@@ -64,7 +64,7 @@ Definition of Done is met and CI is green on all three runners (see
 | **M6** — Wake word | Default "Hey Lashon" at ≤ 1 false activation/hour; in-app Hebrew wake-word trainer wizard | ✓ Done |
 | **M7** — Provider mux foundation | STT + LLM + TTS trait abstractions; cloud providers plumbed; keychain key storage; Settings UI for switching | ✓ Done |
 | **M8** — Tool registry + command mode | Native tool set usable via LLM tool-calls; 20 Hebrew test commands pass; confirmation policy enforced | ✓ Done |
-| **M9** — Recipes | `recipe.yaml` schema + parser + validator + 10 starters; runtime executor (Windows-first); intent cascade (regex tier) wired into the Command-mode dispatcher; Hub Recipes tab + Steps panel; `lashon-mcp` stdio server so Claude Desktop / Cursor / any MCP host can author and read recipes; STT word-aliases. **Phases 1a–1d + 1g shipped; tier 2/3 cascade + Hub Creator UI deferred.** (Redefined — the original "External agent delegation" M9 is re-scoped for a later milestone.) | ✓ Done on `main` (PRs #71/72/74/75/77/78/79/81; ADRs 0027/0028) |
+| **M9** — Recipes | `recipe.yaml` schema + parser + validator + 10 starters; runtime executor (Windows-first); intent cascade (regex tier) wired into the Command-mode dispatcher; Hub Recipes tab + Steps panel; `ottid-mcp` stdio server so Claude Desktop / Cursor / any MCP host can author and read recipes; STT word-aliases. **Phases 1a–1d + 1g shipped; tier 2/3 cascade + Hub Creator UI deferred.** (Redefined — the original "External agent delegation" M9 is re-scoped for a later milestone.) | ✓ Done on `main` (PRs #71/72/74/75/77/78/79/81; ADRs 0027/0028) |
 | **M10** — TTS pipeline | Piper local default; streaming sentence pipeline; audio ducking; voice picker. **Phase 3 minimum.** | Planned |
 | **M11** — Cloud TTS + advanced local | ElevenLabs, Azure, Cartesia plumbed; optional MMS/XTTS download flow. **Phase 3 DoD met.** | Planned |
 | **M12** — Memory + history | Long-term memory (`remember` tool); History tab with audio replay; Memory editor | Planned |
@@ -78,7 +78,7 @@ hardening are deferred; a security review has, however, already hardened the
 STT sidecar trust boundary — a per-process gRPC auth token and boot-time
 model-integrity verification ([`adr/0010-harden-the-stt-sidecar-trust-boundary.md`](adr/0010-harden-the-stt-sidecar-trust-boundary.md)).
 M3 has since shipped, and the next feature work is M4 onward. The **interactive
-first-run tutorial** — the "learn how to use Lashon" slice of M4 — also shipped
+first-run tutorial** — the "learn how to use Ottid" slice of M4 — also shipped
 early, in `v0.2.0` (issue #9; see [`stories/m4-interactive-tutorial.md`](stories/m4-interactive-tutorial.md)
 and [`adr/0008-first-run-tutorial-window.md`](adr/0008-first-run-tutorial-window.md)),
 and has since gained a first-run warm-up display with byte-level model-download
@@ -149,7 +149,7 @@ Tier A hardware.
   device follows the hardware tier (M5,
   [`adr/0014`](adr/0014-stt-device-by-hardware-tier.md)): tiers A/B probe the
   GPU and fall back to CPU; tiers C/D run on the CPU, skipping the CUDA
-  runtime. The Tauri shell passes the choice in `LASHON_STT_DEVICE`.
+  runtime. The Tauri shell passes the choice in `OTTID_STT_DEVICE`.
 - Model warm-up on sidecar boot; warm inference ≤ 250 ms for 3 s of audio on a
   4080.
 - Sanitizer pass: regex-strip `<\|.*?\|>`, `<ctrl\d+>`, `[\x00-\x08\x0b-\x1f]`.
@@ -183,7 +183,7 @@ the STT transcript directly.
 - `openWakeWord` ONNX via `ort` in Rust.
 - Bundled default model: `hey_lashon_v1.onnx`, trained on Piper-synthesized
   "Hey Lashon".
-- In-app trainer wizard (later milestone) to train a Hebrew "היי לשון".
+- In-app trainer wizard (later milestone) to train a Hebrew "היי אוטיד".
 - A CPU thread, ≤ 25% of one core, with a throttle-on-battery option.
 - A 2-consecutive-frame threshold to suppress false positives.
 
@@ -219,7 +219,7 @@ the STT transcript directly.
   [`adr/0013-onboarding-hardware-detection.md`](adr/0013-onboarding-hardware-detection.md)).
   They extend the tutorial window: the mic step opens a capture stream to probe
   access (and raise the macOS prompt); the hardware step detects the host's
-  tier (`lashon-core::hardware`) and lets the user override it. The detected
+  tier (`ottid-core::hardware`) and lets the user override it. The detected
   tier persists as `hardware.tier` — wiring it to per-tier model selection is
   M5-and-later work.
 - The **interactive tutorial** — a skippable, first-run walkthrough that teaches
@@ -255,7 +255,7 @@ external-agent delegation (powerful, slower).
 ### 2.1 Command-mode routing
 
 - After STT, classify intent:
-  - Wake-prefix detection: `^(לשון|lashon)[,،:\s]` — strip the prefix → Command/Chat.
+  - Wake-prefix detection: `^(אוטיד|ottid)[,،:\s]` — strip the prefix → Command/Chat.
   - Verb-lexicon match (`open|run|find|send|create|delete|בצע|פתח|מצא|שלח|צור|מחק|…`) → Command.
   - Question pattern (`?|מה|איך|למה|why|how|what`) → Chat.
   - Otherwise → Dictation (the default fallback).
@@ -263,7 +263,7 @@ external-agent delegation (powerful, slower).
 
 ### 2.2 Native tool registry (Rust)
 
-Each tool implements `trait LashonTool` with `name`, `description`, `parameters`
+Each tool implements `trait OttidTool` with `name`, `description`, `parameters`
 (JSON schema), and `execute(args) -> ToolResult`. Tools register at startup;
 schemas are serialized to whatever format the chosen LLM provider needs
 (Anthropic, OpenAI, Gemini all differ slightly — an adapter pattern).
@@ -292,19 +292,19 @@ Tool list for v1 (schema-only here; full implementation per milestone):
 | `delegate_agent` | Hand off to an external agent (see 2.3) | |
 | `read_screen` | OCR the active window | Tesseract (Hebrew) or PaddleOCR for v1; reserved for Phase 4 vision |
 | `remember` | Save a fact to long-term memory | See 2.5 |
-| `lashon_settings` | Adjust Lashon itself | "use claude opus", "switch to piper", "increase volume" |
+| `ottid_settings` | Adjust Ottid itself | "use claude opus", "switch to piper", "increase volume" |
 
 ### 2.3 External agent delegation
 
 - `delegate_agent({agent: "claude_code" | "opencode" | "codex" | "aider" | "goose", prompt: string, cwd?: string})`.
 - Spawns the agent in a `portable-pty` session; attaches stdin/stdout to the
   Agent panel (xterm.js + Svelte).
-- Lashon stays voice-active: the user can speak follow-ups → Lashon types into
+- Ottid stays voice-active: the user can speak follow-ups → Ottid types into
   the agent's stdin.
 - The agent process lives until the user closes the tab or speaks
   "stop the agent" / "סגור את הסוכן".
 - The Agent panel supports multiple concurrent agent tabs.
-- The tool injects a standard prompt per agent ("you are running inside Lashon,
+- The tool injects a standard prompt per agent ("you are running inside Ottid,
   the user spoke this: …").
 
 ### 2.4 Command-mode LLM loop
@@ -338,7 +338,7 @@ Tool list for v1 (schema-only here; full implementation per milestone):
 
 - Confirmation defaults:
   - **Always confirm:** `file_delete`, `send_message`, `shutdown`, `restart`,
-    any `lashon_settings` change that switches the active LLM/STT/TTS provider to
+    any `ottid_settings` change that switches the active LLM/STT/TTS provider to
     a cloud one, any `file_write` to a system directory.
   - **Never confirm:** `type_text`, `clipboard_*`, `volume`, `web_search`,
     `file_read`, `file_list`.
@@ -359,7 +359,7 @@ Tool list for v1 (schema-only here; full implementation per milestone):
 
 ## Phase 3 — Voice response (TTS)
 
-**Objective:** Lashon speaks back in natural Hebrew (or other supported
+**Objective:** Ottid speaks back in natural Hebrew (or other supported
 languages) for command confirmations and chat replies. Local-first, cloud
 opt-in. Streaming TTS where possible.
 
@@ -368,8 +368,8 @@ opt-in. Streaming TTS where possible.
 1. Command confirmations spoken with ≤ 400 ms first-byte latency on Tier A (Piper).
 2. Chat replies stream — the first audio chunk plays before the LLM has finished
    generating.
-3. Audio ducking: if the user starts speaking (VAD detects voice) while Lashon
-   is speaking, Lashon pauses within 150 ms and resumes from a sentence boundary
+3. Audio ducking: if the user starts speaking (VAD detects voice) while Ottid
+   is speaking, Ottid pauses within 150 ms and resumes from a sentence boundary
    or cancels.
 4. All cloud providers expose a single API-key field in Settings; switching is
    one click.
@@ -421,19 +421,19 @@ opt-in. Streaming TTS where possible.
 - Result: the first audio plays within ~600 ms of the user finishing speaking on
   Tier A.
 
-### 3.6 Voice identity ("Lashon's voice")
+### 3.6 Voice identity ("Ottid's voice")
 
-- Default Hebrew voice: the most natural Piper `he_IL` voice as Lashon's "house
+- Default Hebrew voice: the most natural Piper `he_IL` voice as Ottid's "house
   voice".
 - Branding-relevant: a single named voice the user comes to recognise as
-  Lashon's.
+  Ottid's.
 - The user can switch; the default is sticky.
 
 ## Phase 4 — Polish, installer, signing, distribution
 
 **Definition of Done:**
 
-1. A fresh Win11/macOS 14/Ubuntu 24.04 VM installs Lashon, completes onboarding,
+1. A fresh Win11/macOS 14/Ubuntu 24.04 VM installs Ottid, completes onboarding,
    and runs all three phases end-to-end with no external internet beyond the
    initial model downloads.
 2. Code-signed installers (Win cert, Mac notarized, Linux GPG-signed AppImage).

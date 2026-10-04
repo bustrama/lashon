@@ -14,7 +14,7 @@ use tokio::time::timeout;
 
 use super::path_safety::resolve_safe_path;
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 /// Default timeout — 30 seconds. Most shell commands the user wants
 /// (`npm install` aside) finish well under this; longer-running tools
@@ -41,7 +41,7 @@ impl Default for RunCommand {
     }
 }
 
-impl LashonTool for RunCommand {
+impl OttidTool for RunCommand {
     fn name(&self) -> &str {
         "run_command"
     }
@@ -287,17 +287,17 @@ mod tests {
     fn runs_echo_and_captures_output() {
         // The literal command varies by shell — on Windows we want a
         // PowerShell-shaped one, on Unix a sh-shaped one. Both `echo`
-        // commands print "lashon-run-command-test" to stdout.
+        // commands print "ottid-run-command-test" to stdout.
         let cmd = if cfg!(target_os = "windows") {
-            "Write-Output lashon-run-command-test"
+            "Write-Output ottid-run-command-test"
         } else {
-            "echo lashon-run-command-test"
+            "echo ottid-run-command-test"
         };
         let result = rt()
             .block_on(RunCommand.execute(&json!({"command": cmd})))
             .unwrap();
         assert!(
-            result.content.contains("lashon-run-command-test"),
+            result.content.contains("ottid-run-command-test"),
             "{}",
             result.content
         );

@@ -64,7 +64,7 @@
 
 	// M7 LLM provider mux. Two modes (command + chat) share the same provider
 	// catalog but pick independently. ProviderMeta matches the Rust struct in
-	// lashon-core::provider — keep the two in sync.
+	// ottid-core::provider — keep the two in sync.
 	type Confidence = 'None' | 'Basic' | 'Good' | 'Excellent';
 	type LlmMode = 'command' | 'chat';
 	const LLM_MODES: LlmMode[] = ['command', 'chat'];
@@ -141,7 +141,7 @@
 	// External links for the About section, opened in the system browser via
 	// the opener plugin — the webview itself never navigates away.
 	const LINKS = [
-		{ key: 'hub.about.repo', url: 'https://github.com/bustrama/lashon', text: 'github.com/bustrama/lashon' },
+		{ key: 'hub.about.repo', url: 'https://github.com/bustrama/ottid', text: 'github.com/bustrama/ottid' },
 		{ key: 'hub.about.links', url: 'https://www.bustrama.com/', text: 'bustrama.com' },
 		{ key: 'hub.about.support', url: 'https://ko-fi.com/bustrama', text: 'ko-fi.com/bustrama' }
 	];
@@ -324,7 +324,7 @@
 	// when an API key is saved (or the user clicks Refresh). The Hub uses
 	// the remote list (if present) in preference to the static
 	// `available_models` from the catalogue so brand-new release models
-	// show up without a Lashon update. The list arrives filtered (chat-
+	// show up without an Ottid update. The list arrives filtered (chat-
 	// capable only) + sorted (newest first) + capped at the Rust-side
 	// REMOTE_MODELS_CAP (30); `total_count` carries the pre-cap count so
 	// the UI can render "30 of 78".
@@ -889,7 +889,7 @@
 				✕
 			</button>
 			<div class="title-text">
-				<span class="title-brand he-display">לָשׁוֹן</span>
+				<span class="title-brand he-display">אוטיד</span>
 				<span class="title-sep">·</span>
 				<span class="title-section he-sans">{$t('hub.title')}</span>
 			</div>
@@ -902,7 +902,7 @@
 				<div class="sidebar-brand">
 					<Mark size={28} color="var(--ink-text)" />
 					<div class="sidebar-brand-text">
-						<div class="he-display sidebar-brand-name">לָשׁוֹן</div>
+						<div class="he-display sidebar-brand-name">אוטיד</div>
 						<div class="mono sidebar-brand-meta">
 							{version ? `v${version}` : ''}<span class="dot">·</span>local
 						</div>
@@ -1126,7 +1126,7 @@
 								<button
 									class="train-link"
 									type="button"
-									onclick={() => openExternal('https://bustrama.github.io/lashon/wake-word-training/')}
+									onclick={() => openExternal('https://bustrama.github.io/ottid/wake-word-training/')}
 								>
 									{$t('hub.wakeword.trainGuide')} →
 								</button>
@@ -1522,7 +1522,7 @@
 						{/if}
 					</section>
 				{:else if section === 'recipes'}
-					<RecipesSection onopenmcp={() => openExternal('https://bustrama.github.io/lashon/')} />
+					<RecipesSection onopenmcp={() => openExternal('https://bustrama.github.io/ottid/')} />
 				{:else if section === 'voice'}
 					<VoiceCorrectionsSection />
 				{:else}
@@ -1532,7 +1532,7 @@
 						<span class="section-en lat">· About</span>
 					</h2>
 						<div class="about">
-							<img class="about-mark" src="/lashon-mark.svg" alt="" draggable="false" />
+							<img class="about-mark" src="/ottid-mark.svg" alt="" draggable="false" />
 							<p class="tagline">{$t('hub.about.tagline')}</p>
 							{#if version}
 								<p class="version">{$t('hub.about.version')} {version}</p>

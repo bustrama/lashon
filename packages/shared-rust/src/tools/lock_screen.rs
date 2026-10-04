@@ -7,7 +7,7 @@ use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 pub struct LockScreen;
 
@@ -23,7 +23,7 @@ impl Default for LockScreen {
     }
 }
 
-impl LashonTool for LockScreen {
+impl OttidTool for LockScreen {
     fn name(&self) -> &str {
         "lock_screen"
     }

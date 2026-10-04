@@ -1,6 +1,6 @@
 # Tech stack & hardware tiers
 
-This document describes *what* Lashon is built from and *where* it runs. Exact
+This document describes *what* Ottid is built from and *where* it runs. Exact
 versions are pinned in the manifests (`Cargo.toml`s, `package.json`,
 `pyproject.toml`) and summarised in [`../CLAUDE.md`](../CLAUDE.md) — those are
 authoritative for versions; this document is authoritative for composition.
@@ -13,7 +13,7 @@ authoritative for versions; this document is authoritative for composition.
 
 ## Rust crates
 
-The `lashon-core` crate (`packages/shared-rust/`) holds GUI-independent logic;
+The `ottid-core` crate (`packages/shared-rust/`) holds GUI-independent logic;
 the Tauri crate (`apps/desktop/src-tauri/`) is a thin shell. Key dependencies
 and their roles:
 
@@ -72,7 +72,7 @@ and their roles:
 
 ## Python STT sidecar
 
-The `lashon_stt` package (`services/stt-sidecar/`) is a Python gRPC service.
+The `ottid_stt` package (`services/stt-sidecar/`) is a Python gRPC service.
 Key dependencies:
 
 - `faster-whisper`, `ctranslate2` — the default Hebrew STT engine
@@ -96,9 +96,9 @@ Key dependencies:
 
 ## Hardware tiers
 
-Lashon detects the host's capability at onboarding and picks default models per
+Ottid detects the host's capability at onboarding and picks default models per
 tier. VRAM accounting includes warm-loaded models plus headroom. The user can
-override; Lashon never silently downgrades.
+override; Ottid never silently downgrades.
 
 | Tier | Hardware | STT (warm) | LLM (warm) | TTS | Net VRAM | E2E latency target |
 |---|---|---|---|---|---|---|

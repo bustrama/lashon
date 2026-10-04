@@ -6,7 +6,7 @@ long_description: |
   One-step recipe — snapshots the foreground window and stages the bitmap
   on the OS clipboard so the user can paste it into chat / a doc / a bug
   report. No parameters.
-author: Lashon contributors
+author: Ottid contributors
 recipe_version: 1.0.0
 tags:
   - utility

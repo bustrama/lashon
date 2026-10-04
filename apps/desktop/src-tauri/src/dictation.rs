@@ -21,12 +21,12 @@ use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Emitter};
 
-use lashon_core::audio::{AudioCapture, TARGET_RATE};
-use lashon_core::inject::inject_text;
-use lashon_core::local_agreement::{LocalAgreement, Preview};
-use lashon_core::streaming::{DecodeScheduler, LanguageLatch, WindowAnchor};
-use lashon_core::stt::{FasterWhisperProvider, Segment, SttProvider, TranscribeOptions};
-use lashon_core::vad::{self, EndpointSignal, Endpointer, SileroVad, FRAME_SAMPLES};
+use ottid_core::audio::{AudioCapture, TARGET_RATE};
+use ottid_core::inject::inject_text;
+use ottid_core::local_agreement::{LocalAgreement, Preview};
+use ottid_core::streaming::{DecodeScheduler, LanguageLatch, WindowAnchor};
+use ottid_core::stt::{FasterWhisperProvider, Segment, SttProvider, TranscribeOptions};
+use ottid_core::vad::{self, EndpointSignal, Endpointer, SileroVad, FRAME_SAMPLES};
 
 /// Active activation mode. A settings panel will make this user-selectable;
 /// for now hands-free is the default and hold mode waits behind it.
@@ -148,7 +148,7 @@ impl DictationChannel {
 pub fn spawn_worker(app: AppHandle, gates: crate::Gates) -> DictationChannel {
     let (tx, rx) = mpsc::channel();
     thread::Builder::new()
-        .name("lashon-dictation".into())
+        .name("ottid-dictation".into())
         .spawn(move || run_worker(rx, app, gates))
         .expect("spawn the dictation worker thread");
     DictationChannel(Mutex::new(tx))

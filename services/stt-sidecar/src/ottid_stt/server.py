@@ -1,4 +1,4 @@
-"""Lashon STT sidecar — gRPC server.
+"""Ottid STT sidecar — gRPC server.
 
 Implements HealthCheck, TranscribeBytes, and TranscribeStream over a loopback
 gRPC server (docs/roadmap.md §1.2; transport per ADR-0002, auth per
@@ -18,10 +18,10 @@ from concurrent import futures
 import grpc
 import numpy as np
 
-from lashon_stt import __version__, codegen, cuda_download, model_download
-from lashon_stt.engines.faster_whisper_engine import load_engine
-from lashon_stt.model_registry import DETECTOR_MODEL_ID
-from lashon_stt.paths import generated_dir
+from ottid_stt import __version__, codegen, cuda_download, model_download
+from ottid_stt.engines.faster_whisper_engine import load_engine
+from ottid_stt.model_registry import DETECTOR_MODEL_ID
+from ottid_stt.paths import generated_dir
 
 # Force UTF-8 stdio — Hebrew in logs must never hit a cp1252 Windows console.
 for _stream in (sys.stdout, sys.stderr):
@@ -31,17 +31,17 @@ for _stream in (sys.stdout, sys.stderr):
         pass
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-logger = logging.getLogger("lashon_stt")
+logger = logging.getLogger("ottid_stt")
 
 # Contract: the Rust host parses these exact prefixes from the sidecar's
 # stdout — the token line first, then the port line that signals "listening".
 # See ADR-0002 (transport) and ADR-0010 (the per-process auth token).
-TOKEN_LINE_PREFIX = "LASHON_STT_TOKEN="
-PORT_LINE_PREFIX = "LASHON_STT_PORT="
+TOKEN_LINE_PREFIX = "OTTID_STT_TOKEN="
+PORT_LINE_PREFIX = "OTTID_STT_PORT="
 
 # gRPC metadata key the auth token rides in. Must match AUTH_METADATA_KEY in
 # packages/shared-rust/src/sidecar.rs.
-_AUTH_METADATA_KEY = "x-lashon-auth"
+_AUTH_METADATA_KEY = "x-ottid-auth"
 
 # Longest a transcription RPC waits for the model warm-up to finish.
 MODEL_WAIT_SECONDS = 120.0
@@ -98,11 +98,11 @@ def _make_servicer(stt_pb2, stt_pb2_grpc, token: str):
                 return self._status
 
         def _warm_up(self) -> None:
-            # The host sets LASHON_STT_DEVICE from the hardware tier
+            # The host sets OTTID_STT_DEVICE from the hardware tier
             # (docs/adr/0014): "cpu" forces the CPU path and skips the CUDA
             # runtime; anything else probes the GPU first.
             cpu_only = (
-                os.environ.get("LASHON_STT_DEVICE", "").strip().lower() == "cpu"
+                os.environ.get("OTTID_STT_DEVICE", "").strip().lower() == "cpu"
             )
             try:
                 self._set_status("locating the Hebrew STT model")
@@ -142,7 +142,7 @@ def _make_servicer(stt_pb2, stt_pb2_grpc, token: str):
             if not secrets.compare_digest(presented, self._token):
                 context.abort(
                     grpc.StatusCode.UNAUTHENTICATED,
-                    "missing or invalid Lashon STT auth token",
+                    "missing or invalid Ottid STT auth token",
                 )
 
         def HealthCheck(self, request, context):
@@ -204,7 +204,7 @@ def _make_servicer(stt_pb2, stt_pb2_grpc, token: str):
 def serve() -> grpc.Server:
     """Build, bind, and start the gRPC server; return the running server.
 
-    Prints the ``LASHON_STT_TOKEN=`` and ``LASHON_STT_PORT=`` handshake lines
+    Prints the ``OTTID_STT_TOKEN=`` and ``OTTID_STT_PORT=`` handshake lines
     to stdout once listening. The STT model warms up in a background thread,
     so the server is reachable immediately.
     """

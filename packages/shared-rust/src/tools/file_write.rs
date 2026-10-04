@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 
 use super::path_safety::resolve_safe_path;
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 pub struct FileWrite;
 
@@ -24,7 +24,7 @@ impl Default for FileWrite {
     }
 }
 
-impl LashonTool for FileWrite {
+impl OttidTool for FileWrite {
     fn name(&self) -> &str {
         "file_write"
     }
@@ -124,7 +124,7 @@ fn temp_sibling(target: &std::path::Path) -> Result<std::path::PathBuf> {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    Ok(parent.join(format!(".{stem}.lashon.tmp.{nanos}")))
+    Ok(parent.join(format!(".{stem}.ottid.tmp.{nanos}")))
 }
 
 #[cfg(test)]
@@ -163,7 +163,7 @@ mod tests {
         let bad = if cfg!(target_os = "windows") {
             r"C:\Windows\System32\evil.txt"
         } else {
-            "/etc/lashon-evil"
+            "/etc/ottid-evil"
         };
         let result = rt()
             .block_on(FileWrite.execute(&json!({"path": bad, "content": "x"})))
@@ -174,7 +174,7 @@ mod tests {
 
     #[test]
     fn writes_round_trip_in_temp() {
-        let path = std::env::temp_dir().join("lashon-file_write-test.txt");
+        let path = std::env::temp_dir().join("ottid-file_write-test.txt");
         let _ = std::fs::remove_file(&path);
         let result = rt()
             .block_on(
@@ -190,7 +190,7 @@ mod tests {
 
     #[test]
     fn creates_parent_dirs_on_demand() {
-        let dir = std::env::temp_dir().join("lashon-file_write-nested-test");
+        let dir = std::env::temp_dir().join("ottid-file_write-nested-test");
         let _ = std::fs::remove_dir_all(&dir);
         let path = dir.join("a/b/c/deep.txt");
         let result = rt()

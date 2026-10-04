@@ -241,7 +241,7 @@
 			}, 3200);
 		});
 		// The worker broadcasts the transcribed text once a take finishes; the
-		// practice step echoes it back so the user sees what Lashon heard.
+		// practice step echoes it back so the user sees what Ottid heard.
 		const transcriptUnlisten = listen<string>('dictation:transcript', (event) => {
 			transcript = event.payload;
 		});
@@ -284,7 +284,7 @@
 				</svg>
 			</button>
 			<div class="tut-title">
-				<span class="he-display tut-brand">לָשׁוֹן</span>
+				<span class="he-display tut-brand">אוטיד</span>
 				<span class="tut-sep">·</span>
 				<span class="he-sans tut-section">{$t('tutorial.window.title')}</span>
 			</div>

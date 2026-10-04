@@ -3,7 +3,7 @@
 //! provider (OpenAI, Groq, DeepSeek, Mistral, Together AI, OpenRouter,
 //! MiniMax, Ollama) is served by the parameterised `OpenAiCompatLlmProvider`.
 //!
-//! The translation between Lashon's vendor-neutral `Msg`/`Tool` and the
+//! The translation between Ottid's vendor-neutral `Msg`/`Tool` and the
 //! Messages API wire format lives entirely in this file — callers never see
 //! Anthropic-specific structs.
 
@@ -22,9 +22,9 @@ use crate::provider::{Confidence, ProviderError};
 /// Anthropic-compatible proxies or the `llm.anthropic.base_url` setting.
 pub const DEFAULT_BASE_URL: &str = "https://api.anthropic.com";
 
-/// The Messages API version Lashon was authored against (the `anthropic-version`
+/// The Messages API version Ottid was authored against (the `anthropic-version`
 /// header is required on every call). Bump together with any wire-format
-/// migration; pinned so a vendor change does not surprise an installed Lashon.
+/// migration; pinned so a vendor change does not surprise an installed Ottid.
 pub const ANTHROPIC_API_VERSION: &str = "2023-06-01";
 
 /// Default model id. Aligned with the user's repo guidance — Claude Sonnet 4.6
@@ -92,7 +92,7 @@ impl Default for AnthropicLlmProvider {
 
 fn build_client() -> Client {
     Client::builder()
-        .user_agent(concat!("lashon/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("ottid/", env!("CARGO_PKG_VERSION")))
         .build()
         .expect("reqwest client construction never fails for our config")
 }
@@ -551,13 +551,13 @@ mod tests {
     #[test]
     fn build_request_hoists_system_messages_to_top_level() {
         let messages = [
-            Msg::system("You are Lashon — a Hebrew voice assistant."),
+            Msg::system("You are Ottid — a Hebrew voice assistant."),
             Msg::user("שלום"),
         ];
         let request = build_request(DEFAULT_MODEL, &messages, &[]);
         assert_eq!(
             request.system.as_deref(),
-            Some("You are Lashon — a Hebrew voice assistant.")
+            Some("You are Ottid — a Hebrew voice assistant.")
         );
         assert_eq!(request.messages.len(), 1);
     }
@@ -747,9 +747,9 @@ mod tests {
     }
 
     // Integration test — only runs locally with a real key. CI never sees
-    // `LASHON_LLM_ANTHROPIC_KEY` (`.claude/rules/security.md`).
+    // `OTTID_LLM_ANTHROPIC_KEY` (`.claude/rules/security.md`).
     #[test]
-    #[ignore = "needs LASHON_LLM_ANTHROPIC_KEY in the environment"]
+    #[ignore = "needs OTTID_LLM_ANTHROPIC_KEY in the environment"]
     fn live_anthropic_hebrew_round_trip() {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()

@@ -7,7 +7,7 @@ use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 pub struct Drag;
 
@@ -23,7 +23,7 @@ impl Default for Drag {
     }
 }
 
-impl LashonTool for Drag {
+impl OttidTool for Drag {
     fn name(&self) -> &str {
         "drag"
     }

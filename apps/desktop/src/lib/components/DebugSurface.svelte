@@ -3,7 +3,7 @@
 	import { invoke } from '@tauri-apps/api/core';
 	import { t } from '$lib/i18n';
 
-	// Mirrors the Rust HealthReport struct returned by the lashon_healthcheck command.
+	// Mirrors the Rust HealthReport struct returned by the ottid_healthcheck command.
 	interface HealthReport {
 		ok: boolean;
 		model_ready: boolean;
@@ -15,7 +15,7 @@
 
 	onMount(async () => {
 		try {
-			const report = await invoke<HealthReport>('lashon_healthcheck');
+			const report = await invoke<HealthReport>('ottid_healthcheck');
 			status = report.ok ? 'ok' : 'error';
 			detail = report.detail;
 		} catch (error) {

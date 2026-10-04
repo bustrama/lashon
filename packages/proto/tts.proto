@@ -1,4 +1,4 @@
-// Lashon — text-to-speech sidecar contract.
+// Ottid — text-to-speech sidecar contract.
 //
 // This file is the single source of truth for the TTS gRPC interface. The TTS
 // sidecar itself is a Phase 3 deliverable (Milestones M10–M11); the contract is
@@ -6,7 +6,7 @@
 
 syntax = "proto3";
 
-package lashon.tts.v1;
+package ottid.tts.v1;
 
 // The text-to-speech sidecar service (used for the optional local MMS/XTTS
 // engines; Piper and cloud providers do not go through this sidecar).

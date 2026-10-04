@@ -1,13 +1,13 @@
-# Lashon — Architecture
+# Ottid — Architecture
 
-The system design of Lashon — its posture, interaction modes, topology, and the
+The system design of Ottid — its posture, interaction modes, topology, and the
 provider abstraction that shapes every change. This document is authoritative
 for architecture and is kept current with the code. For the build roadmap see
 [`roadmap.md`](roadmap.md); for decision records see [`adr/`](adr/).
 
 ## 1. Posture
 
-Lashon is a local-first desktop voice assistant spanning three stages:
+Ottid is a local-first desktop voice assistant spanning three stages:
 speech-to-text (STT), PC operation, and text-to-speech (TTS). Every stage runs
 locally by default. Cloud providers exist only as opt-in adapters, each
 surfaced honestly with a "cloud" badge. The user owns their data — nothing
@@ -15,14 +15,14 @@ leaves the machine without explicit consent.
 
 ## 2. Three interaction modes
 
-Lashon has one capture pipeline feeding three modes, distinguished by trigger
+Ottid has one capture pipeline feeding three modes, distinguished by trigger
 and by where the result goes:
 
 | Mode | Trigger | Output | Provider stack |
 |---|---|---|---|
 | **Dictation** | Push-to-talk hotkey | The focused text field (clipboard paste) | STT → optional cleanup LLM → text injector. No agent loop. |
 | **Command** | Wake word, command hotkey, or a command-verb prefix | PC tool execution + spoken confirmation | STT → **word-aliases** (M9 — post-STT substitution from `stt.word_aliases`) → **recipe cascade** (M9 — regex tier; deterministic short-circuit on match) → fall through to: cleanup → tool-use LLM → tool runner → TTS |
-| **Chat** | Chat hotkey or a "Lashon, question" prefix | Conversation panel + streamed TTS | STT → cleanup → chat LLM (streaming) → TTS (streaming) |
+| **Chat** | Chat hotkey or an "Ottid, question" prefix | Conversation panel + streamed TTS | STT → cleanup → chat LLM (streaming) → TTS (streaming) |
 
 **Dictation is the hot path.** It carries no LLM in the critical loop and is
 optimised for latency — sub-800 ms hotkey-release-to-paste on Tier A hardware.
@@ -32,7 +32,7 @@ Command and chat modes trade latency for capability.
 
 The app is a single Tauri 2 process. Its layers, top to bottom:
 
-- **Shell** — the SvelteKit frontend (the Tongue widget, the Hub, the
+- **Shell** — the SvelteKit frontend (the Ottid overlay, the Hub, the
   Conversation and Agent panels), a hotkey manager for three configurable
   chords, plus tray, autostart, and updater.
 - **Dictation FSM** — the Rust core state machine on a `tokio` runtime:
@@ -99,7 +99,7 @@ trait AgentProvider {            // external coding agents, PC-operation only
 `is_local()` and `supports_hebrew()` are not decoration — the UI uses them to
 badge cloud providers and to steer Hebrew-capable defaults. These traits are
 the contract every milestone builds against; the signatures above are
-illustrative — the trait definitions in `lashon-core`
+illustrative — the trait definitions in `ottid-core`
 (`packages/shared-rust/src/`) are authoritative.
 
 ## 5. Why this shapes every change
@@ -111,7 +111,7 @@ illustrative — the trait definitions in `lashon-core`
 
 ## 6. Risks & mitigations
 
-The standing engineering risks that shape Lashon's design and review priorities.
+The standing engineering risks that shape Ottid's design and review priorities.
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
@@ -127,5 +127,5 @@ The standing engineering risks that shape Lashon's design and review priorities.
 | External agent CLI breaks its API | Med | Med | Pin tested agent versions; show a compatibility matrix; degrade gracefully |
 | Cloud provider key exfiltration | Low | High | Keys in the OS keychain only; never logged; redacted from crash reports; ZDR opt-in where supported |
 | GPL/CC-NC contamination | Low | Med | `cargo-deny` + `pip-licenses` in CI; CC-NC TTS models surfaced as optional downloads, never bundled |
-| User confusion: local vs cloud routing | Med | Med | A cloud badge on every cloud provider chip; the provider name shown in the tongue during use |
+| User confusion: local vs cloud routing | Med | Med | A cloud badge on every cloud provider chip; the provider name shown next to Ottid during use |
 | Token-cost runaway in cloud mode | Med | Med | Per-provider spend-cap setting; a daily-usage card in Settings; warn at 80% |

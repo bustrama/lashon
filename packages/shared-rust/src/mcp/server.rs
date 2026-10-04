@@ -1,5 +1,5 @@
-//! `LashonMcpServer` — the rmcp `ServerHandler` Lashon ships over
-//! stdio (`lashon-mcp` binary) and, later, over HTTP+SSE (PR follow-up
+//! `OttidMcpServer` — the rmcp `ServerHandler` Ottid ships over
+//! stdio (`ottid-mcp` binary) and, later, over HTTP+SSE (PR follow-up
 //! for the Hub MCP Server tab).
 //!
 //! Tool roster — Phase 1g v1:
@@ -34,9 +34,9 @@ use crate::recipes::{validate_recipe, Recipe};
 /// MCP server name advertised in the initialise handshake.
 /// Stable — clients use it to disambiguate when multiple servers are
 /// connected.
-pub const MCP_SERVER_NAME: &str = "lashon-mcp";
+pub const MCP_SERVER_NAME: &str = "ottid-mcp";
 
-/// MCP server version. Tracks the `lashon-core` crate version so the
+/// MCP server version. Tracks the `ottid-core` crate version so the
 /// client can correlate against release notes.
 pub const MCP_SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -72,20 +72,20 @@ pub struct SaveRecipeArgs {
 
 // ---------- the server struct ----------
 
-/// The `ServerHandler` Lashon exposes over MCP. Construct with
-/// `LashonMcpServer::new()` and serve via either:
+/// The `ServerHandler` Ottid exposes over MCP. Construct with
+/// `OttidMcpServer::new()` and serve via either:
 ///
 /// ```ignore
 /// use rmcp::ServiceExt;
 /// use rmcp::transport::stdio;
-/// LashonMcpServer::new().serve(stdio()).await?.waiting().await?;
+/// OttidMcpServer::new().serve(stdio()).await?.waiting().await?;
 /// ```
 ///
 /// `Clone` because rmcp's request dispatch may clone the handler per
 /// in-flight call; the struct is field-less today, so cloning is
 /// free.
 #[derive(Debug, Clone)]
-pub struct LashonMcpServer {
+pub struct OttidMcpServer {
     // Read indirectly via the `#[tool_handler]` macro expansion on the
     // `impl ServerHandler` block below; the compiler can't see through
     // the macro and warns it's unused.
@@ -93,7 +93,7 @@ pub struct LashonMcpServer {
     tool_router: rmcp::handler::server::router::tool::ToolRouter<Self>,
 }
 
-impl LashonMcpServer {
+impl OttidMcpServer {
     pub fn new() -> Self {
         Self {
             tool_router: Self::tool_router(),
@@ -101,7 +101,7 @@ impl LashonMcpServer {
     }
 }
 
-impl Default for LashonMcpServer {
+impl Default for OttidMcpServer {
     fn default() -> Self {
         Self::new()
     }
@@ -110,8 +110,8 @@ impl Default for LashonMcpServer {
 // ---------- the #[tool_router] impl carrying every tool ----------
 
 #[tool_router]
-impl LashonMcpServer {
-    #[tool(description = "List every installed Lashon recipe (bundled \
+impl OttidMcpServer {
+    #[tool(description = "List every installed Ottid recipe (bundled \
         starters + per-user). Returns a JSON array of \
         { id, description, source: 'starter'|'user', path }.")]
     pub fn list_recipes(&self) -> String {
@@ -135,7 +135,7 @@ impl LashonMcpServer {
         }
     }
 
-    #[tool(description = "Validate a `recipe.yaml` draft against the Lashon \
+    #[tool(description = "Validate a `recipe.yaml` draft against the Ottid \
         recipe schema (ADR-0027). Returns 'ok' on success or a multi-line \
         list of issues. Use before `save_recipe` to surface every problem \
         in a single round-trip.")]
@@ -196,11 +196,11 @@ impl LashonMcpServer {
         format!(r#"{{"saved":"{}"}}"#, target_file.display())
     }
 
-    #[tool(description = "Describe every step type the Lashon recipe runtime \
+    #[tool(description = "Describe every step type the Ottid recipe runtime \
         supports, with each variant's JSON Schema. Use this to learn what \
         OS-UI primitives are available before drafting a recipe.")]
     pub fn list_recipe_step_types(&self) -> String {
-        // Use lashon-core's bundled schemars (v1) — the recipes types
+        // Use ottid-core's bundled schemars (v1) — the recipes types
         // derive `JsonSchema` against that version, not the v0 that
         // rmcp re-exports.
         let schema = ::schemars::schema_for!(crate::recipes::Step);
@@ -212,7 +212,7 @@ impl LashonMcpServer {
 // ---------- ServerHandler glue ----------
 
 #[tool_handler]
-impl ServerHandler for LashonMcpServer {
+impl ServerHandler for OttidMcpServer {
     fn get_info(&self) -> ServerInfo {
         // Builder-style construction — `ServerInfo` + `Implementation`
         // are `#[non_exhaustive]` upstream, so this is the only
@@ -220,22 +220,22 @@ impl ServerHandler for LashonMcpServer {
         //
         // `Implementation::from_build_env()` derives the server's
         // advertised name + version from `CARGO_PKG_NAME` /
-        // `CARGO_PKG_VERSION` of the *consumer* crate (`lashon-core`),
+        // `CARGO_PKG_VERSION` of the *consumer* crate (`ottid-core`),
         // which matches `MCP_SERVER_VERSION` above by construction.
         // `Implementation::from_build_env()` reads `CARGO_PKG_NAME` at
         // the call site — which is rmcp's own crate name, not ours.
         // Construct with our own name/version explicitly so the
-        // advertised serverInfo says "lashon-mcp" / our version.
+        // advertised serverInfo says "ottid-mcp" / our version.
         let implementation = Implementation::new(MCP_SERVER_NAME, MCP_SERVER_VERSION)
-            .with_title("Lashon")
-            .with_website_url("https://bustrama.github.io/lashon/");
+            .with_title("Ottid")
+            .with_website_url("https://bustrama.github.io/ottid/");
 
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(implementation)
             .with_protocol_version(ProtocolVersion::LATEST)
             .with_instructions(
-                "Lashon recipe management — list / get / validate / save \
-                 Lashon recipes (`recipe.yaml` per ADR-0027). Use \
+                "Ottid recipe management — list / get / validate / save \
+                 Ottid recipes (`recipe.yaml` per ADR-0027). Use \
                  `list_recipe_step_types` to discover the OS-UI step \
                  vocabulary before drafting a recipe."
                     .to_string(),

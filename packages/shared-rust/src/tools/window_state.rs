@@ -12,7 +12,7 @@
 use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 #[derive(Debug, Clone, Copy)]
 enum WindowAction {
@@ -126,7 +126,7 @@ fn truncate(title: &str) -> String {
     }
 }
 
-impl LashonTool for MinimizeWindow {
+impl OttidTool for MinimizeWindow {
     fn name(&self) -> &str {
         "minimize_window"
     }
@@ -143,7 +143,7 @@ impl LashonTool for MinimizeWindow {
     }
 }
 
-impl LashonTool for MaximizeWindow {
+impl OttidTool for MaximizeWindow {
     fn name(&self) -> &str {
         "maximize_window"
     }
@@ -159,7 +159,7 @@ impl LashonTool for MaximizeWindow {
     }
 }
 
-impl LashonTool for CloseWindow {
+impl OttidTool for CloseWindow {
     fn name(&self) -> &str {
         "close_window"
     }

@@ -1,22 +1,22 @@
-# Lashon · לָשׁוֹן
+# Ottid · אוטיד
 
 **Speak Hebrew, see it typed — anywhere. Speak a command, watch your PC do it.
 All on your own machine.**
 
-Lashon (לָשׁוֹן — "tongue / language") is a local-first, **Hebrew-first** voice
+Ottid (אוטיד) is a local-first, **Hebrew-first** voice
 assistant for the desktop. Most dictation tools treat Hebrew as an afterthought
-bolted onto an English product. Lashon is built the other way around.
+bolted onto an English product. Ottid is built the other way around.
 
 - **Hebrew is the product, not a setting.** A Hebrew-specialized speech model
   and an RTL-native interface — right-to-left ordering, combining marks, and
   mixed Hebrew/English (code-switching) handled correctly, everywhere you type.
 - **Fully local. Private by construction.** Speech recognition, language
   models, and speech synthesis all run **on-device** by default. Your audio
-  never leaves your machine — and because Lashon is open source under the GPL,
+  never leaves your machine — and because Ottid is open source under the GPL,
   you can audit exactly what it does. No telemetry. Cloud providers exist only
   as opt-in adapters, each marked with a clear "cloud" badge.
 - **More than dictation — it operates your PC.** Beyond typing what you say,
-  Lashon understands spoken commands and acts on them: a voice-driven command
+  Ottid understands spoken commands and acts on them: a voice-driven command
   mode plus scriptable recipes that drive your foreground app, all hands-free.
 
 Windows-first, open source, and yours to inspect.
@@ -28,14 +28,14 @@ Windows-first, open source, and yours to inspect.
 
 ## What it does
 
-Lashon turns speech into text and action on your own machine, in three modes:
+Ottid turns speech into text and action on your own machine, in three modes:
 
 - **Dictation** — hold a hotkey (or go hands-free with VAD endpointing and an
   optional "Hey Lashon" wake word), speak Hebrew, and the text appears in the
   focused app with correct right-to-left ordering.
-- **Command** — speak a natural-language command; Lashon operates your PC,
+- **Command** — speak a natural-language command; Ottid operates your PC,
   short-circuiting common intents through fast, deterministic recipes.
-- **Chat** — ask a question; Lashon answers, by voice.
+- **Chat** — ask a question; Ottid answers, by voice.
 
 Speech recognition, language models, and speech synthesis all run **locally**
 by default. Cloud providers exist only as opt-in adapters, each marked with a
@@ -44,11 +44,11 @@ without explicit consent.
 
 ## Install
 
-No installer is published yet — for now Lashon is built from source (see
+No installer is published yet — for now Ottid is built from source (see
 below); a signed Windows installer is on the way. Watch the
-[Releases page](https://github.com/bustrama/lashon/releases) for the first build.
+[Releases page](https://github.com/bustrama/ottid/releases) for the first build.
 
-On **first run** Lashon downloads the ~1.6 GB Hebrew speech model; on an NVIDIA
+On **first run** Ottid downloads the ~1.6 GB Hebrew speech model; on an NVIDIA
 GPU it also fetches the CUDA runtime for faster transcription. After that it
 works offline. Press **Ctrl+Space**, speak Hebrew, then pause — the text is
 pasted into the focused app.
@@ -73,7 +73,7 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the development workflow and
 
 ## Roadmap
 
-Lashon is built in three phases:
+Ottid is built in three phases:
 
 1. **Dictation** — Hebrew speech-to-text with system-wide injection. *(current)*
 2. **PC operation** — voice-driven command mode, plus delegation to external
@@ -89,20 +89,20 @@ The full roadmap — scope, milestones, and per-phase workstreams — lives in
 
 ## Diagnostic logs
 
-If Lashon errors or crashes, its diagnostic log is the most useful thing to
-attach to a bug report. Open the tray menu (or right-click the tongue) and
+If Ottid errors or crashes, its diagnostic log is the most useful thing to
+attach to a bug report. Open the tray menu (or right-click Ottid) and
 choose **יומני אבחון · Open logs folder** — on Windows the logs live under
-`%LOCALAPPDATA%\dev.lashon.desktop\logs`. They record only structural
+`%LOCALAPPDATA%\app.ottid.desktop\logs`. They record only structural
 diagnostic events — start-up, hardware tier, errors, timings — and, by design,
 **never** contain your transcribed text, audio, or prompts.
 
 ## Contributing
 
-Lashon is a **solo-maintained** project. **External pull requests are not
+Ottid is a **solo-maintained** project. **External pull requests are not
 accepted and will not be reviewed** — please don't spend effort on a PR, as it
 won't be merged. **Bug reports and issues are very welcome**, though: if
 something is broken or behaves wrong (especially around Hebrew), please
-[open an issue](https://github.com/bustrama/lashon/issues). The source is
+[open an issue](https://github.com/bustrama/ottid/issues). The source is
 GPL-3.0-only, so you're also free to fork and modify it for your own use.
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full policy and the internal
@@ -110,9 +110,9 @@ development workflow.
 
 ## License
 
-[GPL-3.0-only](LICENSE) © 2026 Lashon contributors.
+[GPL-3.0-only](LICENSE) © 2026 Ottid contributors.
 
-Lashon is free software: you may redistribute and/or modify it under the terms
+Ottid is free software: you may redistribute and/or modify it under the terms
 of **version 3 of the GNU General Public License** as published by the Free
 Software Foundation. It is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; see [`LICENSE`](LICENSE) for the full terms.

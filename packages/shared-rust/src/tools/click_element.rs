@@ -21,7 +21,7 @@ use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 pub struct ClickElement;
 
@@ -37,7 +37,7 @@ impl Default for ClickElement {
     }
 }
 
-impl LashonTool for ClickElement {
+impl OttidTool for ClickElement {
     fn name(&self) -> &str {
         "click_element"
     }

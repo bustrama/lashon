@@ -7,7 +7,7 @@ step. A PyInstaller-frozen build bundles the stubs instead (see PyInstaller.spec
 """
 from __future__ import annotations
 
-from lashon_stt.paths import generated_dir, proto_dir
+from ottid_stt.paths import generated_dir, proto_dir
 
 
 def _stale() -> bool:

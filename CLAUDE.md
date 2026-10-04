@@ -1,4 +1,4 @@
-# Lashon — context for Claude Code
+# Ottid — context for Claude Code
 
 Local-first, Hebrew-first desktop voice assistant: STT → PC operation → TTS,
 shipped as a signed cross-platform app.
@@ -13,7 +13,7 @@ current with the code:
 - `docs/tech-stack.md` — stack composition and hardware tiers
 - `docs/design-system.md` — UI / UX
 - `docs/testing.md` — testing strategy and performance budgets
-- `docs/soul.md` — Lashon's identity
+- `docs/soul.md` — Ottid's identity
 - `docs/roadmap.md` — phases, the fourteen milestones (M0–M13), workstreams
 - `docs/stories/` — active and upcoming work units
 - `docs/adr/` — architecture decision records
@@ -25,7 +25,7 @@ this file short; it is a pointer, not a copy.
 
 ## Current state
 
-Lashon is **feature-complete through M9** (Hebrew dictation, command mode, and
+Ottid is **feature-complete through M9** (Hebrew dictation, command mode, and
 recipes) and is now being packaged to ship as an **open-core product**: free
 **GPL-3.0-only** source plus a paid one-time *signed* binary of that same
 source, **Windows-first** for v1.0, never a subscription.
@@ -46,11 +46,11 @@ step. The full milestone-by-milestone dev narrative is kept off-repo.
 
 - `apps/desktop/` — Tauri 2 + SvelteKit 5 app. `src-tauri/` is the Rust GUI
   shell; `src/` is the SvelteKit frontend.
-- `packages/shared-rust/` — the `lashon-core` crate: GUI-independent logic
+- `packages/shared-rust/` — the `ottid-core` crate: GUI-independent logic
   (provider clients, sidecar lifecycle), fully unit-tested. New non-GUI logic
   goes here, not in the Tauri crate.
 - `packages/proto/` — shared `.proto` contracts (`stt.proto`, `tts.proto`).
-- `services/stt-sidecar/` — Python gRPC sidecar (`lashon_stt`).
+- `services/stt-sidecar/` — Python gRPC sidecar (`ottid_stt`).
 - `docs/` — developer documentation (`architecture.md`, `providers.md`,
   `tech-stack.md`, `design-system.md`, `testing.md`, `soul.md`, `roadmap.md`),
   plus `stories/` (work units) and `adr/` (decision records). **Not
@@ -82,13 +82,13 @@ npm run build              # frontend production build
 
 # Rust — run from the repo root
 cargo check --workspace --all-targets
-cargo test --workspace     # lashon-core unit tests
+cargo test --workspace     # ottid-core unit tests
 
 # end-to-end sidecar smoke test (needs the Python env)
-cargo test -p lashon-core --test healthcheck -- --ignored
+cargo test -p ottid-core --test healthcheck -- --ignored
 
 # STT sidecar standalone — run from services/stt-sidecar
-python -m lashon_stt.server   # needs PYTHONPATH=src, or `pip install .`
+python -m ottid_stt.server   # needs PYTHONPATH=src, or `pip install .`
 
 # STT model + WER benchmark — run from the repo root
 python scripts/verify-models.py --download   # fetch the Hebrew STT model
@@ -100,5 +100,5 @@ python scripts/wer-bench.py                  # transcribe the corpus, score WER
 1. `docs/architecture.md` — system design and the provider abstraction.
 2. `docs/roadmap.md` — phases, milestones, and per-phase workstreams.
 3. `docs/adr/` — every architectural decision and its rationale.
-4. `docs/soul.md` — Lashon's identity.
+4. `docs/soul.md` — Ottid's identity.
 5. `CONTRIBUTING.md` — branch model, milestone DoD, commit conventions.
