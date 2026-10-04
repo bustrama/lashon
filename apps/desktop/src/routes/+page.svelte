@@ -489,9 +489,11 @@
 	state={current}
 	wakeArmed={wakeActive}
 	mode={takeMode === 'idle' ? null : takeMode}
-	announcement={current === 'idle' && wakeActive
-		? $t('creature.wakeArmed')
-		: $t(`creature.states.${current}`)}
+	announcement={approval
+		? $t('creature.states.confirm')
+		: current === 'idle' && wakeActive
+			? $t('creature.wakeArmed')
+			: $t(`creature.states.${current}`)}
 	island={{
 		listening: dictationState === 'capturing',
 		takeMode,

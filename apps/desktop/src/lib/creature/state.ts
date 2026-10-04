@@ -11,7 +11,7 @@ export interface StateInputs {
 	dictation: DictationState;
 	takeMode: TakeMode;
 	commandState: CommandState;
-	/** A command waits for the user's approval. */
+	/** A request waits on the approval card. */
 	confirming: boolean;
 	/** The wake word was just heard (a short event). */
 	woke: boolean;
@@ -21,9 +21,12 @@ export interface StateInputs {
  * Most urgent first: an approval outranks everything, the working phases
  * outrank the listening that produced them, and the wake event shows over
  * the start of the take it triggers.
+ *
+ * A pending approval shows the aqua "needs you" state, whoever asks: a
+ * command-mode tool, a recipe step, later an agent (docs/adr/0048).
  */
 export function creatureState(i: StateInputs): CreatureState {
-	if (i.confirming) return 'confirm';
+	if (i.confirming) return 'agent-needs-you';
 	if (i.commandState === 'tool') return 'tool';
 	if (i.commandState === 'thinking') return 'thinking';
 	if (i.dictation === 'transcribing') return 'transcribing';
