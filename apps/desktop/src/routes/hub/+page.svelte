@@ -1567,7 +1567,7 @@
 						{/if}
 					</section>
 				{:else if section === 'recipes'}
-					<RecipesSection onopenmcp={() => openExternal('https://bustrama.github.io/ottid/')} />
+					<RecipesSection onopenmcp={() => openExternal('https://bustrama.github.io/ottid/mcp/')} />
 				{:else if section === 'voice'}
 					<VoiceCorrectionsSection />
 				{:else}
