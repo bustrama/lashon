@@ -1,6 +1,6 @@
 # Packaging — macOS
 
-How to build the Lashon macOS installer. See
+How to build the Ottid macOS installer. See
 [ADR-0018](adr/0018-cross-os-installer-matrix.md) for the design rationale,
 and [releasing.md](releasing.md) for the full release process this fits into.
 
@@ -44,14 +44,14 @@ From `services/stt-sidecar`:
 .venv/bin/python -m PyInstaller --noconfirm --clean PyInstaller.spec
 ```
 
-Output: `dist/lashon-stt/` — a one-folder bundle (`lashon-stt` + `_internal/`).
-The binary has no file extension on macOS (unlike `lashon-stt.exe` on Windows).
+Output: `dist/ottid-stt/` — a one-folder bundle (`ottid-stt` + `_internal/`).
+The binary has no file extension on macOS (unlike `ottid-stt.exe` on Windows).
 
 Copy it where the Tauri bundle expects it:
 
 ```sh
-rm -rf ../../apps/desktop/src-tauri/binaries/lashon-stt
-cp -r dist/lashon-stt ../../apps/desktop/src-tauri/binaries/lashon-stt
+rm -rf ../../apps/desktop/src-tauri/binaries/ottid-stt
+cp -r dist/ottid-stt ../../apps/desktop/src-tauri/binaries/ottid-stt
 ```
 
 ## 2. Build the DMG
@@ -63,8 +63,8 @@ npm install
 npm run tauri build -- --bundles dmg
 ```
 
-Output: `target/release/bundle/dmg/Lashon_0.5.0_aarch64.dmg` (arm64 host) or
-`Lashon_0.5.0_x64.dmg` (Intel host). The Cargo workspace places `target/` at
+Output: `target/release/bundle/dmg/Ottid_0.5.0_aarch64.dmg` (arm64 host) or
+`Ottid_0.5.0_x64.dmg` (Intel host). The Cargo workspace places `target/` at
 the repository root.
 
 For a universal binary (arm64 + x86_64 in one `.dmg`), use:
@@ -98,7 +98,7 @@ v0.5.x ships unsigned. When an Apple Developer ID is obtained (M13):
   never committed. A fresh checkout cannot `tauri build` until step 1 has
   produced it.
 - The Hebrew STT model is **not** bundled; the app downloads it on first run
-  into `~/Library/Application Support/dev.lashon.desktop/models/`.
+  into `~/Library/Application Support/app.ottid.desktop/models/`.
 - The **MIT-licensed "Hey Lashon" wake classifier** (`hey_lashon.onnx`) is
   listed in `tauri.conf.json`'s `bundle.resources` and ships with the DMG.
   On first launch the Tauri shell stages it into the per-user models directory

@@ -4,9 +4,9 @@
 //! This module owns the catalogue of known providers and constructs a fresh
 //! provider instance on each `test_llm_prompt` call from the user's persisted
 //! settings — base URL, model, and (where required) the API key the
-//! `lashon-core::keychain` module fetches.
+//! `ottid-core::keychain` module fetches.
 //!
-//! The `lashon-core::provider_registry::ProviderRegistry` type is not
+//! The `ottid-core::provider_registry::ProviderRegistry` type is not
 //! materialised here; it is the M8 callers (Command mode, Chat mode) that
 //! will wire it in. M7's Hub never holds a long-lived `dyn LLMProvider` —
 //! every dispatch reads the latest persistence and constructs ad-hoc.
@@ -18,11 +18,11 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_store::StoreExt;
 
-use lashon_core::keychain;
-use lashon_core::llama_server::{
+use ottid_core::keychain;
+use ottid_core::llama_server::{
     ready_llama_server, resolve_server_exe, LlamaServerState, SpawnConfig,
 };
-use lashon_core::llm::{
+use ottid_core::llm::{
     anthropic::{
         AnthropicLlmProvider, AVAILABLE_MODELS as ANTHROPIC_MODELS,
         DEFAULT_MODEL as ANTHROPIC_DEFAULT_MODEL,
@@ -39,12 +39,12 @@ use lashon_core::llm::{
     },
     LLMProvider, Msg,
 };
-use lashon_core::model::{
+use ottid_core::model::{
     available_local_llm_models, delete_local_llm_model as delete_local_llm_core,
     install_local_llm_model as install_local_llm_core, is_local_llm_installed,
     local_llm_resolved_path, AvailableLocalLlmModel,
 };
-use lashon_core::provider::{Confidence, ProviderMeta};
+use ottid_core::provider::{Confidence, ProviderMeta};
 
 /// LLM mode — the persistence schema is keyed off this
 /// (`llm.command.provider`, `llm.chat.provider`).
@@ -101,7 +101,7 @@ enum ProviderKind {
 fn catalogue() -> Vec<ProviderDescriptor> {
     let mut entries: Vec<ProviderDescriptor> = vec![
         // Local-first: the in-process LLM tops the chip grid so users
-        // who pick Lashon for its local-first ethos see it before any
+        // who pick Ottid for its local-first ethos see it before any
         // cloud chip (docs/adr/0025, docs/adr/0022 Invariant 1).
         ProviderDescriptor {
             id: LOCAL_LLM_ID,
@@ -196,7 +196,7 @@ fn build_provider(
             Box::new(provider)
         }
         ProviderKind::LocalLlm => {
-            // `base_url` is the loopback URL of the Lashon-managed
+            // `base_url` is the loopback URL of the Ottid-managed
             // `llama-server` subprocess. Resolved by the async caller
             // via `ensure_local_llm_base_url` before this sync helper
             // runs (the spawn cannot happen here because we have no
@@ -385,7 +385,7 @@ pub struct ProviderModelsResult {
 /// Fetch the live model list from a provider. Used by the Hub to
 /// populate the model dropdown after the user pastes an API key — so
 /// brand-new models (or org-private fine-tunes) show up without a
-/// Lashon update. Falls back to the static `available_models()` list
+/// Ottid update. Falls back to the static `available_models()` list
 /// when the remote call fails (no key saved, rate-limited, offline,
 /// vendor doesn't expose `/v1/models`).
 #[tauri::command]
@@ -485,7 +485,7 @@ impl From<AvailableLocalLlmModel> for LocalLlmModelMeta {
 /// "Download required" / "Ready" copy.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LocalLlmStatusReport {
-    /// True when `lashon-core` was compiled with the `local-llm`
+    /// True when `ottid-core` was compiled with the `local-llm`
     /// Cargo feature. False makes the Hub render a "this build does not
     /// include the in-process LLM" notice (the binary still works for
     /// every other provider).
@@ -592,7 +592,7 @@ fn bundled_llama_server_exe(app: &AppHandle) -> Result<PathBuf, String> {
         .join(exe_name))
 }
 
-/// Ensure the Lashon-managed `llama-server` subprocess is running and
+/// Ensure the Ottid-managed `llama-server` subprocess is running and
 /// pointed at the GGUF for `model_id`. Returns the loopback base URL
 /// (`http://127.0.0.1:<port>/v1`) for `LocalLlmProvider::with_base_url`.
 ///

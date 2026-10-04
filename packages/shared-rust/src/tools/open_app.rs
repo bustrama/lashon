@@ -17,7 +17,7 @@ use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 pub struct OpenApp;
 
@@ -47,7 +47,7 @@ enum LaunchOutcome {
     Launched,
 }
 
-impl LashonTool for OpenApp {
+impl OttidTool for OpenApp {
     fn name(&self) -> &str {
         "open_app"
     }

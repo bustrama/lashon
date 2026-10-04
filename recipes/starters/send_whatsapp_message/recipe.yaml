@@ -7,7 +7,7 @@ long_description: |
   contact name, selects the first hit, types the body, and sends. Includes
   longer waits to absorb the Electron-app startup latency authors hit when
   the app cold-launches.
-author: Lashon contributors
+author: Ottid contributors
 recipe_version: 1.0.0
 tags:
   - messaging

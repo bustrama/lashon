@@ -1,6 +1,6 @@
 // Frontend helpers for the dictation hotkey: turning a keydown into a Tauri
 // accelerator string, and formatting an accelerator for display. The accepting
-// / rejecting *policy* lives in `lashon-core::hotkey` (the `validate_hotkey`
+// / rejecting *policy* lives in `ottid-core::hotkey` (the `validate_hotkey`
 // command) — this module only deals with capture and presentation.
 
 const MODIFIER_KEYS = new Set(['Control', 'Shift', 'Alt', 'Meta', 'OS', 'AltGraph']);
@@ -44,7 +44,7 @@ export function eventToAccelerator(event: KeyboardEvent): string | null {
 }
 
 // Format an accelerator for display: `Control+Space` → `Ctrl + Space`. The
-// labels are Windows-oriented (`Super` renders as `Win`), matching Lashon's
+// labels are Windows-oriented (`Super` renders as `Win`), matching Ottid's
 // current Windows-first releases; macOS-specific labelling is a later refinement.
 export function formatAccelerator(accelerator: string): string {
 	return accelerator

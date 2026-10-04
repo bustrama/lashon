@@ -1,7 +1,7 @@
 //! In-process local LLM provider (`docs/adr/0025`).
 //!
 //! `LocalLlmProvider` is a thin OpenAI-compatible HTTP shim over a
-//! Lashon-managed `llama-server` subprocess (the prebuilt ggml binary,
+//! Ottid-managed `llama-server` subprocess (the prebuilt ggml binary,
 //! bundled as a Tauri resource). The Tauri shell owns the subprocess
 //! lifecycle — spawn on first use, health-check, Win32 Job Object
 //! kill-on-parent-exit — and pokes the live loopback URL into the
@@ -50,7 +50,7 @@ pub const DEFAULT_MODEL: &str = "qwen3-4b-q4_k_m";
 /// Ordered with the default first so the Hub renders it first.
 pub const AVAILABLE_MODELS: &[&str] = &["qwen3-4b-q4_k_m", "qwen3-1.7b-q8_0"];
 
-/// Qwen3's effective context window for Lashon: the model is trained
+/// Qwen3's effective context window for Ottid: the model is trained
 /// to 40,960 tokens but the dispatcher caps each request at 4096 for
 /// Command-mode latency (docs/adr/0025 §8). `LocalLlmProvider` reports
 /// the trained context here so the Hub copy is honest; the actual
@@ -82,7 +82,7 @@ const VENDOR_CONFIG: OpenAiCompatConfig = OpenAiCompatConfig {
     recommended_model: Some(DEFAULT_MODEL),
 };
 
-/// `LLMProvider` impl that forwards chat requests to a Lashon-managed
+/// `LLMProvider` impl that forwards chat requests to an Ottid-managed
 /// `llama-server` over loopback HTTP. Construction is cheap; the
 /// inner `reqwest::Client` is recreated per provider instance to stay
 /// `Send`/`Sync` without locking.
@@ -111,7 +111,7 @@ impl LocalLlmProvider {
 
     /// Override which model id this instance reports to the server.
     /// `llama-server` ignores the field in the wire payload (it serves
-    /// whichever GGUF it was launched with) but Lashon's logs print
+    /// whichever GGUF it was launched with) but Ottid's logs print
     /// it, so keeping it accurate aids diagnostics.
     pub fn with_model(mut self, model_id: impl Into<String>) -> Self {
         let new_id = model_id.into();

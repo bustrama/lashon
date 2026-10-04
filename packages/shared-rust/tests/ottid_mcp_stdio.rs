@@ -1,4 +1,4 @@
-//! End-to-end integration test for the `lashon-mcp` stdio binary.
+//! End-to-end integration test for the `ottid-mcp` stdio binary.
 //!
 //! Spawns the built binary as a subprocess, drives the JSON-RPC handshake
 //! over its stdin/stdout, and asserts that:
@@ -11,7 +11,7 @@
 //! Run with:
 //!
 //! ```text
-//! cargo test -p lashon-core --test lashon_mcp_stdio --features mcp-server
+//! cargo test -p ottid-core --test ottid_mcp_stdio --features mcp-server
 //! ```
 //!
 //! Skipped in `--no-default-features` builds (the binary doesn't exist
@@ -28,12 +28,12 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
 use tokio::time::timeout;
 
-/// Locate the built `lashon-mcp` binary. `CARGO_BIN_EXE_lashon-mcp` is
+/// Locate the built `ottid-mcp` binary. `CARGO_BIN_EXE_ottid-mcp` is
 /// set by Cargo for integration tests of crates that declare a `[[bin]]`
 /// — it's the canonical way to find sibling binaries without baking in
 /// platform-specific path logic.
-fn lashon_mcp_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_BIN_EXE_lashon-mcp"))
+fn ottid_mcp_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_BIN_EXE_ottid-mcp"))
 }
 
 /// `recipes/starters/` for the bundled starter library. Same resolution
@@ -56,7 +56,7 @@ async fn rpc_round_trip(
     stdin
         .write_all(line.as_bytes())
         .await
-        .expect("write request to lashon-mcp stdin");
+        .expect("write request to ottid-mcp stdin");
     stdin.flush().await.expect("flush stdin");
 
     // Loop until we read a non-empty line. The server may emit blank
@@ -68,7 +68,7 @@ async fn rpc_round_trip(
             .await
             .expect("response within 15 s timeout")
             .expect("read response line");
-        assert!(n > 0, "lashon-mcp closed stdout unexpectedly");
+        assert!(n > 0, "ottid-mcp closed stdout unexpectedly");
         let trimmed = buf.trim();
         if trimmed.is_empty() {
             continue;
@@ -84,10 +84,10 @@ async fn rpc_round_trip(
 
 #[tokio::test]
 async fn initialise_then_list_tools_then_call_list_recipes() {
-    let binary = lashon_mcp_path();
+    let binary = ottid_mcp_path();
     assert!(
         binary.is_file(),
-        "lashon-mcp binary not found at {} — was the crate built?",
+        "ottid-mcp binary not found at {} — was the crate built?",
         binary.display()
     );
 
@@ -102,26 +102,26 @@ async fn initialise_then_list_tools_then_call_list_recipes() {
     // override the per-user dir to a throwaway temp path so the test
     // doesn't accidentally write into the dev's real recipes dir.
     let temp_user = std::env::temp_dir().join(format!(
-        "lashon-mcp-test-user-recipes-{}",
+        "ottid-mcp-test-user-recipes-{}",
         std::process::id()
     ));
     let _ = std::fs::remove_dir_all(&temp_user);
 
     let mut cmd = Command::new(&binary);
-    cmd.env("LASHON_BUNDLED_RECIPES_DIR", &starters)
-        .env("LASHON_USER_RECIPES_DIR", &temp_user)
+    cmd.env("OTTID_BUNDLED_RECIPES_DIR", &starters)
+        .env("OTTID_USER_RECIPES_DIR", &temp_user)
         .env("RUST_LOG", "warn")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    // CREATE_NO_WINDOW — the lashon-mcp binary is a console-subsystem program;
+    // CREATE_NO_WINDOW — the ottid-mcp binary is a console-subsystem program;
     // spawning it from a console-less parent (an IDE or background test runner)
     // pops a console window that steals foreground focus. Mirrors the production
     // spawn sites (run_command, recipe runtime, sidecar). See
     // .claude/rules/recipes.md.
     #[cfg(target_os = "windows")]
     cmd.creation_flags(0x0800_0000);
-    let mut child = cmd.spawn().expect("spawn lashon-mcp");
+    let mut child = cmd.spawn().expect("spawn ottid-mcp");
 
     let mut stdin = child.stdin.take().expect("stdin pipe");
     let stdout = child.stdout.take().expect("stdout pipe");
@@ -138,7 +138,7 @@ async fn initialise_then_list_tools_then_call_list_recipes() {
             "params": {
                 "protocolVersion": "2025-06-18",
                 "capabilities": {},
-                "clientInfo": { "name": "lashon-mcp-tests", "version": "0.0.0" }
+                "clientInfo": { "name": "ottid-mcp-tests", "version": "0.0.0" }
             }
         }),
     )
@@ -147,7 +147,7 @@ async fn initialise_then_list_tools_then_call_list_recipes() {
     let server_info = &init_resp["result"]["serverInfo"];
     assert_eq!(
         server_info["name"],
-        json!("lashon-mcp"),
+        json!("ottid-mcp"),
         "advertised server name should be the explicitly-set MCP_SERVER_NAME: {init_resp}"
     );
     let caps = &init_resp["result"]["capabilities"];

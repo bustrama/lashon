@@ -4,7 +4,7 @@
 //! Every operation a Hub recipe row supports — list, preview, run,
 //! open file, duplicate, delete — surfaces as a `#[tauri::command]`
 //! in this module. The lib-side logic lives in
-//! [`lashon_core::recipes`] and [`lashon_core::recipes::storage`];
+//! [`ottid_core::recipes`] and [`ottid_core::recipes::storage`];
 //! this module is the thin Tauri wrapper that resolves env paths,
 //! plugs the `EventBasedConfirm` from M8 into the runtime, and emits
 //! the matching tongue events.
@@ -21,12 +21,12 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Listener};
 
-use lashon_core::recipes::storage::{
+use ottid_core::recipes::storage::{
     collect_hub_listings, delete_user_recipe as core_delete_user_recipe, duplicate_to_user,
     find_recipe_by_id, load_recipe, update_recipe_comment as core_update_recipe_comment,
     HubRecipeListing,
 };
-use lashon_core::recipes::{execute_recipe, ConfirmDecision, ConfirmHandler, Recipe, RuntimeError};
+use ottid_core::recipes::{execute_recipe, ConfirmDecision, ConfirmHandler, Recipe, RuntimeError};
 
 /// What [`run_recipe`] returns when a recipe runs to completion. The
 /// Hub uses `steps_executed` for the "ran N steps" footer and
@@ -241,7 +241,7 @@ fn format_runtime_error(err: &RuntimeError) -> String {
 /// emits the `recipe:confirm` event (not `command:confirm`) so the
 /// two surfaces can be wired to independent modal components.
 ///
-/// The lashon-core recipe [`ConfirmHandler`] trait is synchronous —
+/// The ottid-core recipe [`ConfirmHandler`] trait is synchronous —
 /// the runtime calls it from an async context but parks the
 /// executor thread on the answer (an explicit decision: don't
 /// advance to the next step while the user is reading the prompt).

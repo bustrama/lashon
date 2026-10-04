@@ -1,4 +1,4 @@
-// Lashon — speech-to-text sidecar contract.
+// Ottid — speech-to-text sidecar contract.
 //
 // This file is the single source of truth for the STT gRPC interface. It is
 // consumed by:
@@ -11,7 +11,7 @@
 
 syntax = "proto3";
 
-package lashon.stt.v1;
+package ottid.stt.v1;
 
 // The speech-to-text sidecar service.
 service Stt {

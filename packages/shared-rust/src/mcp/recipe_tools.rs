@@ -1,6 +1,6 @@
 //! Helpers shared by the recipe-management MCP tools in
 //! [`crate::mcp::server`]. The tool functions themselves live on the
-//! `LashonMcpServer` impl block decorated with `#[tool_router]` —
+//! `OttidMcpServer` impl block decorated with `#[tool_router]` —
 //! `rmcp`'s macro merges across all `#[tool]` methods in that block,
 //! so this file is helpers only.
 
@@ -9,19 +9,19 @@ use std::path::{Path, PathBuf};
 
 use crate::recipes::Recipe;
 
-/// Env var the Tauri shell sets when it spawns `lashon-mcp` so the
+/// Env var the Tauri shell sets when it spawns `ottid-mcp` so the
 /// stdio binary doesn't have to guess where the bundled starters
-/// landed on a packaged install (`%PROGRAMFILES%\Lashon\recipes\`
+/// landed on a packaged install (`%PROGRAMFILES%\Ottid\recipes\`
 /// on Windows, etc.).
-pub const BUNDLED_RECIPES_ENV: &str = "LASHON_BUNDLED_RECIPES_DIR";
+pub const BUNDLED_RECIPES_ENV: &str = "OTTID_BUNDLED_RECIPES_DIR";
 
 /// Env var to override the per-user recipes dir. Set by integration
 /// tests; in production the binary uses
 /// [`user_data_local_dir`]-derived defaults.
-pub const USER_RECIPES_ENV: &str = "LASHON_USER_RECIPES_DIR";
+pub const USER_RECIPES_ENV: &str = "OTTID_USER_RECIPES_DIR";
 
 /// Where to find the bundled starter recipes. Resolution order:
-/// `$LASHON_BUNDLED_RECIPES_DIR` → cargo-dev fallback
+/// `$OTTID_BUNDLED_RECIPES_DIR` → cargo-dev fallback
 /// (`CARGO_MANIFEST_DIR/../../recipes/starters`).
 pub fn bundled_recipes_dir() -> PathBuf {
     if let Some(path) = std::env::var_os(BUNDLED_RECIPES_ENV) {
@@ -31,17 +31,33 @@ pub fn bundled_recipes_dir() -> PathBuf {
 }
 
 /// Where to read + write per-user recipes. Resolution order:
-/// `$LASHON_USER_RECIPES_DIR` → `<data_local_dir>/lashon/recipes/`.
+/// `$OTTID_USER_RECIPES_DIR` → `<data_local_dir>/ottid/recipes/`.
 ///
 /// `data_local_dir()` resolves to:
-/// - Windows: `%LOCALAPPDATA%\lashon\recipes\`
-/// - macOS:   `~/Library/Application Support/lashon/recipes/`
-/// - Linux:   `$XDG_DATA_HOME/lashon/recipes/` (or `~/.local/share/...`)
+/// - Windows: `%LOCALAPPDATA%\ottid\recipes\`
+/// - macOS:   `~/Library/Application Support/ottid/recipes/`
+/// - Linux:   `$XDG_DATA_HOME/ottid/recipes/` (or `~/.local/share/...`)
+///
+/// Recipes written before the rename live in `<data_local_dir>/lashon/`;
+/// the first resolve moves them here (docs/adr/0042).
 pub fn user_recipes_dir() -> PathBuf {
     if let Some(path) = std::env::var_os(USER_RECIPES_ENV) {
         return PathBuf::from(path);
     }
-    user_data_local_dir().join("lashon").join("recipes")
+    let base = user_data_local_dir();
+    let dir = base.join("ottid").join("recipes");
+    let legacy = base.join(crate::legacy::LEGACY_DIR_NAME);
+    match crate::legacy::adopt_dir(&legacy.join("recipes"), &dir) {
+        Ok(crate::legacy::Adopted::Nothing) => {}
+        Ok(adopted) => {
+            tracing::info!(?adopted, "recipes: adopted the pre-rename recipes dir");
+            crate::legacy::remove_dir_if_empty(&legacy);
+        }
+        Err(err) => {
+            tracing::warn!(error = %err, "recipes: could not adopt the pre-rename recipes dir")
+        }
+    }
+    dir
 }
 
 #[cfg(target_os = "windows")]

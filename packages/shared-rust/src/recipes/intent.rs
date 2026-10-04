@@ -89,7 +89,7 @@ impl CascadeMatcher {
         for tier in &self.tiers {
             if let Some(matched) = tier.match_intent(transcript, recipes) {
                 tracing::info!(
-                    target: "lashon::recipes::intent",
+                    target: "ottid::recipes::intent",
                     recipe = %matched.recipe_id,
                     tier = matched.tier.as_str(),
                     "intent cascade match"

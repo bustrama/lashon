@@ -81,7 +81,7 @@ jobs:
         run: cargo test --workspace
 
       - name: End-to-end STT sidecar smoke test
-        run: cargo test -p lashon-core --test healthcheck -- --ignored
+        run: cargo test -p ottid-core --test healthcheck -- --ignored
 
   license-scan:
     name: license scan

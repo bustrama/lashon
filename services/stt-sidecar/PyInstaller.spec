@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 #
-# PyInstaller spec for the Lashon STT sidecar.
+# PyInstaller spec for the Ottid STT sidecar.
 #
 # Produces a one-folder bundle of the gRPC speech-to-text server with
 # faster-whisper + ctranslate2 frozen in. See docs/adr/0006, docs/adr/0018,
@@ -8,8 +8,8 @@
 #
 #   pyinstaller PyInstaller.spec
 #
-# Output:  dist/lashon-stt/lashon-stt[.exe]  (+ _internal/)
-#          -> copied to apps/desktop/src-tauri/binaries/lashon-stt/ and shipped
+# Output:  dist/ottid-stt/ottid-stt[.exe]  (+ _internal/)
+#          -> copied to apps/desktop/src-tauri/binaries/ottid-stt/ and shipped
 #             by the Tauri bundle as a resource (tauri.conf.json).
 #
 # One-folder, not one-file: a one-file build would re-extract the whole payload
@@ -67,14 +67,14 @@ for _pkg in _base_pkgs:
 
 # Bundled gRPC stubs (generated before this build) and the download manifests
 # (stt.json, cuda.json). The frozen sidecar resolves both via
-# lashon_stt.paths.base_dir().
+# ottid_stt.paths.base_dir().
 datas += [
-    (str(_src / "lashon_stt" / "_generated"), "_generated"),
+    (str(_src / "ottid_stt" / "_generated"), "_generated"),
     (str(_repo / "models" / "manifests"), "manifests"),
 ]
 
 a = Analysis(
-    [str(_src / "lashon_stt" / "server.py")],
+    [str(_src / "ottid_stt" / "server.py")],
     pathex=[str(_src)],
     binaries=binaries,
     datas=datas,
@@ -94,7 +94,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="lashon-stt",
+    name="ottid-stt",
     console=True,
     disable_windowed_traceback=False,
 )
@@ -103,5 +103,5 @@ coll = COLLECT(
     exe,
     a.binaries,
     a.datas,
-    name="lashon-stt",
+    name="ottid-stt",
 )

@@ -8,7 +8,7 @@ use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 pub struct ReadBrowserUrl;
 
@@ -24,7 +24,7 @@ impl Default for ReadBrowserUrl {
     }
 }
 
-impl LashonTool for ReadBrowserUrl {
+impl OttidTool for ReadBrowserUrl {
     fn name(&self) -> &str {
         "read_browser_url"
     }

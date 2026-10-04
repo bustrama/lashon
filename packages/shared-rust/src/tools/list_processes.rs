@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 use sysinfo::System;
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 const MAX_ROWS: usize = 50;
 
@@ -26,7 +26,7 @@ impl Default for ListProcesses {
     }
 }
 
-impl LashonTool for ListProcesses {
+impl OttidTool for ListProcesses {
     fn name(&self) -> &str {
         "list_processes"
     }

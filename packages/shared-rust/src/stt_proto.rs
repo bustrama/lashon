@@ -5,7 +5,7 @@
 
 pub mod stt {
     #![allow(clippy::all, missing_docs)]
-    tonic::include_proto!("lashon.stt.v1");
+    tonic::include_proto!("ottid.stt.v1");
 }
 
 #[cfg(test)]

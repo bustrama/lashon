@@ -7,7 +7,7 @@
 //! the dispatcher is skipped entirely; on a miss, the caller falls
 //! through to `command_mode::dispatch` as before.
 //!
-//! Lives in `lashon-core` rather than the Tauri shell so the
+//! Lives in `ottid-core` rather than the Tauri shell so the
 //! short-circuit path is unit-testable without spinning up Tauri,
 //! and so a future surface (e.g. the MCP server's `run_recipe`
 //! follow-up tool) can reuse it.
@@ -41,7 +41,7 @@ pub enum CommandRoute {
 /// caller can decide whether to apologise to the user or retry via
 /// the planner.
 ///
-/// Side effects: tracing-INFO on `lashon::recipes::cascade` for every
+/// Side effects: tracing-INFO on `ottid::recipes::cascade` for every
 /// matched route, tracing-WARN on every runtime error. No transcript
 /// or arg values are logged (`.claude/rules/security.md`).
 pub async fn try_recipe_cascade(
@@ -59,14 +59,14 @@ pub async fn try_recipe_cascade(
         // it, so this is unreachable in practice; we still handle it
         // by falling through to the planner rather than panicking.
         tracing::warn!(
-            target: "lashon::recipes::cascade",
+            target: "ottid::recipes::cascade",
             recipe = %matched.recipe_id,
             "matcher referenced an unknown recipe — falling through to planner"
         );
         return Ok(CommandRoute::Planner);
     };
     tracing::info!(
-        target: "lashon::recipes::cascade",
+        target: "ottid::recipes::cascade",
         recipe = %matched.recipe_id,
         tier = matched.tier.as_str(),
         arg_count = matched.args.len(),

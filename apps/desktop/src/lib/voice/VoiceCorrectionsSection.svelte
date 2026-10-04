@@ -3,7 +3,7 @@
 	`stt.word_aliases` map. After STT produces a transcript, the
 	Tauri shell applies these substitutions before either the recipe
 	cascade or the LLM planner sees the text. Single source of truth
-	for "when Lashon hears X, treat it as Y" — fixes Whisper's
+	for "when Ottid hears X, treat it as Y" — fixes Whisper's
 	persistent "claude → cloud" misrecognition, contact-name
 	homonyms, Hebrew transliteration drift, etc.
 

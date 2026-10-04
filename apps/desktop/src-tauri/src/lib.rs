@@ -1,11 +1,11 @@
-//! Lashon desktop core — the Tauri 2 application.
+//! Ottid desktop core — the Tauri 2 application.
 //!
 //! This crate is a thin GUI shell. The testable provider and sidecar logic
-//! lives in the `lashon-core` crate (`packages/shared-rust`); see
+//! lives in the `ottid-core` crate (`packages/shared-rust`); see
 //! `docs/adr/0003-core-logic-in-a-tauri-independent-crate.md`.
 //!
 //! It owns the tongue window, the tray, and the global hotkeys, and delegates
-//! capture, transcription, and text injection to the lashon-core crate.
+//! capture, transcription, and text injection to the ottid-core crate.
 
 #[cfg(feature = "command-mode")]
 mod command_mode;
@@ -25,8 +25,8 @@ use tauri::{Emitter, Listener, Manager, PhysicalPosition};
 use tauri_plugin_store::StoreExt;
 
 #[cfg(feature = "command-mode")]
-use lashon_core::llama_server::LlamaServerState;
-use lashon_core::sidecar::{self, HealthReport, SidecarState};
+use ottid_core::llama_server::LlamaServerState;
+use ottid_core::sidecar::{self, HealthReport, SidecarState};
 
 /// Drag-loop state shared by `start_window_drag` / `stop_window_drag`.
 /// A single atomic flag is enough — only one drag at a time per app
@@ -39,7 +39,7 @@ pub struct DragState {
 /// Suspend gates shared by the dictation and wake-word workers.
 ///
 /// The wake-word detector pauses while dictation is capturing — and, from M10,
-/// while TTS is speaking — so it never self-triggers on Lashon's own
+/// while TTS is speaking — so it never self-triggers on Ottid's own
 /// microphone audio (`.claude/rules/architecture.md`).
 #[derive(Clone, Default)]
 pub struct Gates {
@@ -51,7 +51,7 @@ pub struct Gates {
 ///
 /// Invoked from the frontend debug surface (Ctrl+Shift+D).
 #[tauri::command]
-async fn lashon_healthcheck(state: tauri::State<'_, SidecarState>) -> Result<HealthReport, String> {
+async fn ottid_healthcheck(state: tauri::State<'_, SidecarState>) -> Result<HealthReport, String> {
     Ok(sidecar::healthcheck(&state).await)
 }
 
@@ -59,10 +59,10 @@ async fn lashon_healthcheck(state: tauri::State<'_, SidecarState>) -> Result<Hea
 ///
 /// Returns the `HotkeyError` reason code on rejection (`reserved`,
 /// `no-modifier`, …) so the Hub can render a localized explanation. The rule
-/// itself lives in `lashon-core` and is unit-tested there.
+/// itself lives in `ottid-core` and is unit-tested there.
 #[tauri::command]
 fn validate_hotkey(accelerator: String) -> Result<(), String> {
-    lashon_core::hotkey::validate_accelerator(&accelerator).map_err(|err| err.code().to_string())
+    ottid_core::hotkey::validate_accelerator(&accelerator).map_err(|err| err.code().to_string())
 }
 
 /// Reveal the Settings Hub — invoked by a double-click on the tongue, the same
@@ -73,7 +73,7 @@ fn open_hub(app: tauri::AppHandle) {
 }
 
 /// Relaunch the app — invoked by the Hub's restart control so a hardware-tier
-/// change takes effect at once (the STT sidecar reads `LASHON_STT_DEVICE` only
+/// change takes effect at once (the STT sidecar reads `OTTID_STT_DEVICE` only
 /// at startup — see `configure_stt_device_env`).
 #[tauri::command]
 fn restart_app(app: tauri::AppHandle) {
@@ -86,8 +86,8 @@ fn restart_app(app: tauri::AppHandle) {
 /// The probing (NVML, Vulkan, sysinfo) runs on a blocking thread so the
 /// detection latency never stalls the webview's IPC.
 #[tauri::command]
-async fn detect_hardware() -> Result<lashon_core::hardware::HardwareReport, String> {
-    tauri::async_runtime::spawn_blocking(lashon_core::hardware::detect)
+async fn detect_hardware() -> Result<ottid_core::hardware::HardwareReport, String> {
+    tauri::async_runtime::spawn_blocking(ottid_core::hardware::detect)
         .await
         .map_err(|err| err.to_string())
 }
@@ -98,8 +98,8 @@ async fn detect_hardware() -> Result<lashon_core::hardware::HardwareReport, Stri
 /// Run on a blocking thread: opening the capture stream — and, on a first-run
 /// macOS prompt, waiting for the user — must not block the main thread.
 #[tauri::command]
-async fn probe_microphone() -> Result<lashon_core::audio::MicProbe, String> {
-    tauri::async_runtime::spawn_blocking(lashon_core::audio::probe_input)
+async fn probe_microphone() -> Result<ottid_core::audio::MicProbe, String> {
+    tauri::async_runtime::spawn_blocking(ottid_core::audio::probe_input)
         .await
         .map_err(|err| err.to_string())
 }
@@ -108,14 +108,14 @@ async fn probe_microphone() -> Result<lashon_core::audio::MicProbe, String> {
 /// the `.onnx` suffix, sorted. Drives the Hub's wake-word picker.
 #[tauri::command]
 fn list_wake_models() -> Vec<String> {
-    lashon_core::model::list_wake_models()
+    ottid_core::model::list_wake_models()
 }
 
 /// The opt-in wake-word classifiers the Hub can offer to download — each is
 /// CC-BY-NC and is never bundled (see models/manifests/wake-classifiers.json).
 #[tauri::command]
-fn available_wake_models() -> Vec<lashon_core::model::AvailableWakeModel> {
-    lashon_core::model::available_wake_models()
+fn available_wake_models() -> Vec<ottid_core::model::AvailableWakeModel> {
+    ottid_core::model::available_wake_models()
 }
 
 /// Download and verify one of the opt-in wake-word classifiers, placing it in
@@ -123,7 +123,7 @@ fn available_wake_models() -> Vec<lashon_core::model::AvailableWakeModel> {
 /// dialog before invoking this command.
 #[tauri::command]
 async fn install_wake_model(id: String) -> Result<String, String> {
-    lashon_core::model::install_wake_classifier(&id)
+    ottid_core::model::install_wake_classifier(&id)
         .await
         .map_err(|err| format!("{err:#}"))
 }
@@ -208,10 +208,10 @@ fn stop_window_drag(drag: tauri::State<'_, DragState>) {
 /// action, which is dormant outside Command mode.
 #[tauri::command]
 fn log_tongue_diag(message: String) {
-    tracing::info!(target: "lashon::tongue_diag", "tongue: {}", message);
+    tracing::info!(target: "ottid::tongue_diag", "tongue: {}", message);
 }
 
-/// Check GitHub Releases for a newer version of Lashon.
+/// Check GitHub Releases for a newer version of Ottid.
 ///
 /// The updater plugin verifies the minisign signature on the manifest before
 /// returning a hit. On a hit this command downloads and installs the update,
@@ -236,7 +236,7 @@ async fn check_for_updates(app: tauri::AppHandle) -> Result<String, String> {
         .map_err(|err| format!("update check failed: {err:#}"))?;
 
     let Some(update) = update else {
-        tracing::info!("Lashon is up to date");
+        tracing::info!("Ottid is up to date");
         return Ok("up-to-date".to_string());
     };
 
@@ -313,8 +313,14 @@ async fn check_for_updates(app: tauri::AppHandle) -> Result<String, String> {
     Ok("installed".to_string())
 }
 
-/// Build and run the Lashon desktop application.
+/// Build and run the Ottid desktop application.
 pub fn run() {
+    let context = tauri::generate_context!();
+    // Before the builder: Tauri creates the WebView data dir under the new
+    // identifier as soon as the windows exist, which would block the
+    // one-step move of the pre-rename data.
+    let adoption = adopt_legacy_app_dirs(&context.config().identifier);
+
     let builder = tauri::Builder::default()
         // Single-instance must be the FIRST plugin (issue #12). It intercepts a
         // second launch and hands off to the already-running process before any
@@ -344,7 +350,7 @@ pub fn run() {
         // `handle_menu_event`).
         .on_menu_event(|app, event| handle_menu_event(app, event.id.as_ref()))
         .invoke_handler(tauri::generate_handler![
-            lashon_healthcheck,
+            ottid_healthcheck,
             validate_hotkey,
             detect_hardware,
             probe_microphone,
@@ -412,7 +418,7 @@ pub fn run() {
             #[cfg(feature = "command-mode")]
             command_mode::set_word_aliases
         ])
-        .setup(|app| {
+        .setup(move |app| {
             // Initialize logging first, so every start-up step below is
             // captured: a rolling on-disk log for shipped builds plus a dev
             // console (issue #13). It lives in `setup` rather than at the top of
@@ -421,9 +427,12 @@ pub fn run() {
             // the subscriber is live, so a panic lands in that same log.
             init_tracing(app.handle());
             install_panic_hook();
-            tracing::info!("Lashon starting");
+            tracing::info!("Ottid starting");
+            for line in &adoption {
+                tracing::info!(target: "ottid::legacy", "{line}");
+            }
 
-            // Point lashon-core at the bundled, frozen STT sidecar and a
+            // Point ottid-core at the bundled, frozen STT sidecar and a
             // per-user model directory before the dictation worker can spawn
             // it. In `tauri dev` the resources are absent and this is a no-op.
             configure_sidecar_env(app);
@@ -470,9 +479,9 @@ pub fn run() {
             let menu = build_app_menu(app.handle())?;
             // The tray uses the background-free mark so it sits cleanly on the
             // taskbar; the window and installer keep the framed icon.
-            TrayIconBuilder::with_id("lashon-tray")
+            TrayIconBuilder::with_id("ottid-tray")
                 .icon(tauri::include_image!("icons/tray.png"))
-                .tooltip("Lashon · לשון")
+                .tooltip("Ottid · אוטיד")
                 .menu(&menu)
                 .on_menu_event(|app, event| handle_menu_event(app, event.id.as_ref()))
                 .build(app)?;
@@ -491,8 +500,45 @@ pub fn run() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running the Lashon application");
+        .run(context)
+        .expect("error while running the Ottid application");
+}
+
+/// Move the pre-rename install's per-identifier dirs (settings, WebView
+/// storage, logs, models) to this identifier's dirs (ADR-0042).
+///
+/// Mirrors how Tauri resolves its app dirs: each per-user base dir joined
+/// with the identifier. Bases that coincide on an OS (Roaming data and
+/// config on Windows) are visited once. Returns a line per base that had
+/// something to move, to log once tracing is up.
+fn adopt_legacy_app_dirs(identifier: &str) -> Vec<String> {
+    use ottid_core::legacy::{adopt_dir, Adopted, LEGACY_IDENTIFIER};
+
+    let mut seen = Vec::new();
+    let mut report = Vec::new();
+    let bases = [
+        dirs::data_dir(),
+        dirs::data_local_dir(),
+        dirs::config_dir(),
+        dirs::cache_dir(),
+    ];
+    for base in bases.into_iter().flatten() {
+        if seen.contains(&base) {
+            continue;
+        }
+        let (old, new) = (base.join(LEGACY_IDENTIFIER), base.join(identifier));
+        match adopt_dir(&old, &new) {
+            Ok(Adopted::Nothing) => {}
+            Ok(adopted) => report.push(format!(
+                "adopted {} into {}: {adopted:?}",
+                old.display(),
+                new.display()
+            )),
+            Err(err) => report.push(format!("could not adopt {}: {err}", old.display())),
+        }
+        seen.push(base);
+    }
+    report
 }
 
 /// Whether the user has finished or skipped the first-run tutorial.
@@ -542,11 +588,11 @@ fn show_hub(app: &tauri::AppHandle) {
     let _ = window.set_focus();
 }
 
-/// Build Lashon's bilingual menu — shared by the tray and the tongue's
+/// Build Ottid's bilingual menu — shared by the tray and the tongue's
 /// right-click context menu. Labels are `Hebrew · English`; the menu is built
 /// once and is not re-localized when the in-app language changes.
 fn build_app_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
-    let show = MenuItem::with_id(app, "show", "הצג את לשון · Show Lashon", true, None::<&str>)?;
+    let show = MenuItem::with_id(app, "show", "הצג את אוטיד · Show Ottid", true, None::<&str>)?;
     let tutorial = MenuItem::with_id(app, "tutorial", "מדריך · Tutorial", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "הגדרות · Settings", true, None::<&str>)?;
     let logs = MenuItem::with_id(app, "logs", "יומני אבחון · Open logs folder", true, None::<&str>)?;
@@ -568,7 +614,7 @@ fn handle_menu_event(app: &tauri::AppHandle, id: &str) {
 }
 
 /// Raise the primary (tongue) window: reveal it if hidden, un-minimize, and
-/// focus. Shared by the tray / context-menu "Show Lashon" action and the
+/// focus. Shared by the tray / context-menu "Show Ottid" action and the
 /// single-instance handoff (issue #12), which raises the running window when a
 /// second launch is rejected — hence `show()` + `unminimize()` before focus,
 /// since the tray-resident tongue may be hidden or minimized at that point.
@@ -598,22 +644,22 @@ fn open_logs_folder(app: &tauri::AppHandle) {
     }
 }
 
-/// Point `lashon-core` at the bundled STT sidecar and the per-user model
-/// directory via the `LASHON_STT_SIDECAR` / `LASHON_MODELS_ROOT` env vars.
+/// Point `ottid-core` at the bundled STT sidecar and the per-user model
+/// directory via the `OTTID_STT_SIDECAR` / `OTTID_MODELS_ROOT` env vars.
 ///
 /// In a packaged build the PyInstaller-frozen sidecar ships as a bundle
 /// resource. In `tauri dev` that resource does not exist, so both variables
-/// stay unset and `lashon-core` runs the sidecar from Python source against
+/// stay unset and `ottid-core` runs the sidecar from Python source against
 /// the repository's `models/` tree (see `docs/adr/0006`, `docs/adr/0018`).
 ///
 /// The sidecar binary name is OS-specific (see `docs/adr/0018`):
-///   - Windows: `lashon-stt.exe`
-///   - macOS / Linux: `lashon-stt` (no extension)
+///   - Windows: `ottid-stt.exe`
+///   - macOS / Linux: `ottid-stt` (no extension)
 fn configure_sidecar_env(app: &tauri::App) {
     #[cfg(target_os = "windows")]
-    let sidecar_rel = "binaries/lashon-stt/lashon-stt.exe";
+    let sidecar_rel = "binaries/ottid-stt/ottid-stt.exe";
     #[cfg(not(target_os = "windows"))]
-    let sidecar_rel = "binaries/lashon-stt/lashon-stt";
+    let sidecar_rel = "binaries/ottid-stt/ottid-stt";
 
     let sidecar = app
         .path()
@@ -623,7 +669,7 @@ fn configure_sidecar_env(app: &tauri::App) {
         return;
     }
 
-    std::env::set_var("LASHON_STT_SIDECAR", &sidecar);
+    std::env::set_var("OTTID_STT_SIDECAR", &sidecar);
     tracing::info!(path = %sidecar.display(), "using the bundled STT sidecar");
 
     match app.path().app_local_data_dir() {
@@ -637,8 +683,8 @@ fn configure_sidecar_env(app: &tauri::App) {
                     tracing::warn!("could not create {}: {err:#}", path.display());
                 }
             }
-            std::env::set_var("LASHON_MODELS_ROOT", &models);
-            std::env::set_var("LASHON_CUDA_ROOT", &cuda);
+            std::env::set_var("OTTID_MODELS_ROOT", &models);
+            std::env::set_var("OTTID_CUDA_ROOT", &cuda);
             tracing::info!(
                 models = %models.display(),
                 cuda = %cuda.display(),
@@ -661,17 +707,17 @@ fn configure_sidecar_env(app: &tauri::App) {
 /// under `_up_/.../` in the resource directory; the live source-of-truth
 /// for each is under `models/` three levels above `src-tauri/`.
 fn stage_bundled_audio_models(app: &tauri::App) {
-    let Some(models_root) = std::env::var_os("LASHON_MODELS_ROOT") else {
+    let Some(models_root) = std::env::var_os("OTTID_MODELS_ROOT") else {
         // configure_sidecar_env sets this only in a packaged build — there
         // is no bundle in `tauri dev`, so there is nothing to stage.
         return;
     };
     let root = std::path::PathBuf::from(models_root);
 
-    // (resource-side subpath, on-disk target directory under $LASHON_MODELS_ROOT).
-    // Targets mirror `lashon_core::model`'s `model_dir(<local_dir>)` resolution:
+    // (resource-side subpath, on-disk target directory under $OTTID_MODELS_ROOT).
+    // Targets mirror `ottid_core::model`'s `model_dir(<local_dir>)` resolution:
     // it takes the basename of the manifest's `local_dir`, so e.g.
-    // "models/wake/openwakeword" → "$LASHON_MODELS_ROOT/openwakeword".
+    // "models/wake/openwakeword" → "$OTTID_MODELS_ROOT/openwakeword".
     let layouts: [(&str, std::path::PathBuf); 3] = [
         (
             "_up_/_up_/_up_/models/wake/wakewords",
@@ -698,7 +744,7 @@ fn stage_bundled_audio_models(app: &tauri::App) {
             );
             continue;
         };
-        match lashon_core::model::install_bundled_wake_classifiers(&bundled_dir, &target_dir) {
+        match ottid_core::model::install_bundled_wake_classifiers(&bundled_dir, &target_dir) {
             Ok(0) => {}
             Ok(count) => tracing::info!(
                 count,
@@ -715,7 +761,7 @@ fn stage_bundled_audio_models(app: &tauri::App) {
 }
 
 /// Select the STT device mode from the detected hardware tier and hand it to
-/// the sidecar via the `LASHON_STT_DEVICE` environment variable (docs/adr/0014).
+/// the sidecar via the `OTTID_STT_DEVICE` environment variable (docs/adr/0014).
 ///
 /// Read from the `settings.json` store at startup — before the dictation
 /// worker spawns the sidecar — so the sidecar inherits the choice. A tier
@@ -723,8 +769,8 @@ fn stage_bundled_audio_models(app: &tauri::App) {
 /// tier saved yet (onboarding not run) the GPU-probing `auto` mode is used,
 /// which is the sidecar's existing behaviour.
 fn configure_stt_device_env(app: &tauri::App) {
-    let device = stt_device_from_tier(app).unwrap_or(lashon_core::hardware::STT_DEVICE_AUTO);
-    std::env::set_var("LASHON_STT_DEVICE", device);
+    let device = stt_device_from_tier(app).unwrap_or(ottid_core::hardware::STT_DEVICE_AUTO);
+    std::env::set_var("OTTID_STT_DEVICE", device);
     tracing::info!(device, "STT device mode selected from the hardware tier");
 }
 
@@ -733,11 +779,11 @@ fn configure_stt_device_env(app: &tauri::App) {
 fn stt_device_from_tier(app: &tauri::App) -> Option<&'static str> {
     let store = app.store("settings.json").ok()?;
     let code = store.get("hardware.tier")?;
-    let tier = lashon_core::hardware::Tier::from_code(code.as_str()?)?;
+    let tier = ottid_core::hardware::Tier::from_code(code.as_str()?)?;
     Some(tier.stt_device())
 }
 
-/// The per-user directory Lashon writes rolling diagnostic logs to:
+/// The per-user directory Ottid writes rolling diagnostic logs to:
 /// `app_local_data_dir()/logs/` — beside the `models/` and `cuda/` dirs
 /// `configure_sidecar_env` resolves. Created on demand. `None` only when the
 /// platform data directory cannot be resolved at all.
@@ -746,7 +792,7 @@ fn logs_dir(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
     if let Err(err) = std::fs::create_dir_all(&dir) {
         // Pre-subscriber (or a broken data dir): fall back to stderr.
         eprintln!(
-            "lashon: could not create the logs directory {}: {err}",
+            "ottid: could not create the logs directory {}: {err}",
             dir.display()
         );
         return None;
@@ -790,14 +836,14 @@ fn init_tracing(app: &tauri::AppHandle) {
     let file_layer = log_dir.as_ref().and_then(|dir| {
         match Builder::new()
             .rotation(Rotation::DAILY)
-            .filename_prefix("lashon")
+            .filename_prefix("ottid")
             .filename_suffix("log")
             .max_log_files(7)
             .build(dir)
         {
             Ok(appender) => Some(fmt::layer().with_ansi(false).with_writer(appender)),
             Err(err) => {
-                eprintln!("lashon: could not initialize the rolling log: {err}");
+                eprintln!("ottid: could not initialize the rolling log: {err}");
                 None
             }
         }
@@ -840,7 +886,7 @@ fn install_panic_hook() {
             .or_else(|| info.payload().downcast_ref::<String>().cloned())
             .unwrap_or_else(|| "<non-string panic payload>".to_string());
         tracing::error!(
-            target: "lashon::panic",
+            target: "ottid::panic",
             location = %location,
             %backtrace,
             "panic: {message}"

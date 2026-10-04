@@ -2,7 +2,7 @@
 
 Model weights are large and never committed. From source they live under the
 repo's ``models/`` tree. In a packaged build the Tauri shell points
-``LASHON_MODELS_ROOT`` at a per-user app-data directory, and the weights are
+``OTTID_MODELS_ROOT`` at a per-user app-data directory, and the weights are
 downloaded there on first run (see ``model_download.py``).
 """
 from __future__ import annotations
@@ -11,7 +11,7 @@ import json
 import os
 from pathlib import Path
 
-from lashon_stt.paths import manifest_path, repo_root
+from ottid_stt.paths import manifest_path, repo_root
 
 DEFAULT_MODEL_ID = "ivrit-ai-whisper-large-v3-turbo-ct2"
 
@@ -20,7 +20,7 @@ DEFAULT_MODEL_ID = "ivrit-ai-whisper-large-v3-turbo-ct2"
 DETECTOR_MODEL_ID = "faster-whisper-tiny"
 
 # Set by the Tauri shell for a packaged build; absent when run from source.
-MODELS_ROOT_ENV = "LASHON_MODELS_ROOT"
+MODELS_ROOT_ENV = "OTTID_MODELS_ROOT"
 
 
 def _manifest() -> dict:
@@ -38,7 +38,7 @@ def model_entry(model_id: str = DEFAULT_MODEL_ID) -> dict:
 def model_dir(model_id: str = DEFAULT_MODEL_ID) -> Path:
     """Directory a model's weights live in — whether or not they are present.
 
-    Packaged build: ``$LASHON_MODELS_ROOT/<name>``. From source: the repo path
+    Packaged build: ``$OTTID_MODELS_ROOT/<name>``. From source: the repo path
     from the manifest's ``local_dir``. The caller checks whether the weights
     are actually downloaded (see ``is_downloaded``).
     """

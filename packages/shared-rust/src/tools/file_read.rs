@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 
 use super::path_safety::resolve_safe_path;
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 /// 32 KB matches the dispatcher's per-tool result budget. A larger
 /// response would dwarf the rest of the conversation and trip the LLM's
@@ -29,7 +29,7 @@ impl Default for FileRead {
     }
 }
 
-impl LashonTool for FileRead {
+impl OttidTool for FileRead {
     fn name(&self) -> &str {
         "file_read"
     }
@@ -140,7 +140,7 @@ mod tests {
 
     #[test]
     fn reads_a_temp_file_round_trip() {
-        let path = std::env::temp_dir().join("lashon-file_read-test.txt");
+        let path = std::env::temp_dir().join("ottid-file_read-test.txt");
         let _ = std::fs::remove_file(&path);
         {
             let mut f = std::fs::File::create(&path).unwrap();
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn truncates_files_over_the_cap() {
-        let path = std::env::temp_dir().join("lashon-file_read-big.txt");
+        let path = std::env::temp_dir().join("ottid-file_read-big.txt");
         let _ = std::fs::remove_file(&path);
         let body = "A".repeat(MAX_BYTES + 1024);
         std::fs::write(&path, body.as_bytes()).unwrap();

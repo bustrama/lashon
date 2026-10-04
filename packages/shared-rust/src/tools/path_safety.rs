@@ -209,7 +209,7 @@ mod tests {
     #[test]
     fn home_root_accepted() {
         let Some(home) = home_dir() else { return };
-        let target = home.join("lashon-test-file-does-not-exist");
+        let target = home.join("ottid-test-file-does-not-exist");
         let result = resolve_safe_path(target.to_str().unwrap()).unwrap();
         assert!(
             allowed_roots().iter().any(|r| result.starts_with(r)),
@@ -221,7 +221,7 @@ mod tests {
     #[test]
     fn tmp_root_accepted() {
         let tmp = std::env::temp_dir();
-        let target = tmp.join("lashon-test-tmp-file");
+        let target = tmp.join("ottid-test-tmp-file");
         let result = resolve_safe_path(target.to_str().unwrap()).unwrap();
         assert!(allowed_roots().iter().any(|r| result.starts_with(r)));
     }
@@ -232,7 +232,7 @@ mod tests {
             return;
         }
         // Use a leaf the test process won't conflict with even if real.
-        let result = resolve_safe_path("~/lashon-test-tilde-leaf").unwrap();
+        let result = resolve_safe_path("~/ottid-test-tilde-leaf").unwrap();
         let home = home_dir().unwrap();
         let home_canon = std::fs::canonicalize(&home)
             .map(|p| strip_unc_prefix(&p))

@@ -4,9 +4,9 @@ The cuDNN and cuBLAS runtime libraries are ~1.2 GB of NVIDIA wheels — far too
 large to bundle in the installer. When an NVIDIA GPU is present, the sidecar
 downloads them from PyPI on first run (the same place ``pip`` fetches them),
 verifies each wheel against ``models/manifests/cuda.json``, and extracts the
-DLLs into ``LASHON_CUDA_ROOT`` — ``faster_whisper_engine`` discovers them there.
+DLLs into ``OTTID_CUDA_ROOT`` — ``faster_whisper_engine`` discovers them there.
 
-If no NVIDIA GPU is present, or ``LASHON_CUDA_ROOT`` is unset (a from-source run,
+If no NVIDIA GPU is present, or ``OTTID_CUDA_ROOT`` is unset (a from-source run,
 where the virtual environment supplies the libraries), this is a no-op. A
 download failure is non-fatal: the engine simply falls back to the CPU.
 """
@@ -21,14 +21,14 @@ import zipfile
 from pathlib import Path
 from typing import Callable
 
-from lashon_stt.paths import manifest_path
+from ottid_stt.paths import manifest_path
 
 logger = logging.getLogger(__name__)
 
 _CHUNK = 1 << 20
 
 # Set by the Tauri shell for a packaged build; absent when run from source.
-CUDA_ROOT_ENV = "LASHON_CUDA_ROOT"
+CUDA_ROOT_ENV = "OTTID_CUDA_ROOT"
 
 ProgressCallback = Callable[[str], None]
 
@@ -36,7 +36,7 @@ ProgressCallback = Callable[[str], None]
 def cuda_runtime_dir() -> Path | None:
     """Directory the CUDA DLLs are extracted into, or None when unmanaged.
 
-    The Tauri shell sets ``LASHON_CUDA_ROOT`` for a packaged build. From source
+    The Tauri shell sets ``OTTID_CUDA_ROOT`` for a packaged build. From source
     it is unset and the venv's nvidia-*-cu12 packages supply the libraries.
     """
     root = os.environ.get(CUDA_ROOT_ENV)

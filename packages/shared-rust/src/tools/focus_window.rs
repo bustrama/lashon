@@ -11,7 +11,7 @@ use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 pub struct FocusWindow;
 
@@ -27,7 +27,7 @@ impl Default for FocusWindow {
     }
 }
 
-impl LashonTool for FocusWindow {
+impl OttidTool for FocusWindow {
     fn name(&self) -> &str {
         "focus_window"
     }

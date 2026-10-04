@@ -1,10 +1,10 @@
 //! OS-keychain access for the cloud-provider API keys M7 introduces
 //! (docs/adr/0020). A thin wrapper over the `keyring` crate that:
 //!
-//! - Stores keys under the service name `"lashon"` with a
+//! - Stores keys under the service name `"ottid"` with a
 //!   `"<stage>.<provider>"` key name — `"stt.groq"`, `"llm.anthropic"`, …
 //! - Never logs the secret value, only the key name.
-//! - Reads from a `LASHON_<STAGE>_<PROVIDER>_KEY` environment variable
+//! - Reads from an `OTTID_<STAGE>_<PROVIDER>_KEY` environment variable
 //!   first (the headless / CI fallback for environments without a
 //!   running Secret Service daemon).
 //! - Returns `Option<String>` so callers can distinguish "no key stored"
@@ -13,16 +13,16 @@
 //! The Tauri shell exposes `save_api_key`, `has_api_key`, and `delete_api_key`
 //! commands. **There is intentionally no `get_api_key` Tauri command** — the
 //! raw key never crosses the JS bridge. Provider construction inside
-//! `lashon-core` calls `read_key` directly when it needs the value.
+//! `ottid-core` calls `read_key` directly when it needs the value.
 
 use anyhow::{Context, Result};
 use keyring::Entry;
 
-/// The service name every Lashon credential is grouped under in the OS
+/// The service name every Ottid credential is grouped under in the OS
 /// credential store. A fixed string, not configurable — so users can find
-/// and clear Lashon's stored keys from the OS UI ("Lashon" in Credential
-/// Manager / "lashon" in Keychain Access / the GNOME Keyring tree).
-pub const SERVICE: &str = "lashon";
+/// and clear Ottid's stored keys from the OS UI ("Ottid" in Credential
+/// Manager / "ottid" in Keychain Access / the GNOME Keyring tree).
+pub const SERVICE: &str = "ottid";
 
 /// Build the keyring entry handle for a `<stage>.<provider>` key name. A
 /// `keyring::Entry` is cheap to construct — it just stores the service and
@@ -32,12 +32,12 @@ fn entry(key_name: &str) -> Result<Entry> {
 }
 
 /// Translate a `"<stage>.<provider>"` key name into its env-var fallback.
-/// `"llm.anthropic"` → `"LASHON_LLM_ANTHROPIC_KEY"`. Hyphens in provider ids
+/// `"llm.anthropic"` → `"OTTID_LLM_ANTHROPIC_KEY"`. Hyphens in provider ids
 /// (`"opencode-go"`, `"ollama-local"`) are normalised to underscores —
 /// POSIX requires env-var names to be `[A-Z_][A-Z0-9_]*`, and Windows
 /// `cmd /set` rejects the hyphen too.
 fn env_fallback_name(key_name: &str) -> String {
-    let mut out = String::from("LASHON_");
+    let mut out = String::from("OTTID_");
     for ch in key_name.chars() {
         match ch {
             '.' | '-' => out.push('_'),
@@ -58,6 +58,8 @@ pub fn store_key(key_name: &str, secret: &str) -> Result<()> {
     entry(key_name)?
         .set_password(secret)
         .with_context(|| format!("writing keychain entry for {key_name}"))?;
+    // A pre-rename copy would only be a stale duplicate of a secret.
+    forget_legacy_key(key_name);
     Ok(())
 }
 
@@ -81,8 +83,48 @@ pub fn read_key(key_name: &str) -> Result<Option<String>> {
     }
     match entry(key_name)?.get_password() {
         Ok(secret) => Ok(Some(secret)),
-        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(keyring::Error::NoEntry) => adopt_legacy_key(key_name),
         Err(err) => Err(err).with_context(|| format!("reading keychain entry for {key_name}")),
+    }
+}
+
+/// Keys saved before the rename live under the old service name
+/// (docs/adr/0042). On the first read that misses, move the key across:
+/// store it under [`SERVICE`], then drop the old entry.
+fn adopt_legacy_key(key_name: &str) -> Result<Option<String>> {
+    let legacy = legacy_entry(key_name)?;
+    let secret = match legacy.get_password() {
+        Ok(secret) => secret,
+        Err(keyring::Error::NoEntry) => return Ok(None),
+        Err(err) => {
+            return Err(err)
+                .with_context(|| format!("reading pre-rename keychain entry for {key_name}"))
+        }
+    };
+    tracing::info!(
+        key_name,
+        "keychain: adopting a key stored before the rename"
+    );
+    store_key(key_name, &secret)?;
+    Ok(Some(secret))
+}
+
+fn legacy_entry(key_name: &str) -> Result<Entry> {
+    Entry::new(crate::legacy::LEGACY_KEYCHAIN_SERVICE, key_name)
+        .with_context(|| format!("opening pre-rename keychain entry for {key_name}"))
+}
+
+/// Drop the pre-rename copy of a key. Best effort: once the key exists
+/// under [`SERVICE`] a leftover old copy is never read again.
+fn forget_legacy_key(key_name: &str) {
+    match legacy_entry(key_name).map(|entry| entry.delete_credential()) {
+        Ok(Ok(())) | Ok(Err(keyring::Error::NoEntry)) => {}
+        Ok(Err(err)) => {
+            tracing::debug!(key_name, error = %err, "keychain: could not drop the pre-rename entry")
+        }
+        Err(err) => {
+            tracing::debug!(key_name, error = %err, "keychain: could not open the pre-rename entry")
+        }
     }
 }
 
@@ -101,8 +143,12 @@ pub fn has_key(key_name: &str) -> bool {
 }
 
 /// Remove a stored key. Idempotent: deleting a non-existent key is `Ok(())`.
+///
+/// Also removes a pre-rename copy, or [`read_key`] would adopt the deleted
+/// key straight back.
 pub fn delete_key(key_name: &str) -> Result<()> {
     tracing::debug!(key_name, "keychain: deleting key");
+    forget_legacy_key(key_name);
     match entry(key_name)?.delete_credential() {
         Ok(()) => Ok(()),
         Err(keyring::Error::NoEntry) => Ok(()),
@@ -118,12 +164,12 @@ mod tests {
     fn env_fallback_name_uppercases_and_underscores() {
         assert_eq!(
             env_fallback_name("llm.anthropic"),
-            "LASHON_LLM_ANTHROPIC_KEY"
+            "OTTID_LLM_ANTHROPIC_KEY"
         );
-        assert_eq!(env_fallback_name("stt.groq"), "LASHON_STT_GROQ_KEY");
+        assert_eq!(env_fallback_name("stt.groq"), "OTTID_STT_GROQ_KEY");
         assert_eq!(
             env_fallback_name("llm.openai_compat"),
-            "LASHON_LLM_OPENAI_COMPAT_KEY"
+            "OTTID_LLM_OPENAI_COMPAT_KEY"
         );
     }
 
@@ -131,19 +177,19 @@ mod tests {
     fn env_fallback_name_normalises_hyphens_in_provider_ids() {
         // POSIX env-var names can't carry hyphens, so `opencode-go` /
         // `ollama-local` / `ollama-remote` need to map to underscored
-        // forms. Without this, `LASHON_LLM_OPENCODE-GO_KEY` is unsettable
+        // forms. Without this, `OTTID_LLM_OPENCODE-GO_KEY` is unsettable
         // from a shell and the env-var fallback is silently broken.
         assert_eq!(
             env_fallback_name("llm.opencode-go"),
-            "LASHON_LLM_OPENCODE_GO_KEY"
+            "OTTID_LLM_OPENCODE_GO_KEY"
         );
         assert_eq!(
             env_fallback_name("llm.ollama-local"),
-            "LASHON_LLM_OLLAMA_LOCAL_KEY"
+            "OTTID_LLM_OLLAMA_LOCAL_KEY"
         );
         assert_eq!(
             env_fallback_name("llm.ollama-remote"),
-            "LASHON_LLM_OLLAMA_REMOTE_KEY"
+            "OTTID_LLM_OLLAMA_REMOTE_KEY"
         );
     }
 
@@ -178,7 +224,7 @@ mod tests {
 
     // Keychain integration tests — gated by `#[ignore]` so CI runners on
     // Linux without a Secret Service daemon pass cleanly. Run locally with
-    // `cargo test -p lashon-core keychain -- --ignored`.
+    // `cargo test -p ottid-core keychain -- --ignored`.
     #[test]
     #[ignore = "needs a running OS keychain (Credential Manager / Keychain / libsecret)"]
     fn store_read_delete_round_trip() {
@@ -199,5 +245,33 @@ mod tests {
         // Make sure it's gone first.
         let _ = delete_key(key_name);
         delete_key(key_name).expect("idempotent delete");
+    }
+
+    #[test]
+    #[ignore = "needs a running OS keychain"]
+    fn pre_rename_key_is_adopted_on_read_and_deleted_with_the_key() {
+        let key_name = "test.legacy-adopt";
+        let _ = delete_key(key_name);
+        legacy_entry(key_name)
+            .unwrap()
+            .set_password("sk-old")
+            .expect("seed legacy");
+
+        assert_eq!(
+            read_key(key_name).expect("read"),
+            Some("sk-old".to_string())
+        );
+        // Now stored under the current service, and the old copy is gone.
+        assert_eq!(
+            entry(key_name).unwrap().get_password().expect("adopted"),
+            "sk-old"
+        );
+        assert!(matches!(
+            legacy_entry(key_name).unwrap().get_password(),
+            Err(keyring::Error::NoEntry)
+        ));
+
+        delete_key(key_name).expect("delete");
+        assert_eq!(read_key(key_name).expect("read after delete"), None);
     }
 }

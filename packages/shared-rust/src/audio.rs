@@ -13,7 +13,7 @@ pub const TARGET_RATE: u32 = 16_000;
 type SharedBuffer = Arc<Mutex<Vec<f32>>>;
 
 /// The result of probing the default microphone — onboarding shows it so the
-/// user knows whether Lashon can hear them (`docs/adr/0013`).
+/// user knows whether Ottid can hear them (`docs/adr/0013`).
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "status", rename_all = "kebab-case")]
 pub enum MicProbe {
@@ -22,7 +22,7 @@ pub enum MicProbe {
     /// No input device is present at all — nothing is plugged in.
     NoDevice,
     /// A device exists but the capture stream could not be opened. The most
-    /// common cause is the OS withholding microphone access from Lashon.
+    /// common cause is the OS withholding microphone access from Ottid.
     Unavailable { reason: String },
 }
 

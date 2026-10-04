@@ -1,7 +1,7 @@
 # Models
 
 Model weights are **not committed** — they are large and licensed separately
-from the Lashon source. This directory holds only:
+from the Ottid source. This directory holds only:
 
 - `manifests/` — per-stage model registries (`stt.json`, …) recording each
   model's repo, revision, license, and per-file SHA-256.

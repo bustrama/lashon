@@ -4,15 +4,15 @@
 //! window is focused) and uses the system clipboard. Run explicitly:
 //!
 //! ```text
-//! cargo test -p lashon-core --test inject -- --ignored
+//! cargo test -p ottid-core --test inject -- --ignored
 //! ```
 
-use lashon_core::inject::inject_text;
+use ottid_core::inject::inject_text;
 
 #[test]
 #[ignore = "synthesizes real keyboard input and uses the system clipboard"]
 fn injection_preserves_the_clipboard() {
-    let sentinel = "lashon-clipboard-sentinel-מקור";
+    let sentinel = "ottid-clipboard-sentinel-מקור";
     arboard::Clipboard::new()
         .expect("open clipboard")
         .set_text(sentinel)

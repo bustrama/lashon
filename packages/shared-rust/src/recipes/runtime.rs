@@ -1,7 +1,7 @@
 //! M9 Phase 1b — recipe runtime executor.
 //!
 //! Walks a validated `Recipe` through its host-OS step list, executing
-//! each step against Lashon's OS-UI primitives. Step types map to:
+//! each step against Ottid's OS-UI primitives. Step types map to:
 //!
 //! | Step | Backing impl |
 //! |---|---|
@@ -258,7 +258,7 @@ async fn execute_step(
             // sentinel keeps the rest of the recipe runnable.
             if *dry_run {
                 tracing::info!(
-                    target: "lashon::recipes::runtime",
+                    target: "ottid::recipes::runtime",
                     step = index,
                     command_len = resolved.len(),
                     "run_shell: dry-run — command not executed"

@@ -1,8 +1,8 @@
 """First-run download of the STT model weights, verified against stt.json.
 
 A packaged build ships no model — it is ~1.6 GB and Apache-2.0-licensed
-separately from the Lashon source. ``ensure_model`` downloads it on first run
-into ``LASHON_MODELS_ROOT``, streaming each file so the warm-up UI can report
+separately from the Ottid source. ``ensure_model`` downloads it on first run
+into ``OTTID_MODELS_ROOT``, streaming each file so the warm-up UI can report
 real byte-level progress.
 
 Every present file is SHA-256-verified against the manifest on every boot,
@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Callable
 from urllib.parse import quote
 
-from lashon_stt.model_registry import DEFAULT_MODEL_ID, model_dir, model_entry
+from ottid_stt.model_registry import DEFAULT_MODEL_ID, model_dir, model_entry
 
 logger = logging.getLogger(__name__)
 

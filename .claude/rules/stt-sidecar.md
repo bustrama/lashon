@@ -5,19 +5,19 @@ globs: ["services/stt-sidecar/**"]
 
 # STT sidecar
 
-`lashon_stt` is a Python gRPC service the Rust core spawns. See
+`ottid_stt` is a Python gRPC service the Rust core spawns. See
 [`docs/architecture.md`](../../docs/architecture.md) and ADRs 0002, 0004, 0006,
 0010.
 
 ## Transport
 
 - The sidecar binds gRPC to `127.0.0.1` on an ephemeral port and prints a
-  two-line stdout handshake — `LASHON_STT_TOKEN=<hex>` then
-  `LASHON_STT_PORT=<port>`; the Rust core parses both. Those lines are a
+  two-line stdout handshake — `OTTID_STT_TOKEN=<hex>` then
+  `OTTID_STT_PORT=<port>`; the Rust core parses both. Those lines are a
   cross-language contract — changing either is a breaking change to both
-  `server.py` and `lashon-core::sidecar`, together.
+  `server.py` and `ottid-core::sidecar`, together.
 - The token (minted per process with `secrets.token_hex`) authenticates the
-  caller: every RPC must carry it as `x-lashon-auth` metadata, and the sidecar
+  caller: every RPC must carry it as `x-ottid-auth` metadata, and the sidecar
   rejects calls without it with `UNAUTHENTICATED`. Never log the token or write
   it to disk — it travels only on the stdout pipe
   ([ADR-0010](../../docs/adr/0010-harden-the-stt-sidecar-trust-boundary.md)).
@@ -26,7 +26,7 @@ globs: ["services/stt-sidecar/**"]
 
 - The sidecar runs both from Python source (`tauri dev`) and frozen with
   PyInstaller (release). Path code must handle both: use the `base_dir()` /
-  `sys._MEIPASS` pattern, and honour `LASHON_MODELS_ROOT` / `LASHON_CUDA_ROOT`
+  `sys._MEIPASS` pattern, and honour `OTTID_MODELS_ROOT` / `OTTID_CUDA_ROOT`
   when set. Never hardcode a path that only works from a source checkout.
 
 ## Model integrity

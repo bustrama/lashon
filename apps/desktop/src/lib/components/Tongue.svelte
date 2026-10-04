@@ -1,6 +1,6 @@
 <script lang="ts">
 	// The Tongue is a transparent, frameless, always-on-top overlay — just
-	// the Lashon mark, floating and draggable.
+	// the Ottid mark, floating and draggable.
 	//
 	// REDESIGN — "המנורה / The Lamp" direction:
 	// - The mark's resting color is the locked peach. State is communicated
@@ -373,7 +373,7 @@
 	// inside the stage (halo, sonar rings, glyph badge appear/disappear).
 	// No reflow → no window resize → no mark jump. Decorations change
 	// around a stationary mark, which is exactly what the user asked
-	// for ("things needs to change around the lashon").
+	// for ("things needs to change around the ottid").
 	//
 	// Budget: armed sonar peaks at scale 2.2 on the 96 px mark = 211 px,
 	// rounded up to 221 for breathing room. ~62 px of transparent buffer

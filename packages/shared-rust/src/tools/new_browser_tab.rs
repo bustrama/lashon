@@ -8,7 +8,7 @@ use anyhow::Result;
 use serde_json::{json, Value};
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 const BLANK: &str = "about:blank";
 
@@ -26,7 +26,7 @@ impl Default for NewBrowserTab {
     }
 }
 
-impl LashonTool for NewBrowserTab {
+impl OttidTool for NewBrowserTab {
     fn name(&self) -> &str {
         "new_browser_tab"
     }

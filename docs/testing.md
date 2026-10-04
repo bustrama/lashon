@@ -25,7 +25,7 @@ touches (see [`roadmap.md`](roadmap.md) for milestone scope).
 - `tests/commands.he.yaml` — 20 voice commands with the expected tool sequence
   (asserted on exact tool name + argument matching).
 - Tool unit tests in Rust with fixtures.
-- Integration: spawn a sandbox test app, voice-command Lashon to manipulate it,
+- Integration: spawn a sandbox test app, voice-command Ottid to manipulate it,
   assert the outcome.
 - Confirmation-policy tests: assert every `requires_confirmation` tool blocks
   until approval.

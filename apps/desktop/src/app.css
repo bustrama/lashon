@@ -57,7 +57,7 @@
 		U+FEFF, U+FFFD;
 }
 
-/* ── Lashon design tokens — "המנורה / The Lamp" direction ────────────────
+/* ── Ottid design tokens — "המנורה / The Lamp" direction ────────────────
    Cool slate study at night; cool bone parchment by day. The peach mark is
    the only warm note in a cooler room. Mode chromas (gold / cyan / violet)
    are evenly spaced around the hue wheel so a glance is enough to read
@@ -102,7 +102,7 @@
 	/* M9 recipe accent — terracotta, the "recipe match" tone. Solid (not
 	   pulsing): recipes are deterministic; pulse stays reserved for
 	   thinking states. Shares warm-family DNA with the locked peach
-	   mark — recipes are Lashon's own skill set, not an LLM. */
+	   mark — recipes are Ottid's own skill set, not an LLM. */
 	--hearth: #d97a4a;
 	--hearth-glow: rgba(217, 122, 74, 0.55);
 	--hearth-soft: rgba(217, 122, 74, 0.16);
@@ -176,7 +176,7 @@ body {
 	cursor: default;
 }
 
-/* Suppress scrollbars on every Lashon window. The tongue's own size
+/* Suppress scrollbars on every Ottid window. The tongue's own size
    is driven by `setSize` (M8.3) — when the content grows, the HWND
    grows in the same frame, and there's nothing to scroll. Without
    this, the brief ~1 frame where content is taller than the still-

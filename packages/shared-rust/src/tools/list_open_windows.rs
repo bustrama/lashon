@@ -7,7 +7,7 @@ use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 const MAX_LINES: usize = 100;
 
@@ -25,7 +25,7 @@ impl Default for ListOpenWindows {
     }
 }
 
-impl LashonTool for ListOpenWindows {
+impl OttidTool for ListOpenWindows {
     fn name(&self) -> &str {
         "list_open_windows"
     }

@@ -1,6 +1,6 @@
 //! M8 Phase-1 tool catalogue (`docs/roadmap.md §2.2`).
 //!
-//! Each submodule implements one `LashonTool`. The
+//! Each submodule implements one `OttidTool`. The
 //! `register_phase_one_tools` helper wires the whole catalogue into a
 //! `ToolRegistry` so the Tauri shell can construct one with a single
 //! call.
@@ -10,7 +10,7 @@
 
 use std::sync::Arc;
 
-use crate::tool::{LashonTool, ToolRegistry};
+use crate::tool::{OttidTool, ToolRegistry};
 
 pub mod click_element;
 pub mod clipboard;
@@ -32,7 +32,7 @@ pub mod open_url;
 pub mod path_safety;
 pub mod press_keys;
 pub mod read_active_window_text;
-// `uia_focus` — focused-element runtime-id snapshot. Not a `LashonTool`
+// `uia_focus` — focused-element runtime-id snapshot. Not an `OttidTool`
 // itself; the M9 recipe runtime's `wait_for_focus_change` step type
 // consumes it to wait for keyboard focus to move to a different
 // control (e.g. Ctrl+K opening a modal whose input gets focus). The
@@ -63,7 +63,7 @@ pub mod window_state;
 /// Order matters only as far as test snapshot diffs — actual call
 /// order is decided by the LLM, not the registry.
 pub fn register_phase_one_tools(registry: &mut ToolRegistry) {
-    let tools: Vec<Arc<dyn LashonTool>> = vec![
+    let tools: Vec<Arc<dyn OttidTool>> = vec![
         // Phase 1 — M8.1 safe interactive set.
         Arc::new(click_element::ClickElement::new()),
         Arc::new(clipboard::ClipboardGet::new()),
@@ -121,7 +121,7 @@ mod tests {
 
     /// Tools that must gate on the confirmation modal — kept in one
     /// place so the registry test and any future audits stay in sync
-    /// with the in-code overrides of `LashonTool::requires_confirmation`.
+    /// with the in-code overrides of `OttidTool::requires_confirmation`.
     /// 8 tools per `docs/stories/m8-os-tools.md`.
     pub(crate) const DESTRUCTIVE_TOOLS: &[&str] = &[
         "close_window",

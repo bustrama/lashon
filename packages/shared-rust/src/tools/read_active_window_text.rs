@@ -18,7 +18,7 @@ use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 /// Hard cap on the returned text. 4 KB is enough for a typical
 /// app's visible chrome (~150 labels at ~25 chars each) and leaves
@@ -45,7 +45,7 @@ impl Default for ReadActiveWindowText {
     }
 }
 
-impl LashonTool for ReadActiveWindowText {
+impl OttidTool for ReadActiveWindowText {
     fn name(&self) -> &str {
         "read_active_window_text"
     }

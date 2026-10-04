@@ -134,7 +134,7 @@ impl Msg {
 }
 
 /// A tool definition the LLM may invoke. M8's tool registry serialises its
-/// `LashonTool` trait's schema into one of these; the provider impl
+/// `OttidTool` trait's schema into one of these; the provider impl
 /// translates it to its vendor wire format.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Tool {
@@ -266,7 +266,7 @@ pub trait LLMProvider: Send + Sync {
     /// API key, the picker swaps from the hard-coded `available_models()`
     /// list to whatever the provider actually serves — so a brand-new
     /// release model (or a fine-tune private to the user's org) shows up
-    /// without a Lashon update.
+    /// without an Ottid update.
     ///
     /// The implementation is expected to **filter, sort, and cap** the
     /// raw response before returning so the Hub's dropdown stays usable
@@ -550,14 +550,14 @@ mod tests {
         // build conversations exactly like this; the round-trip must lose
         // nothing.
         let conversation: Vec<Msg> = vec![
-            Msg::system("את לשון."),
+            Msg::system("אתה אוטיד."),
             Msg::user("פתח את VS Code"),
             Msg {
                 role: Role::Assistant,
                 content: MsgContent::Blocks {
                     blocks: vec![
                         ContentBlock::Text {
-                            text: "פותחת את VS Code".into(),
+                            text: "פותח את VS Code".into(),
                         },
                         ContentBlock::ToolCall {
                             id: "call_1".into(),

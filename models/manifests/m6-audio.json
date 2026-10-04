@@ -1,5 +1,5 @@
 {
-  "_comment": "M6 audio-overhaul model registry — Silero VAD (and, later, the openWakeWord wake-word pipeline). ONNX weights are downloaded, never committed; each file records a direct download URL, its byte size, and a SHA-256. lashon-core re-verifies every file against this manifest before ONNX Runtime loads it, because a tampered ONNX graph is native code (docs/adr/0010, docs/adr/0015).",
+  "_comment": "M6 audio-overhaul model registry — Silero VAD (and, later, the openWakeWord wake-word pipeline). ONNX weights are downloaded, never committed; each file records a direct download URL, its byte size, and a SHA-256. ottid-core re-verifies every file against this manifest before ONNX Runtime loads it, because a tampered ONNX graph is native code (docs/adr/0010, docs/adr/0015).",
   "models": [
     {
       "id": "silero-vad-v5",

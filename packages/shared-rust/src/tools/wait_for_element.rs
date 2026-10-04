@@ -15,7 +15,7 @@ use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 const DEFAULT_TIMEOUT_MS: u64 = 5_000;
 /// 60 s matches `wait_for_window`'s cap so a chain can wait for the
@@ -43,7 +43,7 @@ impl Default for WaitForElement {
     }
 }
 
-impl LashonTool for WaitForElement {
+impl OttidTool for WaitForElement {
     fn name(&self) -> &str {
         "wait_for_element"
     }

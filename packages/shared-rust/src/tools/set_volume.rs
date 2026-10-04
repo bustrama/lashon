@@ -6,7 +6,7 @@ use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 pub struct SetVolume;
 
@@ -22,7 +22,7 @@ impl Default for SetVolume {
     }
 }
 
-impl LashonTool for SetVolume {
+impl OttidTool for SetVolume {
     fn name(&self) -> &str {
         "set_volume"
     }

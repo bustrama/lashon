@@ -7,8 +7,8 @@ use crate::sidecar::{healthcheck, ready_sidecar, HealthReport, SidecarState};
 use crate::stt_proto::stt;
 
 // `Confidence` is the same shape for STT and LLM (docs/adr/0019). It lives in
-// `lashon-core::provider` and is re-exported here so callers can keep saying
-// `use lashon_core::stt::Confidence`.
+// `ottid-core::provider` and is re-exported here so callers can keep saying
+// `use ottid_core::stt::Confidence`.
 pub use crate::provider::Confidence;
 
 /// One decoded segment and where it sits in the submitted audio. Timestamps are

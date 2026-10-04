@@ -1,6 +1,6 @@
 # Bundled llama-server
 
-Prebuilt `llama-server.exe` and the minimum DLL set Lashon needs to run
+Prebuilt `llama-server.exe` and the minimum DLL set Ottid needs to run
 the in-process local LLM (docs/adr/0025). Mirrored from the
 `ggml.llamacpp` winget release — a Vulkan-only build that runs on any
 modern GPU (NVIDIA, AMD, Intel) and falls back to CPU on hosts without
@@ -11,7 +11,7 @@ Upstream: <https://github.com/ggml-org/llama.cpp>
 Distribution: <https://winget.run/pkg/ggml/llamacpp>
 
 ## License
-llama.cpp and ggml are licensed under the MIT License. Lashon's own code is
+llama.cpp and ggml are licensed under the MIT License. Ottid's own code is
 GPL-3.0-only (see the project root's `LICENSE`); llama.cpp's MIT notice is
 reproduced in the project root's `NOTICE` file. This directory ships binary
 form only.

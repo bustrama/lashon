@@ -2,7 +2,7 @@
 	// The hardware-tier picker — four selectable cards, one per tier. Shared by
 	// the onboarding hardware step and the Hub's Hardware section so the chosen
 	// tier reads the same in both. The detected tier is just the default
-	// selection; Lashon never silently downgrades, so the user always picks
+	// selection; Ottid never silently downgrades, so the user always picks
 	// (docs/tech-stack.md, docs/adr/0013). RTL-native, design tokens only.
 	import { t } from '$lib/i18n';
 	import { TIERS, type Tier } from '$lib/hardware';

@@ -1,25 +1,25 @@
 //! Snapshot test — keeps the committed JSON Schema export in sync with
-//! the Rust types. Reads `recipes/schema/lashon-recipe.schema.json`,
+//! the Rust types. Reads `recipes/schema/ottid-recipe.schema.json`,
 //! re-derives it from `Recipe`, and asserts equality. On drift the
 //! test fails with the instruction to regenerate:
 //!
 //! ```text
-//! cargo test -p lashon-core --test recipe_schema_snapshot -- --ignored regenerate
+//! cargo test -p ottid-core --test recipe_schema_snapshot -- --ignored regenerate
 //! ```
 //!
 //! The committed file is the canonical contract for external
-//! consumers — the Hub creator UI, Lashon-as-MCP-server clients, and
+//! consumers — the Hub creator UI, Ottid-as-MCP-server clients, and
 //! third-party recipe authoring tools all read it without having to
 //! depend on the Rust crate.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use lashon_core::recipes::Recipe;
+use ottid_core::recipes::Recipe;
 
-/// `<repo>/recipes/schema/lashon-recipe.schema.json`.
+/// `<repo>/recipes/schema/ottid-recipe.schema.json`.
 fn schema_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../recipes/schema/lashon-recipe.schema.json")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../recipes/schema/ottid-recipe.schema.json")
 }
 
 /// Generate the schema and serialise it to a canonical pretty form so
@@ -37,7 +37,7 @@ fn committed_schema_matches_rust_types() {
     let path = schema_path();
     let committed = fs::read_to_string(&path).unwrap_or_else(|err| {
         panic!(
-            "{} not found: {err} — run `cargo test -p lashon-core --test \
+            "{} not found: {err} — run `cargo test -p ottid-core --test \
              recipe_schema_snapshot -- --ignored regenerate` to seed it",
             path.display()
         )
@@ -53,14 +53,14 @@ fn committed_schema_matches_rust_types() {
             serde_json::from_str(&generated).expect("generated schema is valid JSON");
         assert_eq!(
             committed_value, generated_value,
-            "JSON Schema drift — regenerate with `cargo test -p lashon-core \
+            "JSON Schema drift — regenerate with `cargo test -p ottid-core \
              --test recipe_schema_snapshot -- --ignored regenerate`"
         );
         // Identical content, different formatting — still surface as a
         // failure so the on-disk pretty-print stays deterministic.
         panic!(
             "JSON Schema content matches but formatting differs — \
-             regenerate with `cargo test -p lashon-core --test \
+             regenerate with `cargo test -p ottid-core --test \
              recipe_schema_snapshot -- --ignored regenerate`"
         );
     }

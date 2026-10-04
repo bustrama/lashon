@@ -1,7 +1,7 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-    Reclaim disk space by deleting Lashon's build artifacts and (optionally)
+    Reclaim disk space by deleting Ottid's build artifacts and (optionally)
     language environments and downloaded model weights.
 
 .DESCRIPTION
@@ -143,7 +143,7 @@ try {
     $beforeMB = Get-RepoTotalMB -Root $root
     $beforeGB = [math]::Round($beforeMB / 1024, 2)
     Write-Host ""
-    Write-Host "Lashon repo cleanup -- tier: $Level $(if ($DryRun) { '(dry-run)' })" -ForegroundColor Cyan
+    Write-Host "Ottid repo cleanup -- tier: $Level $(if ($DryRun) { '(dry-run)' })" -ForegroundColor Cyan
     Write-Host ("Repo total before: {0} GB" -f $beforeGB)
     Write-Host ""
 
@@ -179,21 +179,21 @@ try {
         $reclaimed += Remove-PathSafely -Path (Join-Path $root 'apps\desktop\build')         -Label 'apps/desktop/build'         -DryRun:$DryRun
 
         # PyInstaller-frozen sidecar — kept .gitkeep, blow away everything else.
-        $sttBin = Join-Path $root 'apps\desktop\src-tauri\binaries\lashon-stt'
+        $sttBin = Join-Path $root 'apps\desktop\src-tauri\binaries\ottid-stt'
         if (Test-Path $sttBin) {
             $items = Get-ChildItem -LiteralPath $sttBin -Force | Where-Object { $_.Name -ne '.gitkeep' }
             $sttMB = ($items | ForEach-Object { Get-DirSizeMB -Path $_.FullName } | Measure-Object -Sum).Sum
             if (-not $sttMB) { $sttMB = 0 }
             if ($items.Count -eq 0) {
-                Write-Host "  - src-tauri/binaries/lashon-stt/*                        (clean)" -ForegroundColor DarkGray
+                Write-Host "  - src-tauri/binaries/ottid-stt/*                        (clean)" -ForegroundColor DarkGray
             }
             elseif ($DryRun) {
-                Write-Host ("  - src-tauri/binaries/lashon-stt/* (keep .gitkeep)        {0,8} MB  (dry-run)" -f $sttMB) -ForegroundColor Yellow
+                Write-Host ("  - src-tauri/binaries/ottid-stt/* (keep .gitkeep)        {0,8} MB  (dry-run)" -f $sttMB) -ForegroundColor Yellow
                 $reclaimed += $sttMB
             }
             else {
                 $items | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-                Write-Host ("  - src-tauri/binaries/lashon-stt/* (keep .gitkeep)        {0,8} MB  deleted" -f $sttMB) -ForegroundColor Green
+                Write-Host ("  - src-tauri/binaries/ottid-stt/* (keep .gitkeep)        {0,8} MB  deleted" -f $sttMB) -ForegroundColor Green
                 $reclaimed += $sttMB
             }
         }

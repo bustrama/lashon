@@ -1,5 +1,5 @@
 {
-  "_comment": "In-process local LLM models (docs/adr/0025). Loaded by `lashon-core::llm::local::LocalLlmProvider` via mistralrs. Apache-2.0 / MIT only — anything else is opt-in with a non-commercial badge, per the wake-classifier precedent (docs/adr/0016). Files are downloaded on first use; the SHA-256 is verified on every load (docs/adr/0010). The `sha256` and `bytes` fields are mirrored from the upstream Hugging Face LFS pointer (the `oid sha256:…` and `size` lines of the .gguf's LFS metadata); whoever bumps the manifest entry refreshes both in the same commit.",
+  "_comment": "In-process local LLM models (docs/adr/0025). Loaded by `ottid-core::llm::local::LocalLlmProvider` via mistralrs. Apache-2.0 / MIT only — anything else is opt-in with a non-commercial badge, per the wake-classifier precedent (docs/adr/0016). Files are downloaded on first use; the SHA-256 is verified on every load (docs/adr/0010). The `sha256` and `bytes` fields are mirrored from the upstream Hugging Face LFS pointer (the `oid sha256:…` and `size` lines of the .gguf's LFS metadata); whoever bumps the manifest entry refreshes both in the same commit.",
   "models": [
     {
       "id": "qwen3-4b-q4_k_m",

@@ -1,4 +1,4 @@
-//! `lashon-mcp` — stdio MCP server exposing Lashon's recipe-management
+//! `ottid-mcp` — stdio MCP server exposing Ottid's recipe-management
 //! tools to any agent host (Claude Desktop, Cursor, GPT-via-MCP-client).
 //! ADR-0028.
 //!
@@ -11,11 +11,11 @@ use anyhow::Result;
 use rmcp::{transport::stdio, ServiceExt};
 use tracing_subscriber::EnvFilter;
 
-use lashon_core::mcp::LashonMcpServer;
+use ottid_core::mcp::OttidMcpServer;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // tracing → stderr. Default to INFO; respect RUST_LOG / LASHON_LOG
+    // tracing → stderr. Default to INFO; respect RUST_LOG / OTTID_LOG
     // when the user wants more verbose diagnostics. ANSI off so the
     // log stays readable when the host captures it to a file.
     tracing_subscriber::fmt()
@@ -27,11 +27,11 @@ async fn main() -> Result<()> {
         .init();
 
     tracing::info!(
-        version = lashon_core::mcp::MCP_SERVER_VERSION,
-        "starting lashon-mcp"
+        version = ottid_core::mcp::MCP_SERVER_VERSION,
+        "starting ottid-mcp"
     );
 
-    let service = LashonMcpServer::new()
+    let service = OttidMcpServer::new()
         .serve(stdio())
         .await
         .inspect_err(|err| tracing::error!("rmcp serve error: {err:?}"))?;

@@ -1,4 +1,4 @@
-# Lashon native tool registry — skeleton.
+# Ottid native tool registry — skeleton.
 #
 # Enumerates the v1 native tool set from docs/roadmap.md §2.2. This is a
 # SKELETON: every tool's `parameters` JSON Schema is authored in Phase 2
@@ -219,16 +219,16 @@ description = "OCR the active window and return its text."
 requires_confirmation = false
 parameters = "TODO"
 
-# ── Lashon itself ─────────────────────────────────────────────────────────
+# ── Ottid itself ─────────────────────────────────────────────────────────
 [[tool]]
 name = "remember"
-description = "Save a fact to Lashon's long-term local memory."
+description = "Save a fact to Ottid's long-term local memory."
 requires_confirmation = false
 parameters = "TODO"
 
 [[tool]]
-name = "lashon_settings"
-description = "Adjust Lashon's own settings (active providers, volume, and so on)."
+name = "ottid_settings"
+description = "Adjust Ottid's own settings (active providers, volume, and so on)."
 # Conditional: confirm when switching the active provider to a cloud one
 # (docs/roadmap.md §2.6).
 requires_confirmation = false

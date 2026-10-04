@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Word-error-rate benchmark for the Lashon STT pipeline (see docs/testing.md).
+"""Word-error-rate benchmark for the Ottid STT pipeline (see docs/testing.md).
 
 Transcribes every clip in tests/hebrew-corpus/manifest.json that is present on
 disk, computes WER against the ground-truth transcript, and reports per-tier
@@ -36,12 +36,12 @@ def main() -> int:
     import jiwer
     from faster_whisper.audio import decode_audio
 
-    from lashon_stt.engines.faster_whisper_engine import SAMPLE_RATE, load_engine
+    from ottid_stt.engines.faster_whisper_engine import SAMPLE_RATE, load_engine
 
     manifest = json.loads((CORPUS / "manifest.json").read_text(encoding="utf-8"))
-    # LASHON_STT_MODEL_ID selects the transcription model for an A/B run (e.g.
+    # OTTID_STT_MODEL_ID selects the transcription model for an A/B run (e.g.
     # turbo vs non-turbo large-v3); unset loads the shipped default. See ADR-0036.
-    engine = load_engine(model_id=os.environ.get("LASHON_STT_MODEL_ID"))
+    engine = load_engine(model_id=os.environ.get("OTTID_STT_MODEL_ID"))
     print(f"engine: {engine.device} ({engine.compute_type}) — model {engine.model_id}\n")
 
     gate_ok = True

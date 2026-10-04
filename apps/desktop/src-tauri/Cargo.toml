@@ -1,24 +1,24 @@
 [package]
-name = "lashon"
+name = "ottid"
 version = "1.1.0"
-description = "Lashon — local-first Hebrew voice assistant"
-authors = ["Lashon contributors"]
+description = "Ottid — local-first Hebrew voice assistant"
+authors = ["Ottid contributors"]
 edition = "2021"
 rust-version = "1.95"
 license = "GPL-3.0-only"
 publish = false
 
-# This crate is a thin Tauri GUI shell. Testable logic lives in `lashon-core`.
+# This crate is a thin Tauri GUI shell. Testable logic lives in `ottid-core`.
 # `test = false` keeps `cargo test` from building a Tauri-linked test binary,
 # which fails to load on Windows. See
 # docs/adr/0003-core-logic-in-a-tauri-independent-crate.md.
 [lib]
-name = "lashon_lib"
+name = "ottid_lib"
 test = false
 doctest = false
 
 [[bin]]
-name = "lashon"
+name = "ottid"
 path = "src/main.rs"
 test = false
 doctest = false
@@ -27,14 +27,14 @@ doctest = false
 tauri-build = { version = "=2.6.2", features = [] }
 
 [features]
-# Editioning (ADR-0034): `command-mode` forwards to lashon-core's umbrella
+# Editioning (ADR-0034): `command-mode` forwards to ottid-core's umbrella
 # feature. A free `--no-default-features` build ships dictation only — command
 # mode (LLM, tools, recipes, local LLM, MCP) is compiled out of the binary.
 default = ["command-mode"]
-command-mode = ["lashon-core/command-mode"]
+command-mode = ["ottid-core/command-mode"]
 
 [dependencies]
-lashon-core = { path = "../../../packages/shared-rust", default-features = false }
+ottid-core = { path = "../../../packages/shared-rust", default-features = false }
 tauri = { version = "=2.11.2", features = ["tray-icon", "macos-private-api"] }
 tauri-plugin-global-shortcut = "=2.3.1"
 tauri-plugin-opener = "=2.5.4"
@@ -61,3 +61,7 @@ tracing-subscriber = { version = "=0.3.23", features = ["env-filter"] }
 # a release build (which has no console) errors or crashes. Used synchronously,
 # not via `non_blocking`, so the last lines survive a hard abort.
 tracing-appender = "=0.2.5"
+# The per-user base dirs Tauri resolves its app dirs from, needed before the
+# builder runs to move the pre-rename install's data (ADR-0042). The same
+# version Tauri already depends on.
+dirs = "=6.0.0"

@@ -6,7 +6,7 @@ use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 pub struct KillProcess;
 
@@ -22,7 +22,7 @@ impl Default for KillProcess {
     }
 }
 
-impl LashonTool for KillProcess {
+impl OttidTool for KillProcess {
     fn name(&self) -> &str {
         "kill_process"
     }

@@ -11,7 +11,7 @@ long_description: |
   language" which would need an LLM-call step type (`recipes::Step`
   variant) the Phase 1 schema doesn't include — translation lands when
   the recipe runtime gains LLM steps (post-M9).
-author: Lashon contributors
+author: Ottid contributors
 recipe_version: 1.0.0
 tags:
   - utility

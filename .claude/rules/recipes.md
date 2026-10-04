@@ -1,9 +1,9 @@
 # Recipes & subprocess spawning
 
 M9 introduced recipes (`recipe.yaml` files run by
-`lashon_core::recipes::runtime`), the cascade dispatcher (recipes
+`ottid_core::recipes::runtime`), the cascade dispatcher (recipes
 short-circuit voice commands before the LLM planner), the MCP
-server (`lashon-mcp` stdio binary exposes recipe management to
+server (`ottid-mcp` stdio binary exposes recipe management to
 agent hosts), and a new family of subprocess-spawn sites. A few
 patterns are now load-bearing across all of them.
 
@@ -23,12 +23,12 @@ to the M8 `run_command` tool, the MCP binary, llama-server, the
 STT sidecar, and `open_app`.
 
 Sites that already follow this:
-- `lashon_core::llama_server::spawn`
-- `lashon_core::sidecar::spawn`
-- `lashon_core::tools::open_app::launch`
-- `lashon_core::tools::run_command::build_command`
-- `lashon_core::recipes::runtime::run_powershell`
-- `lashon_core::recipes::runtime::run_open_app`
+- `ottid_core::llama_server::spawn`
+- `ottid_core::sidecar::spawn`
+- `ottid_core::tools::open_app::launch`
+- `ottid_core::tools::run_command::build_command`
+- `ottid_core::recipes::runtime::run_powershell`
+- `ottid_core::recipes::runtime::run_open_app`
 
 The pattern was retrofitted to `run_command` (pre-existing M8 bug)
 + both new recipe-runtime sites in PR #81 after the bug surfaced
@@ -37,7 +37,7 @@ spawn sites must not regress this. CI doesn't catch it because
 the symptom is visual (focus theft); it caught us during
 end-to-end testing instead.
 
-## Recipe storage layer (`lashon_core::recipes::storage`)
+## Recipe storage layer (`ottid_core::recipes::storage`)
 
 Three invariants the storage helpers preserve — preserve them in
 any new helper you add:

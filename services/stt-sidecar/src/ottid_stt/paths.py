@@ -9,7 +9,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-# .../services/stt-sidecar/src/lashon_stt
+# .../services/stt-sidecar/src/ottid_stt
 _PACKAGE_DIR = Path(__file__).resolve().parent
 
 
@@ -47,7 +47,7 @@ def manifest_path(name: str) -> Path:
 
 def repo_root() -> Path:
     """Repository root. Only meaningful when running from source."""
-    # _PACKAGE_DIR == <root>/services/stt-sidecar/src/lashon_stt
+    # _PACKAGE_DIR == <root>/services/stt-sidecar/src/ottid_stt
     #   parents[0] src  parents[1] stt-sidecar  parents[2] services  parents[3] root
     return _PACKAGE_DIR.parents[3]
 

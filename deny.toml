@@ -11,7 +11,7 @@
 
 [licenses]
 allow = [
-    # Lashon's own workspace crates (lashon, lashon-core) are GPL-3.0-only as of
+    # Ottid's own workspace crates (ottid, ottid-core) are GPL-3.0-only as of
     # ADR-0032 (the open-core relicense). cargo-deny checks workspace members
     # too, so the project's own license must be allowed here. This does NOT
     # invite copyleft *dependencies* — third-party crates stay permissive, and

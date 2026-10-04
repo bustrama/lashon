@@ -6,7 +6,7 @@ long_description: |
   Calls the OS launcher with the app name and waits for the window to
   appear before focusing it. Use this as the front half of any
   application-specific chain that doesn't have its own dedicated recipe.
-author: Lashon contributors
+author: Ottid contributors
 recipe_version: 1.0.0
 tags:
   - productivity

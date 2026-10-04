@@ -6,7 +6,7 @@ use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 pub struct RightClick;
 
@@ -22,7 +22,7 @@ impl Default for RightClick {
     }
 }
 
-impl LashonTool for RightClick {
+impl OttidTool for RightClick {
     fn name(&self) -> &str {
         "right_click"
     }

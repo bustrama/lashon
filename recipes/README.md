@@ -1,10 +1,10 @@
-# Lashon Recipes
+# Ottid Recipes
 
 Pre-recorded parameterised desktop workflows. Each recipe lives in its own
 directory with a `recipe.yaml` that declares parameters and per-OS step
 lists. The format is specified in
 [`docs/stories/m9-recipes.md`](../docs/stories/m9-recipes.md) and parsed by
-[`lashon_core::recipes`](../packages/shared-rust/src/recipes/mod.rs).
+[`ottid_core::recipes`](../packages/shared-rust/src/recipes/mod.rs).
 
 ## Layout
 
@@ -12,7 +12,7 @@ lists. The format is specified in
 recipes/
 ├── README.md                        # This file
 ├── schema/
-│   └── lashon-recipe.schema.json    # Auto-derived JSON Schema; snapshot-tested
+│   └── ottid-recipe.schema.json    # Auto-derived JSON Schema; snapshot-tested
 └── starters/                        # The 10 bundled starter recipes
     ├── <recipe-id>/
     │   └── recipe.yaml              # The recipe spec
@@ -26,7 +26,7 @@ The schema in `recipe.yaml` blends three formats — see the module docs at
 for the lineage. Validate authored recipes with the unit test:
 
 ```sh
-cargo test -p lashon-core --lib recipes
+cargo test -p ottid-core --lib recipes
 ```
 
 The validator surfaces every issue at once (unknown interpolations, dangling
@@ -34,7 +34,7 @@ parameters, missing OS variants, missing `shell.run` permission for shell
 steps) so a single edit/test loop is enough.
 
 The recommended authoring path is via **Claude Desktop / Cursor / any
-MCP host** connected to the `lashon-mcp` stdio server — the agent can
+MCP host** connected to the `ottid-mcp` stdio server — the agent can
 read existing recipes via `get_recipe`, validate drafts via
 `validate_recipe`, and save via `save_recipe`. Wire-up:
 [`docs/stories/m9-mcp-server.md`](../docs/stories/m9-mcp-server.md#manual-smoke-test-today).
@@ -44,8 +44,8 @@ read existing recipes via `get_recipe`, validate drafts via
 From the CLI (testing surface; doesn't go through voice):
 
 ```sh
-cargo run -p lashon-core --bin lashon-recipe -- --list
-cargo run -p lashon-core --bin lashon-recipe -- send-discord-message --recipient=kuki --body=hi
+cargo run -p ottid-core --bin ottid-recipe -- --list
+cargo run -p ottid-core --bin ottid-recipe -- send-discord-message --recipient=kuki --body=hi
 ```
 
 From voice — speak any of the recipe's `intents:` phrases at the
@@ -59,7 +59,7 @@ configure in Hub → Voice corrections.
 
 **M9 Phases 1a, 1b, 1c (tier 1), 1d (incl. Steps panel), 1g
 shipped on `main`.** The author→test loop works end-to-end:
-write a recipe → list/run via the Hub or `lashon-recipe` CLI →
+write a recipe → list/run via the Hub or `ottid-recipe` CLI →
 trigger by voice once an `intents:` phrase matches the transcript.
 
 Deferred to future milestones:
@@ -72,5 +72,5 @@ Deferred to future milestones:
   coverage on real Hebrew + English utterances.
 - **Phase 1g Hub MCP Server tab.** Users currently wire MCP by
   hand-editing `claude_desktop_config.json` per the manual.
-- **`lashon-recipes` GitHub org marketplace.** Wait until there's
-  an authoring community outside Lashon.
+- **`ottid-recipes` GitHub org marketplace.** Wait until there's
+  an authoring community outside Ottid.

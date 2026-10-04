@@ -6,7 +6,7 @@ fn main() {
     let protoc = protoc_bin_vendored::protoc_bin_path().expect("vendored protoc binary");
     std::env::set_var("PROTOC", protoc);
 
-    // Lashon is the gRPC client; the Python sidecar is the server.
+    // Ottid is the gRPC client; the Python sidecar is the server.
     tonic_build::configure()
         .build_server(false)
         .compile_protos(&["../proto/stt.proto"], &["../proto"])

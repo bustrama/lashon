@@ -7,7 +7,7 @@ use arboard::Clipboard;
 use serde_json::{json, Value};
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 /// Read the clipboard's current text and feed it back to the LLM.
 pub struct ClipboardGet;
@@ -24,7 +24,7 @@ impl Default for ClipboardGet {
     }
 }
 
-impl LashonTool for ClipboardGet {
+impl OttidTool for ClipboardGet {
     fn name(&self) -> &str {
         "clipboard_get"
     }
@@ -73,7 +73,7 @@ impl Default for ClipboardSet {
     }
 }
 
-impl LashonTool for ClipboardSet {
+impl OttidTool for ClipboardSet {
     fn name(&self) -> &str {
         "clipboard_set"
     }

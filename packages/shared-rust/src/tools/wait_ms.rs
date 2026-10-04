@@ -10,7 +10,7 @@ use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 /// Maximum sleep the LLM may request in a single call — keeps a
 /// runaway chain from wedging the dispatcher for minutes. 10 seconds
@@ -32,7 +32,7 @@ impl Default for WaitMs {
     }
 }
 
-impl LashonTool for WaitMs {
+impl OttidTool for WaitMs {
     fn name(&self) -> &str {
         "wait_ms"
     }

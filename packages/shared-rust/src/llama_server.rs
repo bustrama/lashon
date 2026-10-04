@@ -31,7 +31,7 @@ use crate::sidecar::{attach_to_kill_on_close_job, job_object};
 /// Environment variable that overrides the bundled `llama-server.exe`
 /// path. Set by integration tests + by developers who want to point
 /// at a freshly-built llama.cpp binary instead of the bundled one.
-pub const LLAMA_SERVER_ENV: &str = "LASHON_LLAMA_SERVER";
+pub const LLAMA_SERVER_ENV: &str = "OTTID_LLAMA_SERVER";
 
 /// How long to wait for the server's `/health` endpoint to first
 /// return `200 OK`. Cold model load (1.83 GB GGUF) plus Vulkan device
@@ -90,11 +90,11 @@ impl Drop for LlamaServer {
 
 /// Resolve where `llama-server.exe` lives.
 ///
-/// - If `LASHON_LLAMA_SERVER` is set, use that path verbatim (dev /
+/// - If `OTTID_LLAMA_SERVER` is set, use that path verbatim (dev /
 ///   integration tests).
 /// - Otherwise fall back to `bundled_exe` — the path the Tauri shell
 ///   computes from `tauri::path::resource_dir()`. Passing the resource
-///   path in here keeps `lashon-core` free of any `tauri::*` deps.
+///   path in here keeps `ottid-core` free of any `tauri::*` deps.
 pub fn resolve_server_exe(bundled_exe: PathBuf) -> Result<PathBuf> {
     if let Some(explicit) = std::env::var_os(LLAMA_SERVER_ENV) {
         let path = PathBuf::from(explicit);
@@ -241,16 +241,16 @@ pub async fn spawn(config: SpawnConfig) -> Result<LlamaServer> {
     let job = attach_to_kill_on_close_job(&child)
         .context("attaching llama-server to its kill-on-close job object")?;
 
-    // Drain stdout + stderr into Lashon's tracing. Without a reader the
+    // Drain stdout + stderr into Ottid's tracing. Without a reader the
     // piped buffers eventually fill and llama-server blocks on its next
     // write — a latent hang that would only manifest after thousands of
     // chat turns. The forwarder also parses the slot-stats lines
     // ("slot update_slots: id N | task M | … n_past = X, n_tokens = Y")
     // and re-emits them as a structured INFO event on
-    // `lashon::llama_server::slot` so the user can measure
+    // `ottid::llama_server::slot` so the user can measure
     // `--cache-reuse` (`docs/adr/0025`, PR #67) effectiveness from
-    // Lashon's own logs without grepping subprocess output. Everything
-    // else falls through to DEBUG under `lashon::llama_server`.
+    // Ottid's own logs without grepping subprocess output. Everything
+    // else falls through to DEBUG under `ottid::llama_server`.
     if let Some(stdout) = child.stdout.take() {
         forward_llama_lines(stdout, "stdout");
     }
@@ -359,7 +359,7 @@ pub async fn stop_llama_server(state: &LlamaServerState) {
 ///   `--cache-reuse N`, this is just the divergent suffix; the cached
 ///   prefix is not re-prefilled.
 ///
-/// Reuse therefore = `n_past − n_tokens`. On Lashon's typical Command-
+/// Reuse therefore = `n_past − n_tokens`. On Ottid's typical Command-
 /// mode turn (~5 K-token system prompt + ~600-token tool catalogue +
 /// growing tail), turns 2+ should show `n_tokens` ≪ `n_past`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -415,7 +415,7 @@ fn reuse_percentage(cached: u64, total: u64) -> f64 {
     (cached as f64 / total as f64) * 100.0
 }
 
-/// Pump a llama-server output pipe line-by-line into Lashon's
+/// Pump a llama-server output pipe line-by-line into Ottid's
 /// `tracing` subscriber. The task lives for the lifetime of the pipe —
 /// EOF (the server exiting) ends the loop and the spawned task
 /// returns.
@@ -434,7 +434,7 @@ fn forward_llama_lines<R: AsyncRead + Unpin + Send + 'static>(reader: R, stream:
             if let Some(stats) = parse_slot_stats(&line) {
                 let cached = stats.n_past.saturating_sub(stats.n_tokens);
                 tracing::info!(
-                    target: "lashon::llama_server::slot",
+                    target: "ottid::llama_server::slot",
                     slot = stats.slot,
                     task = stats.task,
                     prompt_tokens = stats.n_past,
@@ -445,7 +445,7 @@ fn forward_llama_lines<R: AsyncRead + Unpin + Send + 'static>(reader: R, stream:
                     "llama-server slot turn"
                 );
             } else {
-                tracing::debug!(target: "lashon::llama_server", stream, "{line}");
+                tracing::debug!(target: "ottid::llama_server", stream, "{line}");
             }
         }
     });
@@ -551,7 +551,7 @@ mod tests {
         assert!((reuse_percentage(0, 5234) - 0.0).abs() < 0.01);
         // Full reuse — divergent suffix was zero tokens (degenerate).
         assert!((reuse_percentage(5234, 5234) - 100.0).abs() < 0.01);
-        // The expected steady-state on Lashon's Command-mode chains:
+        // The expected steady-state on Ottid's Command-mode chains:
         // ~5500 cached / ~5750 total ≈ 95.6%. The whole point of
         // `--cache-reuse` is to put us in this band on turn 2+.
         assert!((reuse_percentage(5500, 5750) - 95.65).abs() < 0.05);

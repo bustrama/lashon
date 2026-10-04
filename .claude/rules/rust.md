@@ -1,13 +1,13 @@
 ---
-description: Rust conventions — the lashon-core test boundary, builds, dependency pinning
+description: Rust conventions — the ottid-core test boundary, builds, dependency pinning
 globs: ["**/*.rs", "**/Cargo.toml"]
 ---
 
 # Rust
 
-## Tests live in lashon-core
+## Tests live in ottid-core
 
-- Testable logic and its `#[test]`s live in `lashon-core`
+- Testable logic and its `#[test]`s live in `ottid-core`
   (`packages/shared-rust/`). If you are writing logic worth testing, it belongs
   there.
 - `apps/desktop/src-tauri/` is a thin shell with `test = false` — **never** add

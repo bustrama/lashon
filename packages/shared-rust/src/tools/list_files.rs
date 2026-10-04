@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 
 use super::path_safety::resolve_safe_path;
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 /// Cap on the number of entries we surface. A user's Downloads folder
 /// with 5 000 files would otherwise drown the LLM in noise; the model
@@ -28,7 +28,7 @@ impl Default for ListFiles {
     }
 }
 
-impl LashonTool for ListFiles {
+impl OttidTool for ListFiles {
     fn name(&self) -> &str {
         "list_files"
     }
@@ -173,7 +173,7 @@ mod tests {
 
     #[test]
     fn lists_a_temp_dir_and_filters_by_glob() {
-        let dir = std::env::temp_dir().join("lashon-list_files-test");
+        let dir = std::env::temp_dir().join("ottid-list_files-test");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("alpha.txt"), "a").unwrap();

@@ -7,13 +7,13 @@
 //! Run with:
 //!
 //! ```text
-//! cargo test -p lashon-core --test recipe_starters
+//! cargo test -p ottid-core --test recipe_starters
 //! ```
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use lashon_core::recipes::{validate_recipe, IntentMatcher, Recipe, RegexMatcher};
+use ottid_core::recipes::{validate_recipe, IntentMatcher, Recipe, RegexMatcher};
 
 /// `<repo>/recipes/starters`. `CARGO_MANIFEST_DIR` is
 /// `<repo>/packages/shared-rust`, so the relative path traverses up two

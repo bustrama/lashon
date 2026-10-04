@@ -1,5 +1,5 @@
 {
-  "_comment": "Hardware tier -> default-model map. Encodes the hardware tiers in docs/tech-stack.md. Tier detection runs at onboarding (tiers are tested A, then B, then C, then D); the user may override and Lashon never silently downgrades.",
+  "_comment": "Hardware tier -> default-model map. Encodes the hardware tiers in docs/tech-stack.md. Tier detection runs at onboarding (tiers are tested A, then B, then C, then D); the user may override and Ottid never silently downgrades.",
   "tiers": {
     "A": {
       "name": "Studio",

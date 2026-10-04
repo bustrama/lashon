@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 
 use super::path_safety::resolve_safe_path;
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 pub struct FileMove;
 
@@ -23,7 +23,7 @@ impl Default for FileMove {
     }
 }
 
-impl LashonTool for FileMove {
+impl OttidTool for FileMove {
     fn name(&self) -> &str {
         "file_move"
     }
@@ -175,7 +175,7 @@ mod tests {
         } else {
             "/etc/hostname"
         };
-        let tmp = std::env::temp_dir().join("lashon-file_move-target");
+        let tmp = std::env::temp_dir().join("ottid-file_move-target");
         let result = rt()
             .block_on(FileMove.execute(&json!({"from": from, "to": tmp.to_str().unwrap()})))
             .unwrap();
@@ -185,8 +185,8 @@ mod tests {
 
     #[test]
     fn moves_a_temp_file() {
-        let from = std::env::temp_dir().join("lashon-file_move-src.txt");
-        let to = std::env::temp_dir().join("lashon-file_move-dst.txt");
+        let from = std::env::temp_dir().join("ottid-file_move-src.txt");
+        let to = std::env::temp_dir().join("ottid-file_move-dst.txt");
         let _ = std::fs::remove_file(&from);
         let _ = std::fs::remove_file(&to);
         std::fs::write(&from, "payload").unwrap();

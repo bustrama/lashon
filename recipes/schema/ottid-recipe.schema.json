@@ -118,7 +118,7 @@
       "type": "object"
     },
     "Step": {
-      "description": "A single OS-UI primitive. The `type:` discriminator carries the\nvariant tag in YAML.\n\nLashon-specific design notes:\n- `rtl_safe: true` on a `type_unicode` step routes via the clipboard\n  path instead of synthetic keypresses — Electron apps mangle\n  synthetic BiDi otherwise (`.claude/rules/hebrew.md`).\n- `click_label.ocr_fallback: true` declares intent; Phase 1 doesn't\n  ship the OCR adapter, Phase 2 does. The validator accepts the\n  flag now so authors don't have to bump the schema later.\n- `run_shell` always requires the `shell.run` permission and gates\n  on the same confirmation modal as the Command-mode `run_command`\n  tool. v1 honours `timeout_ms` and `capture_into`.",
+      "description": "A single OS-UI primitive. The `type:` discriminator carries the\nvariant tag in YAML.\n\nOttid-specific design notes:\n- `rtl_safe: true` on a `type_unicode` step routes via the clipboard\n  path instead of synthetic keypresses — Electron apps mangle\n  synthetic BiDi otherwise (`.claude/rules/hebrew.md`).\n- `click_label.ocr_fallback: true` declares intent; Phase 1 doesn't\n  ship the OCR adapter, Phase 2 does. The validator accepts the\n  flag now so authors don't have to bump the schema later.\n- `run_shell` always requires the `shell.run` permission and gates\n  on the same confirmation modal as the Command-mode `run_command`\n  tool. v1 honours `timeout_ms` and `capture_into`.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -493,7 +493,7 @@
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "A `recipe.yaml`. Top-level fields are split between identity (the\nAgent-Skills-shaped envelope) and behaviour (Goose-shaped\n`parameters:` + Lashon-shaped `os_steps:`).",
+  "description": "A `recipe.yaml`. Top-level fields are split between identity (the\nAgent-Skills-shaped envelope) and behaviour (Goose-shaped\n`parameters:` + Ottid-shaped `os_steps:`).",
   "properties": {
     "author": {
       "description": "Recipe author / maintainer. Free-text; not parsed.",

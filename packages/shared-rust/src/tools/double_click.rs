@@ -7,7 +7,7 @@ use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 pub struct DoubleClick;
 
@@ -23,7 +23,7 @@ impl Default for DoubleClick {
     }
 }
 
-impl LashonTool for DoubleClick {
+impl OttidTool for DoubleClick {
     fn name(&self) -> &str {
         "double_click"
     }

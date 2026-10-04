@@ -3,7 +3,7 @@
 //! Pipeline:
 //!
 //! 1. The dictation worker produces a transcript (Hebrew or English).
-//! 2. The dispatcher builds a system prompt — Lashon identity, OS, date,
+//! 2. The dispatcher builds a system prompt — Ottid identity, OS, date,
 //!    UI language, and the registered tools' names + descriptions.
 //! 3. `LLMProvider::chat` runs with `[system, user]` messages and the
 //!    full `tools` array.
@@ -32,7 +32,7 @@ use crate::llm::{ContentBlock, LLMProvider, Msg, MsgContent, Role};
 use crate::tool::{ConfirmDecision, ToolRegistry, ToolResult};
 
 /// Whether opt-in tool-arg + result-content logging is enabled. Reads
-/// `LASHON_DEBUG_TOOL_ARGS` once and caches the answer for the process
+/// `OTTID_DEBUG_TOOL_ARGS` once and caches the answer for the process
 /// lifetime — restart the app to flip the flag.
 ///
 /// **Off by default** so the security rule (`.claude/rules/security.md`:
@@ -41,8 +41,8 @@ use crate::tool::{ConfirmDecision, ToolRegistry, ToolResult};
 /// debugger-of-the-day: when a tool chain mis-fires the way Claude
 /// Haiku did on the Discord case (open_app reported success but no
 /// window appeared), the arg-key + result-length log isn't enough to
-/// localise the failure. Set `LASHON_DEBUG_TOOL_ARGS=1` in the shell
-/// you launch Lashon from, reproduce, then unset and restart.
+/// localise the failure. Set `OTTID_DEBUG_TOOL_ARGS=1` in the shell
+/// you launch Ottid from, reproduce, then unset and restart.
 ///
 /// Accepted truthy values: `1`, `true`, `yes` (case-insensitive). Any
 /// other value (including unset) leaves the flag off.
@@ -50,7 +50,7 @@ pub fn debug_tool_args_enabled() -> bool {
     use std::sync::OnceLock;
     static CACHE: OnceLock<bool> = OnceLock::new();
     *CACHE.get_or_init(|| {
-        match std::env::var("LASHON_DEBUG_TOOL_ARGS")
+        match std::env::var("OTTID_DEBUG_TOOL_ARGS")
             .ok()
             .as_deref()
             .map(str::to_ascii_lowercase)
@@ -154,7 +154,7 @@ impl ConfirmHandler for AlwaysDeny {
 }
 
 /// User-visible progress emitted around each LLM round-trip and tool
-/// call. Lashon's tongue listens for these and renders a "thinking"
+/// call. Ottid's tongue listens for these and renders a "thinking"
 /// indicator + a per-tool status flash, so the user never sits through
 /// a silent gap wondering whether anything is happening
 /// (`docs/roadmap.md §2.7`, the M8.1 UX feedback ask).
@@ -214,7 +214,7 @@ pub fn build_system_prompt(
 ) -> String {
     let mut prompt = String::with_capacity(1024);
     prompt.push_str(
-        "You are Lashon — a local-first Hebrew voice assistant. You execute commands \
+        "You are Ottid — a local-first Hebrew voice assistant. You execute commands \
          on the user's machine via the tools below. Follow these rules strictly:\n\n",
     );
     prompt.push_str(&format!("- Current OS: {os}\n"));
@@ -334,7 +334,7 @@ pub fn build_system_prompt(
              - `list_files({ path: \"~/Downloads\", pattern: \"Screenshot*\" })` \
                 (to find the actual file name) →\n\
              - `file_delete({ path: \"~/Downloads/Screenshot 2026-05-25 …png\" })` \
-                — Lashon shows the confirmation modal at this point. The \
+                — Ottid shows the confirmation modal at this point. The \
                 tool returns either \"deleted\" or the user-denied \
                 short-circuit message. Either way, do not retry. If the \
                 user denies, acknowledge politely (\"בסדר, לא מחקתי\"); \
@@ -648,7 +648,7 @@ async fn execute_call(
     // rule. Keys leak nothing — they're already in the static tool
     // schema.
     //
-    // When `LASHON_DEBUG_TOOL_ARGS=1` the dispatcher additionally
+    // When `OTTID_DEBUG_TOOL_ARGS=1` the dispatcher additionally
     // logs the full arg JSON. See `debug_tool_args_enabled()` for the
     // why and the security trade-off.
     let arg_keys: Vec<&str> = call

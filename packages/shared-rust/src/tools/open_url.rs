@@ -7,7 +7,7 @@ use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 /// Default search-engine URL template. `{query}` is replaced with the
 /// percent-encoded search terms. DuckDuckGo is the default — no account
@@ -29,7 +29,7 @@ impl Default for OpenUrl {
     }
 }
 
-impl LashonTool for OpenUrl {
+impl OttidTool for OpenUrl {
     fn name(&self) -> &str {
         "open_url"
     }
@@ -86,7 +86,7 @@ impl Default for WebSearch {
     }
 }
 
-impl LashonTool for WebSearch {
+impl OttidTool for WebSearch {
     fn name(&self) -> &str {
         "web_search"
     }

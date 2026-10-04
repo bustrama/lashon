@@ -16,7 +16,7 @@ pub const SCHEMA_VERSION: u32 = 1;
 
 /// A `recipe.yaml`. Top-level fields are split between identity (the
 /// Agent-Skills-shaped envelope) and behaviour (Goose-shaped
-/// `parameters:` + Lashon-shaped `os_steps:`).
+/// `parameters:` + Ottid-shaped `os_steps:`).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Recipe {
@@ -129,7 +129,7 @@ pub struct OsSteps {
 /// A single OS-UI primitive. The `type:` discriminator carries the
 /// variant tag in YAML.
 ///
-/// Lashon-specific design notes:
+/// Ottid-specific design notes:
 /// - `rtl_safe: true` on a `type_unicode` step routes via the clipboard
 ///   path instead of synthetic keypresses — Electron apps mangle
 ///   synthetic BiDi otherwise (`.claude/rules/hebrew.md`).

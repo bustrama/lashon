@@ -1,5 +1,5 @@
 //! Integration tests for the M9 Phase 1b recipe runtime
-//! (`lashon_core::recipes::runtime`).
+//! (`ottid_core::recipes::runtime`).
 //!
 //! Exercises the executor end-to-end with [`AlwaysAllow`] / [`AlwaysDeny`]
 //! confirmation handlers on flows that don't touch the desktop —
@@ -12,7 +12,7 @@
 
 use std::collections::HashMap;
 
-use lashon_core::recipes::{
+use ottid_core::recipes::{
     execute_recipe_for_os, AlwaysAllow, AlwaysDeny, OsSteps, Recipe, RuntimeError, Step,
 };
 
@@ -59,10 +59,10 @@ async fn clipboard_write_then_read_round_trips_through_runtime() {
     // Ubuntu CI ("X11 server connection timed out") and there's no
     // useful headless clipboard backend. Same posture as
     // `tests/inject.rs`'s ignored test. Run on a desktop with:
-    // `cargo test -p lashon-core --test recipe_runtime -- --ignored`.
+    // `cargo test -p ottid-core --test recipe_runtime -- --ignored`.
     let recipe = recipe_with_windows_steps(vec![
         Step::ClipboardSet {
-            text: "lashon-runtime-integration-sentinel".into(),
+            text: "ottid-runtime-integration-sentinel".into(),
             comment: None,
         },
         Step::ClipboardGetInto {
@@ -76,7 +76,7 @@ async fn clipboard_write_then_read_round_trips_through_runtime() {
     assert_eq!(run.steps_executed, 2);
     assert_eq!(
         run.variables.get("stash").map(String::as_str),
-        Some("lashon-runtime-integration-sentinel"),
+        Some("ottid-runtime-integration-sentinel"),
         "clipboard_get_into must populate the named recipe var"
     );
 }

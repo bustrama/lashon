@@ -11,7 +11,7 @@ long_description: |
   (#, &, ?) may break in unusual ways. A Phase 2 step type could add
   encoding. For the common case (plain words, Hebrew text, spaces) the
   browser tolerates the input.
-author: Lashon contributors
+author: Ottid contributors
 recipe_version: 1.0.0
 tags:
   - browser

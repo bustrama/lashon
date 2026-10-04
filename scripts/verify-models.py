@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download, record, and verify Lashon's model weights.
+"""Download, record, and verify Ottid's model weights.
 
 Model weights are never committed; `models/manifests/*.json` is the source of
 truth for what to fetch and how to verify it.
@@ -114,7 +114,7 @@ def verify(model: dict) -> bool:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Download/verify Lashon models.")
+    parser = argparse.ArgumentParser(description="Download/verify Ottid models.")
     parser.add_argument("--download", action="store_true", help="download before verifying")
     parser.add_argument(
         "--record",

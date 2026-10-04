@@ -7,7 +7,7 @@ use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 use serde_json::{json, Value};
 
 use crate::llm::BoxFuture;
-use crate::tool::{LashonTool, ToolResult};
+use crate::tool::{OttidTool, ToolResult};
 
 pub struct PressKeys;
 
@@ -23,7 +23,7 @@ impl Default for PressKeys {
     }
 }
 
-impl LashonTool for PressKeys {
+impl OttidTool for PressKeys {
     fn name(&self) -> &str {
         "press_keys"
     }

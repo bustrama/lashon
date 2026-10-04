@@ -1,77 +1,40 @@
-//! `lashon-recipe` — CLI driver for the M9 Phase 1b recipe runtime.
+//! `ottid-recipe` — CLI driver for the M9 Phase 1b recipe runtime.
 //!
 //! Locates a recipe by id under either the bundled starters
 //! (`recipes/starters/` in dev / `<install>/recipes/` packaged) or the
-//! per-user dir (`<data-local>/lashon/recipes/`), parses + validates
+//! per-user dir (`<data-local>/ottid/recipes/`), parses + validates
 //! it, fills slots from `--<key>=<value>` argv flags, and executes via
-//! `lashon_core::recipes::execute_recipe`. Run-shell steps are denied
+//! `ottid_core::recipes::execute_recipe`. Run-shell steps are denied
 //! unless `--allow-shell` is passed (matches the safe default the MCP
 //! `run_recipe` tool will adopt in its follow-up PR).
 //!
 //! Usage:
 //!
 //! ```text
-//! lashon-recipe send-discord-message --recipient=kuki --body="hi there"
-//! lashon-recipe lock-workstation
-//! lashon-recipe batch-rename-files --directory=C:\tmp \
+//! ottid-recipe send-discord-message --recipient=kuki --body="hi there"
+//! ottid-recipe lock-workstation
+//! ottid-recipe batch-rename-files --directory=C:\tmp \
 //!     --pattern="*.txt" --find=old --replace=new --allow-shell
-//! lashon-recipe --list
+//! ottid-recipe --list
 //! ```
 //!
-//! Lives next to `lashon-mcp` (the stdio MCP server binary, ADR-0028)
+//! Lives next to `ottid-mcp` (the stdio MCP server binary, ADR-0028)
 //! under the `mcp-server` feature only because both are
 //! optional-by-feature; the recipe runtime itself is feature-free.
-//! Reuses the same `LASHON_BUNDLED_RECIPES_DIR` / `LASHON_USER_RECIPES_DIR`
-//! env-var overrides ADR-0028 introduced.
+//! Resolves both recipe dirs exactly as the MCP server does (same
+//! `OTTID_BUNDLED_RECIPES_DIR` / `OTTID_USER_RECIPES_DIR` overrides,
+//! ADR-0028), including the pre-rename recipes carry-over.
 
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use anyhow::{anyhow, bail, Result};
 
-use lashon_core::recipes::{
+use ottid_core::mcp::recipe_tools::{bundled_recipes_dir, user_recipes_dir};
+use ottid_core::recipes::{
     execute_recipe, AlwaysAllow, AlwaysDeny, ConfirmDecision, ConfirmHandler, Recipe, RuntimeError,
 };
-
-/// `LASHON_BUNDLED_RECIPES_DIR` (with cargo-dev fallback) — mirrors
-/// the constant the MCP server uses so the two binaries find the same
-/// starters when both are installed alongside the Tauri shell.
-fn bundled_recipes_dir() -> PathBuf {
-    if let Some(path) = std::env::var_os("LASHON_BUNDLED_RECIPES_DIR") {
-        return PathBuf::from(path);
-    }
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../recipes/starters")
-}
-
-fn user_recipes_dir() -> PathBuf {
-    if let Some(path) = std::env::var_os("LASHON_USER_RECIPES_DIR") {
-        return PathBuf::from(path);
-    }
-    user_data_local_dir().join("lashon").join("recipes")
-}
-
-#[cfg(target_os = "windows")]
-fn user_data_local_dir() -> PathBuf {
-    std::env::var_os("LOCALAPPDATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."))
-}
-
-#[cfg(target_os = "macos")]
-fn user_data_local_dir() -> PathBuf {
-    std::env::var_os("HOME")
-        .map(|h| PathBuf::from(h).join("Library/Application Support"))
-        .unwrap_or_else(|| PathBuf::from("."))
-}
-
-#[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
-fn user_data_local_dir() -> PathBuf {
-    std::env::var_os("XDG_DATA_HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")))
-        .unwrap_or_else(|| PathBuf::from("."))
-}
 
 /// Resolve a recipe by id. Walks the bundled + user dirs and matches
 /// on the recipe's `id:` field rather than the directory name —
@@ -142,11 +105,11 @@ fn list_all() -> Result<()> {
 
 fn print_usage() {
     eprintln!(
-        "lashon-recipe — run a Lashon recipe from the CLI
+        "ottid-recipe — run an Ottid recipe from the CLI
 
 usage:
-  lashon-recipe <id> [--key=value ...]
-  lashon-recipe --list
+  ottid-recipe <id> [--key=value ...]
+  ottid-recipe --list
 
 flags:
   --list           list installed recipes (bundled + per-user)
@@ -154,11 +117,11 @@ flags:
   --help, -h       this message
 
 env vars:
-  LASHON_BUNDLED_RECIPES_DIR   override the bundled starters dir
-  LASHON_USER_RECIPES_DIR      override the per-user recipes dir
+  OTTID_BUNDLED_RECIPES_DIR   override the bundled starters dir
+  OTTID_USER_RECIPES_DIR      override the per-user recipes dir
 
 example:
-  lashon-recipe send-discord-message --recipient=kuki --body=\"hi\""
+  ottid-recipe send-discord-message --recipient=kuki --body=\"hi\""
     );
 }
 
@@ -221,7 +184,7 @@ async fn main() -> Result<()> {
     let recipe: Recipe = serde_yaml_ng::from_str(&body)?;
 
     eprintln!(
-        "lashon-recipe: running {id} ({} steps, allow_shell={allow_shell})",
+        "ottid-recipe: running {id} ({} steps, allow_shell={allow_shell})",
         recipe
             .os_steps
             .windows
@@ -242,10 +205,7 @@ async fn main() -> Result<()> {
 
     match execute_recipe(&recipe, slots, confirm.as_ref()).await {
         Ok(run) => {
-            eprintln!(
-                "lashon-recipe: done — {} steps executed",
-                run.steps_executed
-            );
+            eprintln!("ottid-recipe: done — {} steps executed", run.steps_executed);
             Ok(())
         }
         Err(RuntimeError::Denied { kind, .. }) => {

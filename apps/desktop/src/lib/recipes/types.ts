@@ -10,7 +10,7 @@
 
 /**
  * One row in the listing returned by the `list_recipes_for_hub`
- * Tauri command. Mirrors `lashon_core::recipes::storage::HubRecipeListing`.
+ * Tauri command. Mirrors `ottid_core::recipes::storage::HubRecipeListing`.
  */
 export type HubRecipeListing = {
 	id: string;
@@ -29,13 +29,13 @@ export type HubRecipeListing = {
 	parse_error: string | null;
 };
 
-/** The shape of `lashon_core::recipes::ParameterType` over the wire. */
+/** The shape of `ottid_core::recipes::ParameterType` over the wire. */
 export type ParameterType = 'string' | 'number' | 'boolean' | 'file' | 'date';
 
-/** The shape of `lashon_core::recipes::ParameterRequirement`. */
+/** The shape of `ottid_core::recipes::ParameterRequirement`. */
 export type ParameterRequirement = 'required' | 'optional' | 'user_prompt';
 
-/** The shape of `lashon_core::recipes::Parameter`. */
+/** The shape of `ottid_core::recipes::Parameter`. */
 export type Parameter = {
 	key: string;
 	input_type: ParameterType;
@@ -44,7 +44,7 @@ export type Parameter = {
 	default: unknown;
 };
 
-/** Tagged-union mirror of `lashon_core::recipes::Step`. The
+/** Tagged-union mirror of `ottid_core::recipes::Step`. The
  *  discriminator is the `type` field (snake_case to match the YAML
  *  representation). Every variant carries the optional `comment`
  *  field. Adding a new variant in Rust requires adding it here too —
@@ -111,7 +111,7 @@ export const STEP_VARIANTS = [
 ] as const;
 export type StepVariant = (typeof STEP_VARIANTS)[number];
 
-/** Mirrors `lashon_core::recipes::Recipe` — the get_recipe return. */
+/** Mirrors `ottid_core::recipes::Recipe` — the get_recipe return. */
 export type Recipe = {
 	version: number;
 	id: string;
