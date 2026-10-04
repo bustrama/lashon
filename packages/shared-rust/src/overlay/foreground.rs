@@ -11,6 +11,14 @@
 //! and [`Foreground::give_back`] puts it back afterwards. It only undoes the
 //! overlay's own activation: if the user clicked into another app to close
 //! the menu, that app stays in front.
+//!
+//! An item that opens a window (Settings, the tutorial, the logs folder)
+//! keeps the front instead. Handing it to the user's app first would flash
+//! that app, and the new window would then have to take the front from
+//! another process, which Windows may refuse. [`Handback`] holds the
+//! give-back until the item picked is known.
+
+use std::sync::Mutex;
 
 /// The window that was in front before the overlay's menu opened.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,7 +34,55 @@ impl Foreground {
     /// Bring this window to the front again if the overlay, whose native
     /// handle is `overlay`, is still in front. Returns whether it did.
     pub fn give_back(self, overlay: isize) -> bool {
-        should_give_back(self.0, imp::foreground(), overlay) && imp::bring_to_front(self.0)
+        if !should_give_back(self.0, imp::foreground(), overlay) {
+            return false;
+        }
+        let given = imp::bring_to_front(self.0);
+        if !given {
+            // The next dictation would type into the overlay. No window
+            // titles: they can hold document names.
+            tracing::warn!("could not give the foreground back after the overlay's menu");
+        }
+        given
+    }
+}
+
+/// A give-back waiting for the overlay menu's outcome.
+///
+/// [`arm`](Self::arm) it before the menu opens. Once the item picked is
+/// known, [`settle`](Self::settle) it exactly once; later calls find nothing
+/// to do.
+#[derive(Debug, Default)]
+pub struct Handback(Mutex<Option<(Foreground, isize)>>);
+
+impl Handback {
+    /// Hold a give-back to `previous` from the overlay, whose native handle
+    /// is `overlay`.
+    pub fn arm(&self, previous: Foreground, overlay: isize) {
+        *self.lock() = Some((previous, overlay));
+    }
+
+    /// Settle the give-back held, if any: drop it when the item picked
+    /// keeps the front (it opens a window), and give the front back
+    /// otherwise. Returns whether the front was given back.
+    pub fn settle(&self, keep_front: bool) -> bool {
+        let Some((previous, overlay)) = self.lock().take() else {
+            return false;
+        };
+        !keep_front && previous.give_back(overlay)
+    }
+
+    /// Whether a give-back is held.
+    pub fn is_armed(&self) -> bool {
+        self.lock().is_some()
+    }
+
+    fn lock(&self) -> std::sync::MutexGuard<'_, Option<(Foreground, isize)>> {
+        // The value is a plain pair, always whole: a panic elsewhere while
+        // the lock was held leaves nothing half-written.
+        self.0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 }
 
@@ -98,5 +154,43 @@ mod tests {
     #[test]
     fn never_gives_the_foreground_to_the_overlay() {
         assert!(!should_give_back(OVERLAY, Some(OVERLAY), OVERLAY));
+    }
+
+    // The handles below are made up and never in front, so `give_back`
+    // stops at `should_give_back` and no real window is touched.
+
+    #[test]
+    fn a_handback_holds_nothing_until_armed() {
+        let handback = Handback::default();
+        assert!(!handback.is_armed());
+        assert!(!handback.settle(false));
+    }
+
+    #[test]
+    fn an_item_that_opens_a_window_drops_the_handback() {
+        let handback = Handback::default();
+        handback.arm(Foreground(APP), OVERLAY);
+        assert!(handback.is_armed());
+        assert!(!handback.settle(true));
+        assert!(!handback.is_armed());
+    }
+
+    #[test]
+    fn a_handback_settles_once() {
+        // The menu event can reach the handler twice, and the fallback for
+        // a menu closed without a pick always runs after it.
+        let handback = Handback::default();
+        handback.arm(Foreground(APP), OVERLAY);
+        handback.settle(false);
+        assert!(!handback.is_armed());
+        assert!(!handback.settle(false));
+    }
+
+    #[test]
+    fn a_new_menu_replaces_a_handback_still_held() {
+        let handback = Handback::default();
+        handback.arm(Foreground(APP), OVERLAY);
+        handback.arm(Foreground(OTHER), OVERLAY);
+        assert_eq!(*handback.lock(), Some((Foreground(OTHER), OVERLAY)));
     }
 }
