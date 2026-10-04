@@ -737,6 +737,36 @@ mod tests {
     }
 
     #[test]
+    fn names_keep_every_hebrew_punctuation_mark() {
+        // The maqaf, paseq, sof pasuq, nun hafukha, geresh and gershayim.
+        let gc = CodePointMapData::<GeneralCategory>::new();
+        let marks: Vec<char> = ('\u{0591}'..='\u{05F4}')
+            .filter(|&c| {
+                matches!(
+                    gc.get(c),
+                    GeneralCategory::DashPunctuation | GeneralCategory::OtherPunctuation
+                )
+            })
+            .collect();
+        assert_eq!(
+            marks,
+            ['\u{05BE}', '\u{05C0}', '\u{05C3}', '\u{05C6}', '\u{05F3}', '\u{05F4}']
+        );
+        for mark in marks {
+            let name = format!("\u{05D0}{mark}\u{05D1}");
+            let mut v = default_value();
+            v["name"]["he"] = serde_json::json!(name);
+            assert!(validate_value(&v).is_ok(), "U+{:04X}", mark as u32);
+        }
+        // As written: a geresh in a borrowed sound, gershayim in an acronym.
+        for name in ["צ\u{05F3}יפס", "צה\u{05F4}ל"] {
+            let mut v = default_value();
+            v["name"]["he"] = serde_json::json!(name);
+            assert!(validate_value(&v).is_ok(), "{name:?}");
+        }
+    }
+
+    #[test]
     fn collects_every_out_of_range_number() {
         let mut v = default_value();
         v["body"]["radius_x"] = serde_json::json!(80);
