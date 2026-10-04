@@ -133,8 +133,12 @@ async fn install_wake_model(id: String) -> Result<String, String> {
 /// The menu brings the overlay to the front (Windows closes a popup on a
 /// click elsewhere only when its owner is in front). The front goes back to
 /// the user's app once the item is known, or the next dictation types into
-/// the overlay; an item that opens a window keeps it instead (see
-/// `ottid_core::overlay::Handback`).
+/// the overlay. The exceptions open a window that takes the front instead.
+/// Settings and Tutorial open one of ours, and the front goes back after
+/// them only if it couldn't take it. The logs folder opens in the file
+/// manager in its own time, so the front is left for it, unless the folder
+/// couldn't be opened. See `handle_menu_event` and
+/// `ottid_core::overlay::Handback`.
 #[tauri::command]
 fn show_tongue_menu(window: tauri::Window, menu: tauri::State<'_, Menu<tauri::Wry>>) {
     use tauri::menu::ContextMenu;
