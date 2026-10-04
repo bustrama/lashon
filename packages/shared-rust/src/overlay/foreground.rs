@@ -52,35 +52,78 @@ impl Foreground {
 ///
 /// [`arm`](Self::arm) it before the menu opens. Once the item picked is
 /// known, [`settle`](Self::settle) it exactly once; later calls find nothing
-/// to do.
+/// to do. A late settlement for one menu uses [`settle_if`](Self::settle_if),
+/// so it can't settle a menu opened since.
 #[derive(Debug, Default)]
-pub struct Handback(Mutex<Option<(Foreground, isize)>>);
+pub struct Handback(Mutex<Held>);
+
+#[derive(Debug, Default)]
+struct Held {
+    /// The last menu armed: menus are numbered from 1.
+    menus: u64,
+    pending: Option<Pending>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Pending {
+    menu: u64,
+    previous: Foreground,
+    overlay: isize,
+}
 
 impl Handback {
     /// Hold a give-back to `previous` from the overlay, whose native handle
-    /// is `overlay`.
-    pub fn arm(&self, previous: Foreground, overlay: isize) {
-        *self.lock() = Some((previous, overlay));
+    /// is `overlay`, replacing any still held. Returns the menu's number,
+    /// for [`settle_if`](Self::settle_if).
+    pub fn arm(&self, previous: Foreground, overlay: isize) -> u64 {
+        let mut held = self.lock();
+        held.menus += 1;
+        let menu = held.menus;
+        held.pending = Some(Pending {
+            menu,
+            previous,
+            overlay,
+        });
+        menu
     }
 
     /// Settle the give-back held, if any: drop it when the item picked
     /// keeps the front (it opens a window), and give the front back
     /// otherwise. Returns whether the front was given back.
     pub fn settle(&self, keep_front: bool) -> bool {
-        let Some((previous, overlay)) = self.lock().take() else {
-            return false;
+        let pending = self.lock().pending.take();
+        Self::carry_out(pending, keep_front)
+    }
+
+    /// [`settle`](Self::settle), if the give-back held is menu `menu`'s.
+    /// Another menu's stays held.
+    pub fn settle_if(&self, menu: u64, keep_front: bool) -> bool {
+        let pending = {
+            let mut held = self.lock();
+            match held.pending {
+                Some(pending) if pending.menu == menu => held.pending.take(),
+                _ => None,
+            }
         };
-        !keep_front && previous.give_back(overlay)
+        Self::carry_out(pending, keep_front)
     }
 
     /// Whether a give-back is held.
     pub fn is_armed(&self) -> bool {
-        self.lock().is_some()
+        self.lock().pending.is_some()
     }
 
-    fn lock(&self) -> std::sync::MutexGuard<'_, Option<(Foreground, isize)>> {
-        // The value is a plain pair, always whole: a panic elsewhere while
-        // the lock was held leaves nothing half-written.
+    /// Give the front back for `pending`, outside the lock.
+    fn carry_out(pending: Option<Pending>, keep_front: bool) -> bool {
+        match pending {
+            Some(p) if !keep_front => p.previous.give_back(p.overlay),
+            _ => false,
+        }
+    }
+
+    fn lock(&self) -> std::sync::MutexGuard<'_, Held> {
+        // The value is plain data, always whole: a panic elsewhere while the
+        // lock was held leaves nothing half-written.
         self.0
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -190,8 +233,42 @@ mod tests {
     #[test]
     fn a_new_menu_replaces_a_handback_still_held() {
         let handback = Handback::default();
-        handback.arm(Foreground(APP), OVERLAY);
-        handback.arm(Foreground(OTHER), OVERLAY);
-        assert_eq!(*handback.lock(), Some((Foreground(OTHER), OVERLAY)));
+        let first = handback.arm(Foreground(APP), OVERLAY);
+        let second = handback.arm(Foreground(OTHER), OVERLAY);
+        assert!(second > first);
+        assert_eq!(
+            handback.lock().pending,
+            Some(Pending {
+                menu: second,
+                previous: Foreground(OTHER),
+                overlay: OVERLAY
+            })
+        );
+    }
+
+    #[test]
+    fn a_late_settlement_leaves_a_newer_menu_alone() {
+        // The first menu closed without a pick; before its fallback ran,
+        // the user opened a second one.
+        let handback = Handback::default();
+        let first = handback.arm(Foreground(APP), OVERLAY);
+        let second = handback.arm(Foreground(APP), OVERLAY);
+        assert!(!handback.settle_if(first, false));
+        assert!(handback.is_armed());
+        // The second menu's own settlement still finds it.
+        handback.settle_if(second, false);
+        assert!(!handback.is_armed());
+    }
+
+    #[test]
+    fn a_settlement_for_its_own_menu_settles_it() {
+        let handback = Handback::default();
+        let menu = handback.arm(Foreground(APP), OVERLAY);
+        handback.settle_if(menu, true);
+        assert!(!handback.is_armed());
+        // Already settled by the item picked: the fallback finds nothing.
+        let menu = handback.arm(Foreground(APP), OVERLAY);
+        handback.settle(false);
+        assert!(!handback.settle_if(menu, false));
     }
 }

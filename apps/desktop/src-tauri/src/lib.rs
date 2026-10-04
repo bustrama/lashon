@@ -138,29 +138,36 @@ fn show_tongue_menu(window: tauri::Window, menu: tauri::State<'_, Menu<tauri::Wr
     use tauri::menu::ContextMenu;
     let app = window.app_handle().clone();
     #[cfg(windows)]
-    {
+    let armed = {
         let overlay = window.hwnd().ok().map(|hwnd| hwnd.0 as isize);
-        if let (Some(previous), Some(overlay)) =
-            (ottid_core::overlay::Foreground::remember(), overlay)
-        {
-            app.state::<ottid_core::overlay::Handback>()
-                .arm(previous, overlay);
+        match (ottid_core::overlay::Foreground::remember(), overlay) {
+            (Some(previous), Some(overlay)) => Some(
+                app.state::<ottid_core::overlay::Handback>()
+                    .arm(previous, overlay),
+            ),
+            _ => None,
         }
-    }
+    };
+    #[cfg(not(windows))]
+    let armed: Option<u64> = None;
     if let Err(err) = menu.popup(window) {
         tracing::warn!("could not show the tongue context menu: {err:#}");
     }
+    let Some(armed) = armed else {
+        return;
+    };
     // The menu library sends the item picked to the event loop before
     // `popup` returns, and `handle_menu_event` settles the give-back for it.
     // A menu closed without a pick sends nothing: settle it from a task
     // queued behind that event. (`run_on_main_thread` would run it at once
-    // on this thread, so it is sent from another.)
+    // on this thread, so it is sent from another.) Only this menu's: the
+    // task may run after the user has opened the menu again.
     tauri::async_runtime::spawn(async move {
         let handle = app.clone();
         if let Err(err) = app.run_on_main_thread(move || {
             handle
                 .state::<ottid_core::overlay::Handback>()
-                .settle(false);
+                .settle_if(armed, false);
         }) {
             tracing::warn!("could not settle the overlay menu's foreground: {err:#}");
         }
