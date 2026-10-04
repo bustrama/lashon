@@ -174,6 +174,39 @@ describe('segments', () => {
 		]);
 	});
 
+	it('keeps a fully pointed and accented letter whole', () => {
+		// Shin with dagesh, shin dot, qamats, meteg and an accent: five marks.
+		const text = 'שָּֽׁ֑ה';
+		expect(segments(text)).toEqual([{ kind: 'text', text }]);
+	});
+
+	it('shows marks stacked past what a letter takes', () => {
+		// A sixth mark, and every one after it.
+		expect(segments('שָּֽׁ֑֒֓')).toEqual([
+			{ kind: 'text', text: 'שָּֽׁ֑' },
+			{ kind: 'hidden', code: 'U+0592' },
+			{ kind: 'hidden', code: 'U+0593' }
+		]);
+		// The next letter starts its own count.
+		expect(segments('בָּֽ֑֥גָּ')).toEqual([
+			{ kind: 'text', text: 'בָּֽ֑֥גָּ' }
+		]);
+	});
+
+	it('shows the same mark twice on a letter', () => {
+		expect(segments('בּּ')).toEqual([
+			{ kind: 'text', text: 'בּ' },
+			{ kind: 'hidden', code: 'U+05BC' }
+		]);
+		// A tall stack of one vowel draws one, and shows the rest.
+		expect(segments('ב' + 'ָ'.repeat(4))).toEqual([
+			{ kind: 'text', text: 'בָ' },
+			{ kind: 'hidden', code: 'U+05B8' },
+			{ kind: 'hidden', code: 'U+05B8' },
+			{ kind: 'hidden', code: 'U+05B8' }
+		]);
+	});
+
 	it('returns nothing for empty text', () => {
 		expect(segments('')).toEqual([]);
 	});

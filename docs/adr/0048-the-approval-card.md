@@ -96,7 +96,11 @@ its own, so a frontend bug or a hotkey cannot get round them.
     disguises what it is drawn on (`=` with U+0338 looks like `≠`), and a
     decomposed accent is a different file name from the composed one.
 
-  Niqqud, dagesh and cantillation on a Hebrew letter show as they are.
+  Niqqud, dagesh and cantillation on a Hebrew letter show as they are, up
+  to five different marks on a letter: a dagesh or mappiq, a shin or sin
+  dot, a vowel, a meteg and an accent. A mark repeated on the letter, or
+  one past five, is a badge too, since a tall stack of marks draws over the
+  lines around it.
 - **Direction.** The text is shown left to right, in its own bidi isolate
   inside the RTL interface, and in the order it runs. Ordinary bidi would
   reorder a command line around its Hebrew words: `Copy-Item "דוח" "ארכיון"`

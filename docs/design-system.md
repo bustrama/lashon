@@ -117,7 +117,8 @@ later an agent, the island shows the approval card
 - **Hidden characters show by code point.** A bidi override, a zero-width
   character, a look-alike space or filler, or a combining mark that isn't on
   a Hebrew letter is drawn as a small `--saffron` badge such as `U+202E`,
-  never obeyed. Niqqud on Hebrew letters shows as it is.
+  never obeyed. Niqqud on Hebrew letters shows as it is, up to five
+  different marks on a letter; a repeated mark, or one past that, is a badge.
 - **The look.** Dark glass with an `--aqua` border and glow, matching the
   creature's lamp. Allow is rose (`--state-error`): it runs something that
   can't be taken back. It stays dim until it arms, and fills from the inline

@@ -80,6 +80,11 @@ const SHOWN_AS_IS = new Set(['\t', '\n', ' ']);
 // a stroke or slash overlay, an accent on a look-alike. Only Hebrew marks
 // on a Hebrew letter (niqqud, dagesh, cantillation) show as they are.
 const MARK = /\p{M}/u;
+// Even Hebrew marks stack without limit, and a tall enough stack draws over
+// the lines around it. A letter takes at most a dagesh or mappiq, a shin or
+// sin dot, a vowel, a meteg and an accent, and never the same mark twice;
+// past that, a mark is shown by its code point.
+const MAX_MARKS = 5;
 const HEBREW = /\p{Script=Hebrew}/u;
 const LETTER = /\p{L}/u;
 // The separators of a command line: ASCII whitespace, punctuation and
@@ -105,10 +110,13 @@ export function segments(text: string): Segment[] {
 	let run = '';
 	// The last character drawn is a Hebrew letter, or a mark drawn on one.
 	let onHebrew = false;
+	// The marks drawn on that letter.
+	let marks: string[] = [];
 	for (const ch of text) {
 		const mark = MARK.test(ch);
-		const hidden =
-			(HIDDEN.test(ch) && !SHOWN_AS_IS.has(ch)) || (mark && !(onHebrew && HEBREW.test(ch)));
+		const drawnMark =
+			onHebrew && HEBREW.test(ch) && marks.length < MAX_MARKS && !marks.includes(ch);
+		const hidden = (HIDDEN.test(ch) && !SHOWN_AS_IS.has(ch)) || (mark && !drawnMark);
 		if (hidden) {
 			if (run) out.push({ kind: 'text', text: run });
 			run = '';
@@ -116,7 +124,12 @@ export function segments(text: string): Segment[] {
 			onHebrew = false;
 		} else {
 			run += ch;
-			if (!mark) onHebrew = HEBREW.test(ch) && LETTER.test(ch);
+			if (mark) {
+				marks.push(ch);
+			} else {
+				onHebrew = HEBREW.test(ch) && LETTER.test(ch);
+				marks = [];
+			}
 		}
 	}
 	if (run) out.push({ kind: 'text', text: run });
