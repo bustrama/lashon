@@ -51,13 +51,17 @@ runtime-downloaded CUDA cannot leak into the artifact.
 
 ## 3. Verify the artifacts
 
-Install to a scratch directory and check it:
+Install it per-user and check it:
 
 ```sh
-Ottid-X.Y.Z-windows-x64-setup.exe /S /D=C:\ottid-check
+Ottid-X.Y.Z-windows-x64-setup.exe /S /CurrentUser
 ```
 
-- `C:\ottid-check\ottid.exe` and `binaries\ottid-stt\ottid-stt.exe` exist.
+The installer uses `installMode: "both"`, so NSIS ignores `/D=`. A per-user
+install goes to `%LOCALAPPDATA%\Programs\Ottid`, unless an earlier install is
+found, in which case it reuses that folder.
+
+- `ottid.exe` and `binaries\ottid-stt\ottid-stt.exe` exist there.
 - `binaries\ottid-stt\_internal\nvidia` does **not** exist — CUDA is fetched at
   runtime, never bundled.
 - Launch it: the tongue appears, shows the dim "preparing" pulse while it

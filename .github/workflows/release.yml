@@ -498,20 +498,24 @@ jobs:
           Compress-Archive -Path "$stage\*" -DestinationPath $zip -Force
           echo "PORTABLE_ZIP=$zip" >> $env:GITHUB_ENV
 
-      # Proves the signing end to end: installs the installer silently into a
-      # scratch folder — which is the only way to see the uninstaller NSIS
-      # writes at install time — and fails unless the installer and every PE
-      # image installed, plus every one in the portable tree, carries a valid
-      # signature. The installer is already on the draft release by now; a red
-      # run means that draft must not be published.
+      # Proves the signing end to end: installs the installer silently — the
+      # only way to see the uninstaller NSIS writes at install time — and fails
+      # unless the installer and every PE image installed, plus every one in
+      # the portable tree, carries a valid signature. installMode "both" makes
+      # NSIS's MultiUser reset $INSTDIR after /D= is read, so the step installs
+      # per-user and takes the folder from the installer's uninstall record.
+      # The installer is already on the draft release by now; a red run means
+      # that draft must not be published.
       - name: Verify the Authenticode signatures
         if: runner.os == 'Windows' && needs.signing.outputs.sign == 'true'
         shell: pwsh
         run: |
           $installer = Get-ChildItem target\release\bundle\nsis\*-setup.exe | Select-Object -First 1
-          $installDir = "$env:RUNNER_TEMP\ottid-install-check"
-          $p = Start-Process -FilePath $installer.FullName -ArgumentList '/S', "/D=$installDir" -Wait -PassThru
+          $p = Start-Process -FilePath $installer.FullName -ArgumentList '/S', '/CurrentUser' -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "silent install exited with $($p.ExitCode)" }
+          $product = (Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).productName
+          $record = Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$product"
+          $installDir = $record.InstallLocation.Trim('"')
           if (-not (Test-Path "$installDir\uninstall.exe")) { throw "no uninstall.exe in $installDir" }
           ./scripts/sign-windows.ps1 -Verify $installer.FullName $installDir "$env:RUNNER_TEMP\ottid-portable"
 

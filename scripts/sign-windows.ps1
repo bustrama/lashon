@@ -14,16 +14,16 @@
 
       sign-windows.ps1 -Tree <dir> [<dir>...]
           Sign every PE image under these directories that does not already
-          carry a valid signature. release.yml runs it on the staged bundle
-          resources before `tauri build`: the frozen ottid-stt sidecar and, in
-          the full edition, llama-server. Tauri signs resources too, but only
+          carry a valid embedded signature. release.yml runs it on the staged
+          bundle resources before `tauri build`: the frozen ottid-stt sidecar
+          and, in the full edition, llama-server. Tauri signs resources too, but only
           *.exe / *.dll, one process per file; the sidecar also ships ~90 *.pyd
           modules, and Smart App Control checks every module the loader maps,
           whatever its extension.
 
       sign-windows.ps1 -Verify <file-or-dir> [...]
           Sign nothing; fail unless every PE image given, or under a directory
-          given, carries a valid signature.
+          given, carries a valid embedded signature.
 
     Files go through signtool with the Artifact Signing dlib: a SHA-256 digest
     and an RFC 3161 timestamp. The timestamp is not optional: Artifact Signing
@@ -108,8 +108,12 @@ function Get-PortableExecutable([string[]] $Paths) {
     }
 }
 
+# Embedded signatures only: Get-AuthenticodeSignature also reports 'Valid' for
+# a file whose hash is in this machine's system catalogs, and a user's machine
+# need not have that catalog.
 function Test-ValidSignature([string] $File) {
-    (Get-AuthenticodeSignature -LiteralPath $File).Status -eq 'Valid'
+    $signature = Get-AuthenticodeSignature -LiteralPath $File
+    $signature.Status -eq 'Valid' -and $signature.SignatureType -eq 'Authenticode'
 }
 
 if ($Verify) {

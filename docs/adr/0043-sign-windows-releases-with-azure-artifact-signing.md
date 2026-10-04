@@ -120,10 +120,13 @@ exact files we ship, which is what Smart App Control asks of a publisher.
   for minutes; the access token it buys lives about an hour, cached for every
   signtool process. So the workflow fetches that token immediately before the
   signing steps.
-- **CI checks the result.** It silently installs the finished installer into a
-  scratch folder and fails unless every PE image there is validly signed. That
+- **CI checks the result.** It silently installs the finished installer and
+  fails unless every PE image installed carries a valid embedded signature. That
   includes the uninstaller, which NSIS writes only at install time. The portable
-  tree is checked too.
+  tree is checked too. The install is per-user (`/CurrentUser`), and the step
+  reads the folder from the installer's uninstall record. With `installMode:
+  "both"`, NSIS's MultiUser resets the install folder after reading `/D=`, so
+  `/D=` cannot choose it.
 
 What we read in the Tauri source (tag `tauri-cli-v2.11.2`) shaped this:
 
