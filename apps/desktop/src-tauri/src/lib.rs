@@ -547,6 +547,9 @@ fn show_tutorial(app: &tauri::AppHandle, restart: bool) {
         return;
     };
     let _ = window.show();
+    // A minimized window stays minimized through `show`, and `set_focus`
+    // passes it over.
+    let _ = window.unminimize();
     let _ = window.set_focus();
     if restart {
         let _ = window.emit("tutorial:open", ());
@@ -562,6 +565,8 @@ fn show_hub(app: &tauri::AppHandle) {
         return;
     };
     let _ = window.show();
+    // As for the tutorial: `show` leaves a minimized window minimized.
+    let _ = window.unminimize();
     let _ = window.set_focus();
 }
 
@@ -613,12 +618,32 @@ fn build_app_menu(
 /// Dispatch a menu selection — shared by the tray menu and the overlay's
 /// right-click context menu, which carry the same item ids.
 fn handle_menu_event(app: &tauri::AppHandle, id: &str) {
-    // From the overlay's menu, settle the front first (see
-    // `show_tongue_menu`): an item that opens a window keeps it, so the
-    // window can take it; any other hands it back before it runs.
-    let opens_a_window = matches!(id, "tutorial" | "settings" | "logs");
-    app.state::<ottid_core::overlay::Handback>()
-        .settle(opens_a_window);
+    // From the overlay's menu, settle the front too (see `show_tongue_menu`).
+    let handback = app.state::<ottid_core::overlay::Handback>();
+    match id {
+        // One of our windows takes the front from the overlay. Settle after:
+        // if it couldn't (it is gone, or Windows refused), the front still
+        // goes back to the user's app.
+        "tutorial" | "settings" => {
+            run_menu_item(app, id);
+            handback.settle(false);
+        }
+        // Explorer opens in its own time, after this returns: keep the front
+        // so it may take it.
+        "logs" => {
+            handback.settle(true);
+            run_menu_item(app, id);
+        }
+        // Anything else hands the front back before it runs (hiding the
+        // overlay first would leave Windows to pick the next window).
+        _ => {
+            handback.settle(false);
+            run_menu_item(app, id);
+        }
+    }
+}
+
+fn run_menu_item(app: &tauri::AppHandle, id: &str) {
     if let Some(code) = id.strip_prefix(overlay::MENU_PREFIX) {
         if let Some(placement) = Placement::from_code(code) {
             // Off the main thread: it saves the settings file.

@@ -13,10 +13,11 @@
 //! the menu, that app stays in front.
 //!
 //! An item that opens a window (Settings, the tutorial, the logs folder)
-//! keeps the front instead. Handing it to the user's app first would flash
-//! that app, and the new window would then have to take the front from
+//! must not have the front handed to the user's app first: that would flash
+//! the app, and the new window would then have to take the front from
 //! another process, which Windows may refuse. [`Handback`] holds the
-//! give-back until the item picked is known.
+//! give-back until the item picked is known, so the app can run such an
+//! item first and give the front back only if the overlay still holds it.
 
 use std::sync::Mutex;
 
