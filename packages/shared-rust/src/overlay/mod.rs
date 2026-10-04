@@ -8,6 +8,7 @@
 //! Tauri shell (`apps/desktop/src-tauri/src/overlay.rs`) runs the cursor
 //! poll and moves the real window.
 
+pub mod foreground;
 pub mod gaze;
 pub mod geometry;
 pub mod hit_test;
@@ -15,6 +16,7 @@ pub mod placement;
 pub mod pointer;
 pub mod regions;
 
+pub use foreground::Foreground;
 pub use gaze::{gaze_toward, Gaze, GAZE_FALLOFF};
 pub use geometry::{Point, Rect};
 pub use hit_test::{decide, ClickThrough, Decision, Sample, HIT_MARGIN};
