@@ -4,28 +4,91 @@
 //! `rmcp`'s macro merges across all `#[tool]` methods in that block,
 //! so this file is helpers only.
 
+use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::recipes::Recipe;
 
-/// Env var the Tauri shell sets when it spawns `ottid-mcp` so the
-/// stdio binary doesn't have to guess where the bundled starters
-/// landed on a packaged install (`%PROGRAMFILES%\Ottid\recipes\`
-/// on Windows, etc.).
+/// Env var that points the recipe code at the bundled starters. A packaged
+/// Ottid sets it for itself at start-up, from the resource dir Tauri
+/// resolves (`configure_recipes_env` in the Tauri shell), so the runtime
+/// never depends on a path baked in at compile time. A developer, or an MCP
+/// host's config, may set it to use another starters tree. `ottid-mcp` runs
+/// as the host's child process, not Ottid's, so an installed one needs no
+/// env var: it finds the starters from its own location
+/// ([`bundled_recipes_dir`]).
 pub const BUNDLED_RECIPES_ENV: &str = "OTTID_BUNDLED_RECIPES_DIR";
+
+/// Where the installer puts the bundled starters, relative to the resource
+/// dir (the folder holding `ottid.exe` on Windows). `tauri.conf.json` lists
+/// them as `../../../recipes/starters/**/*`, and Tauri stores each `..` of a
+/// resource path as `_up_`. `tests/bundle_layout.rs` keeps this in step with
+/// that entry.
+pub const BUNDLED_RECIPES_RESOURCE_DIR: &str = "_up_/_up_/_up_/recipes/starters";
+
+/// Where the installer puts `ottid-mcp`, relative to the resource dir:
+/// `binaries/ottid-mcp/ottid-mcp[.exe]`, beside the `binaries/ottid-stt`
+/// sidecar (ADR-0049). Matches the `binaries/ottid-mcp/**/*` resource.
+pub const MCP_RESOURCE_DIR: &str = "binaries/ottid-mcp";
 
 /// Env var to override the per-user recipes dir. Set by integration
 /// tests; in production the binary uses
 /// [`user_data_local_dir`]-derived defaults.
 pub const USER_RECIPES_ENV: &str = "OTTID_USER_RECIPES_DIR";
 
+/// The starters the installer put under `resource_dir`, or `None` when this
+/// build shipped none: a free edition, or a run from a checkout.
+pub fn starters_in_resource_dir(resource_dir: &Path) -> Option<PathBuf> {
+    // Joined part by part so the path reads with the OS's own separators
+    // (`list_recipes` shows it to the agent host).
+    let dir = BUNDLED_RECIPES_RESOURCE_DIR
+        .split('/')
+        .fold(resource_dir.to_path_buf(), |dir, part| dir.join(part));
+    dir.is_dir().then_some(dir)
+}
+
+/// The resource dir an installed `ottid-mcp` sits in, read from the binary's
+/// own path: `<resource dir>/binaries/ottid-mcp/ottid-mcp[.exe]`. `None` for
+/// a binary anywhere else, such as a `cargo build` in `target/`. Windows
+/// paths are case-insensitive, so a host config that spells the folders
+/// differently still matches.
+fn mcp_resource_dir(exe: &Path) -> Option<&Path> {
+    let mut dir = exe.parent()?;
+    for want in Path::new(MCP_RESOURCE_DIR).components().rev() {
+        if !dir.file_name()?.eq_ignore_ascii_case(want.as_os_str()) {
+            return None;
+        }
+        dir = dir.parent()?;
+    }
+    Some(dir)
+}
+
 /// Where to find the bundled starter recipes. Resolution order:
-/// `$OTTID_BUNDLED_RECIPES_DIR` → cargo-dev fallback
-/// (`CARGO_MANIFEST_DIR/../../recipes/starters`).
+/// 1. `$OTTID_BUNDLED_RECIPES_DIR`;
+/// 2. the starters installed beside this binary, when it is the installed
+///    `ottid-mcp` (see [`mcp_resource_dir`]);
+/// 3. the checkout's `recipes/starters`, found through
+///    `CARGO_MANIFEST_DIR`. That path is baked in at compile time, so it
+///    serves `cargo run` and the tests, never a shipped build.
 pub fn bundled_recipes_dir() -> PathBuf {
-    if let Some(path) = std::env::var_os(BUNDLED_RECIPES_ENV) {
+    resolve_bundled_recipes_dir(
+        std::env::var_os(BUNDLED_RECIPES_ENV),
+        std::env::current_exe().ok().as_deref(),
+    )
+}
+
+/// [`bundled_recipes_dir`] with the env value and the running binary's path
+/// passed in, so it can be tested.
+fn resolve_bundled_recipes_dir(env: Option<OsString>, exe: Option<&Path>) -> PathBuf {
+    if let Some(path) = env {
         return PathBuf::from(path);
+    }
+    if let Some(dir) = exe
+        .and_then(mcp_resource_dir)
+        .and_then(starters_in_resource_dir)
+    {
+        return dir;
     }
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../recipes/starters")
 }
@@ -212,5 +275,84 @@ mod tests {
         );
         // The emptied `lashon/` parent is tidied away too.
         assert!(!base.path().join("lashon").exists());
+    }
+
+    /// An installed resource dir: `ottid-mcp` under `binaries/` and the
+    /// starters under `_up_/`. Returns the resource dir.
+    fn install_layout() -> tempfile::TempDir {
+        let res = tempfile::tempdir().unwrap();
+        fs::create_dir_all(res.path().join(BUNDLED_RECIPES_RESOURCE_DIR)).unwrap();
+        fs::create_dir_all(res.path().join(MCP_RESOURCE_DIR)).unwrap();
+        res
+    }
+
+    fn dev_fallback() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../recipes/starters")
+    }
+
+    #[test]
+    fn an_installed_mcp_finds_the_starters_beside_it() {
+        let res = install_layout();
+        let exe = res.path().join(MCP_RESOURCE_DIR).join("ottid-mcp.exe");
+        assert_eq!(
+            resolve_bundled_recipes_dir(None, Some(&exe)),
+            res.path().join(BUNDLED_RECIPES_RESOURCE_DIR)
+        );
+    }
+
+    #[test]
+    fn the_installed_folders_may_be_spelled_in_any_case() {
+        let res = install_layout();
+        let exe = res.path().join("Binaries/OTTID-MCP/ottid-mcp.exe");
+        assert_eq!(
+            resolve_bundled_recipes_dir(None, Some(&exe)),
+            res.path().join(BUNDLED_RECIPES_RESOURCE_DIR)
+        );
+    }
+
+    #[test]
+    fn the_env_var_beats_the_installed_starters() {
+        let res = install_layout();
+        let exe = res.path().join(MCP_RESOURCE_DIR).join("ottid-mcp.exe");
+        let custom = OsString::from("/somewhere/else");
+        assert_eq!(
+            resolve_bundled_recipes_dir(Some(custom), Some(&exe)),
+            PathBuf::from("/somewhere/else")
+        );
+    }
+
+    #[test]
+    fn a_binary_outside_the_install_layout_uses_the_checkout() {
+        // A cargo build in `target/` with a starters dir two levels up must
+        // not be mistaken for an installed one.
+        let res = install_layout();
+        let exe = res.path().join("target/debug/ottid-mcp.exe");
+        assert_eq!(
+            resolve_bundled_recipes_dir(None, Some(&exe)),
+            dev_fallback()
+        );
+        assert_eq!(resolve_bundled_recipes_dir(None, None), dev_fallback());
+    }
+
+    #[test]
+    fn an_install_without_starters_falls_back_rather_than_pointing_at_nothing() {
+        let res = tempfile::tempdir().unwrap();
+        fs::create_dir_all(res.path().join(MCP_RESOURCE_DIR)).unwrap();
+        let exe = res.path().join(MCP_RESOURCE_DIR).join("ottid-mcp.exe");
+        assert_eq!(
+            resolve_bundled_recipes_dir(None, Some(&exe)),
+            dev_fallback()
+        );
+    }
+
+    #[test]
+    fn starters_in_a_resource_dir_are_found_only_when_shipped() {
+        let res = install_layout();
+        assert_eq!(
+            starters_in_resource_dir(res.path()),
+            Some(res.path().join(BUNDLED_RECIPES_RESOURCE_DIR))
+        );
+        let bare = tempfile::tempdir().unwrap();
+        assert_eq!(starters_in_resource_dir(bare.path()), None);
     }
 }
