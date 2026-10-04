@@ -49,6 +49,8 @@ pub enum RegionError {
     BadRect(String),
     #[error("{0} is not a valid scale factor")]
     BadScale(f64),
+    #[error("report epoch {0} was never handed out")]
+    UnknownEpoch(u64),
 }
 
 /// The last accepted report.
@@ -59,6 +61,8 @@ pub struct RegionSet {
     version: u64,
     /// The stamp of the last report applied.
     stamp: Option<Stamp>,
+    /// The last epoch handed to a page.
+    epochs: u64,
 }
 
 impl Default for RegionSet {
@@ -68,6 +72,7 @@ impl Default for RegionSet {
             scale: 1.0,
             version: 0,
             stamp: None,
+            epochs: 0,
         }
     }
 }
@@ -76,24 +81,26 @@ impl Default for RegionSet {
 ///
 /// Reports arrive through async commands, which the shell may handle out of
 /// order. An older report applied after a newer one would leave stale
-/// rectangles in force until the next change. `seq` counts the reports one
-/// page sends; `source` names the page, because a reloaded page counts from
-/// the start again.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// rectangles in force until the next change. `epoch` names the page that
+/// sent it, from [`RegionSet::new_epoch`]: a reloaded page gets a higher one,
+/// so no report from before the reload can undo one sent since. `seq` counts
+/// the reports one page sends.
+///
+/// Stamps compare by epoch, then by count.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Stamp {
-    pub source: u32,
+    pub epoch: u64,
     pub seq: u64,
 }
 
-impl Stamp {
-    /// Whether a report stamped `self` was sent after one stamped `last`:
-    /// a later report of the same page, or any report of another page.
-    pub fn follows(&self, last: &Stamp) -> bool {
-        self.source != last.source || self.seq > last.seq
-    }
-}
-
 impl RegionSet {
+    /// Start a new epoch for a page about to report, later than every page
+    /// before it.
+    pub fn new_epoch(&mut self) -> u64 {
+        self.epochs += 1;
+        self.epochs
+    }
+
     /// Replace the report with one the frontend stamped, unless a report it
     /// sent later has already been applied. Returns whether anything changed.
     ///
@@ -105,7 +112,11 @@ impl RegionSet {
         scale: f64,
         stamp: Stamp,
     ) -> Result<bool, RegionError> {
-        if self.stamp.is_some_and(|last| !stamp.follows(&last)) {
+        // An epoch never handed out would outrank every page after it.
+        if stamp.epoch == 0 || stamp.epoch > self.epochs {
+            return Err(RegionError::UnknownEpoch(stamp.epoch));
+        }
+        if self.stamp.is_some_and(|last| stamp <= last) {
             return Ok(false);
         }
         let changed = self.replace(regions, scale)?;
@@ -318,67 +329,123 @@ mod tests {
         assert_eq!(set.hit(Point::new(5.0, 5.0), 1.0, 0.0), Some("creature"));
     }
 
-    fn stamp(source: u32, seq: u64) -> Stamp {
-        Stamp { source, seq }
+    fn stamp(epoch: u64, seq: u64) -> Stamp {
+        Stamp { epoch, seq }
+    }
+
+    #[test]
+    fn every_page_gets_a_later_epoch() {
+        let mut set = RegionSet::default();
+        let first = set.new_epoch();
+        assert!(first > 0);
+        assert!(set.new_epoch() > first);
     }
 
     #[test]
     fn a_late_report_cannot_replace_a_newer_one() {
         let mut set = RegionSet::default();
+        let page = set.new_epoch();
         let newer = vec![region("island", 0.0, 0.0, 10.0, 10.0)];
         let older = vec![region("creature", 50.0, 50.0, 10.0, 10.0)];
-        assert!(set.replace_in_order(newer, 1.0, stamp(7, 2)).unwrap());
+        assert!(set.replace_in_order(newer, 1.0, stamp(page, 2)).unwrap());
         // Sent first, handled second: dropped.
         assert!(!set
-            .replace_in_order(older.clone(), 1.0, stamp(7, 1))
+            .replace_in_order(older.clone(), 1.0, stamp(page, 1))
             .unwrap());
         assert_eq!(set.hit(Point::new(5.0, 5.0), 1.0, 0.0), Some("island"));
         // A repeat of the last report's stamp is not newer either.
-        assert!(!set.replace_in_order(older, 1.0, stamp(7, 2)).unwrap());
+        assert!(!set.replace_in_order(older, 1.0, stamp(page, 2)).unwrap());
         assert_eq!(set.hit(Point::new(55.0, 55.0), 1.0, 0.0), None);
     }
 
     #[test]
     fn a_reloaded_page_counts_from_the_start_again() {
         let mut set = RegionSet::default();
+        let before = set.new_epoch();
         set.replace_in_order(
             vec![region("creature", 0.0, 0.0, 10.0, 10.0)],
             1.0,
-            stamp(1, 500),
+            stamp(before, 500),
         )
         .unwrap();
+        let reloaded = set.new_epoch();
         let fresh = vec![region("island", 0.0, 0.0, 10.0, 10.0)];
-        assert!(set.replace_in_order(fresh, 1.0, stamp(2, 1)).unwrap());
+        assert!(set
+            .replace_in_order(fresh, 1.0, stamp(reloaded, 1))
+            .unwrap());
         assert_eq!(set.hit(Point::new(5.0, 5.0), 1.0, 0.0), Some("island"));
+    }
+
+    #[test]
+    fn a_report_from_before_a_reload_cannot_undo_the_reloaded_page() {
+        let mut set = RegionSet::default();
+        let before = set.new_epoch();
+        let reloaded = set.new_epoch();
+        let fresh = vec![region("island", 0.0, 0.0, 10.0, 10.0)];
+        assert!(set
+            .replace_in_order(fresh, 1.0, stamp(reloaded, 1))
+            .unwrap());
+        // Sent by the old page before the reload, handled after the new
+        // page's first report: dropped, however far its count got.
+        let stale = vec![region("creature", 50.0, 50.0, 10.0, 10.0)];
+        assert!(!set
+            .replace_in_order(stale, 1.0, stamp(before, 501))
+            .unwrap());
+        assert_eq!(set.hit(Point::new(5.0, 5.0), 1.0, 0.0), Some("island"));
+        assert_eq!(set.hit(Point::new(55.0, 55.0), 1.0, 0.0), None);
+    }
+
+    #[test]
+    fn rejects_an_epoch_never_handed_out() {
+        let mut set = RegionSet::default();
+        let report = vec![region("creature", 0.0, 0.0, 10.0, 10.0)];
+        assert_eq!(
+            set.replace_in_order(report.clone(), 1.0, stamp(0, 1)),
+            Err(RegionError::UnknownEpoch(0))
+        );
+        let page = set.new_epoch();
+        assert_eq!(
+            set.replace_in_order(report.clone(), 1.0, stamp(page + 1, 1)),
+            Err(RegionError::UnknownEpoch(page + 1))
+        );
+        assert!(set.is_empty());
+        // Nothing was taken as applied: the page's first report still is.
+        assert!(set.replace_in_order(report, 1.0, stamp(page, 1)).unwrap());
     }
 
     #[test]
     fn an_unchanged_report_still_moves_the_order_on() {
         let mut set = RegionSet::default();
+        let page = set.new_epoch();
         let report = vec![region("creature", 0.0, 0.0, 10.0, 10.0)];
-        set.replace_in_order(report.clone(), 1.0, stamp(3, 1))
+        set.replace_in_order(report.clone(), 1.0, stamp(page, 1))
             .unwrap();
-        assert!(!set.replace_in_order(report, 1.0, stamp(3, 3)).unwrap());
+        assert!(!set.replace_in_order(report, 1.0, stamp(page, 3)).unwrap());
         // Older than the unchanged report, so older than what is in force.
-        assert!(!set.replace_in_order(Vec::new(), 1.0, stamp(3, 2)).unwrap());
+        assert!(!set
+            .replace_in_order(Vec::new(), 1.0, stamp(page, 2))
+            .unwrap());
         assert!(!set.is_empty());
     }
 
     #[test]
     fn a_rejected_report_leaves_the_order_alone() {
         let mut set = RegionSet::default();
+        let page = set.new_epoch();
         set.replace_in_order(
             vec![region("creature", 0.0, 0.0, 10.0, 10.0)],
             1.0,
-            stamp(4, 1),
+            stamp(page, 1),
         )
         .unwrap();
         assert_eq!(
-            set.replace_in_order(Vec::new(), 0.0, stamp(4, 3)),
+            set.replace_in_order(Vec::new(), 0.0, stamp(page, 3)),
             Err(RegionError::BadScale(0.0))
         );
         // Report 2 was sent after the last one applied, so it applies.
-        assert!(set.replace_in_order(Vec::new(), 1.0, stamp(4, 2)).unwrap());
+        assert!(set
+            .replace_in_order(Vec::new(), 1.0, stamp(page, 2))
+            .unwrap());
         assert!(set.is_empty());
     }
 

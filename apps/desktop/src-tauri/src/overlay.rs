@@ -148,22 +148,29 @@ pub async fn overlay_layout(
 
 /// The frontend's interactive rectangles: physical pixels relative to the
 /// window, measured at `scale`. The cursor poll hit-tests against them from
-/// the next tick on. `source` and `seq` stamp the report, so one handled
-/// after a report the page sent later is dropped.
+/// the next tick on. `epoch` (from `overlay_regions_epoch`) and `seq` stamp
+/// the report, so one handled after a report sent later is dropped.
 #[tauri::command]
 pub async fn overlay_set_regions(
     state: tauri::State<'_, OverlayState>,
     regions: Vec<Region>,
     scale: f64,
-    source: u32,
+    epoch: u64,
     seq: u64,
 ) -> Result<(), String> {
     state
         .lock()
         .regions
-        .replace_in_order(regions, scale, Stamp { source, seq })
+        .replace_in_order(regions, scale, Stamp { epoch, seq })
         .map(|_| ())
         .map_err(|err| err.to_string())
+}
+
+/// Start a region epoch for a page about to report: later than any page's
+/// before, so reports a page sent before a reload can't undo its successor's.
+#[tauri::command]
+pub async fn overlay_regions_epoch(state: tauri::State<'_, OverlayState>) -> Result<u64, String> {
+    Ok(state.lock().regions.new_epoch())
 }
 
 /// Start dragging the creature. The poll moves the window with the cursor

@@ -12,14 +12,26 @@
 //
 // Reports go out through async commands, which the shell may handle out of
 // order, so each is stamped and the poll drops one older than the last it
-// applied. `SOURCE` names this page and `seq` counts its reports, across every
-// reporter on it; a reloaded page picks a new source and counts from 1 again.
+// applied. The poll hands this page an epoch later than any page's before it,
+// and `seq` counts the page's reports, across every reporter on it. A report
+// the page sent before a reload carries the old epoch, so it can't undo one
+// the reloaded page sent.
 import { invoke } from '@tauri-apps/api/core';
 
 const SELECTOR = '[data-interactive]';
 
-const SOURCE = crypto.getRandomValues(new Uint32Array(1))[0];
+/** This page's epoch, asked for with its first report. */
+let epoch: Promise<number> | null = null;
 let seq = 0;
+
+function pageEpoch(): Promise<number> {
+	epoch ??= invoke<number>('overlay_regions_epoch').catch((err: unknown) => {
+		// Ask again with the next report.
+		epoch = null;
+		throw err;
+	});
+	return epoch;
+}
 
 interface Region {
 	id: string;
@@ -94,10 +106,13 @@ export function reportRegions(root: HTMLElement): RegionReporter {
 		if (key === last) return;
 		last = key;
 		seq += 1;
+		const stamp = seq;
 		// Outside Tauri (a browser preview) there is no poll to tell.
-		void invoke('overlay_set_regions', { regions, scale, source: SOURCE, seq }).catch(() => {
-			last = '';
-		});
+		void pageEpoch()
+			.then((page) => invoke('overlay_set_regions', { regions, scale, epoch: page, seq: stamp }))
+			.catch(() => {
+				last = '';
+			});
 	}
 
 	function measure(): void {

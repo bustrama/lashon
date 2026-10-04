@@ -129,25 +129,51 @@ async fn install_wake_model(id: String) -> Result<String, String> {
 /// A sync command, so it runs on the main thread and `popup` returns only
 /// once the menu has closed. The item picked reaches `handle_menu_event`
 /// after that, through the event loop.
+///
+/// The menu brings the overlay to the front (Windows closes a popup on a
+/// click elsewhere only when its owner is in front). The front goes back to
+/// the user's app once the item is known, or the next dictation types into
+/// the overlay; an item that opens a window keeps it instead (see
+/// `ottid_core::overlay::Handback`).
 #[tauri::command]
 fn show_tongue_menu(window: tauri::Window, menu: tauri::State<'_, Menu<tauri::Wry>>) {
     use tauri::menu::ContextMenu;
-    // The menu brings the overlay to the front (Windows closes a popup on a
-    // click elsewhere only when its owner is in front). Give the front back
-    // to the user's app afterwards, or the next dictation types into the
-    // overlay. An item that opens a window still focuses it: its handler
-    // runs after this.
+    let app = window.app_handle().clone();
     #[cfg(windows)]
-    let previous = ottid_core::overlay::Foreground::remember();
-    #[cfg(windows)]
-    let overlay = window.hwnd().ok().map(|hwnd| hwnd.0 as isize);
+    let armed = {
+        let overlay = window.hwnd().ok().map(|hwnd| hwnd.0 as isize);
+        match (ottid_core::overlay::Foreground::remember(), overlay) {
+            (Some(previous), Some(overlay)) => Some(
+                app.state::<ottid_core::overlay::Handback>()
+                    .arm(previous, overlay),
+            ),
+            _ => None,
+        }
+    };
+    #[cfg(not(windows))]
+    let armed: Option<u64> = None;
     if let Err(err) = menu.popup(window) {
         tracing::warn!("could not show the tongue context menu: {err:#}");
     }
-    #[cfg(windows)]
-    if let (Some(previous), Some(overlay)) = (previous, overlay) {
-        previous.give_back(overlay);
-    }
+    let Some(armed) = armed else {
+        return;
+    };
+    // The menu library sends the item picked to the event loop before
+    // `popup` returns, and `handle_menu_event` settles the give-back for it.
+    // A menu closed without a pick sends nothing: settle it from a task
+    // queued behind that event. (`run_on_main_thread` would run it at once
+    // on this thread, so it is sent from another.) Only this menu's: the
+    // task may run after the user has opened the menu again.
+    tauri::async_runtime::spawn(async move {
+        let handle = app.clone();
+        if let Err(err) = app.run_on_main_thread(move || {
+            handle
+                .state::<ottid_core::overlay::Handback>()
+                .settle_if(armed, false);
+        }) {
+            tracing::warn!("could not settle the overlay menu's foreground: {err:#}");
+        }
+    });
 }
 
 /// Check GitHub Releases for a newer version of Ottid.
@@ -275,7 +301,8 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(SidecarState::default())
-        .manage(overlay::OverlayState::default());
+        .manage(overlay::OverlayState::default())
+        .manage(ottid_core::overlay::Handback::default());
 
     // Command-mode-only managed state — compiled out of the free build (ADR-0034).
     #[cfg(feature = "command-mode")]
@@ -285,9 +312,9 @@ pub fn run() {
         .manage(approval::Approvals::default());
 
     builder
-        // Menu selections from the tongue's right-click context menu arrive
-        // here; the tray menu keeps its own handler (both call the same
-        // `handle_menu_event`).
+        // Every menu selection arrives here once: the tray's and the
+        // tongue's right-click context menu's. (A tray's own `on_menu_event`
+        // would be one more app-wide handler, not a tray-only one.)
         .on_menu_event(|app, event| handle_menu_event(app, event.id.as_ref()))
         .invoke_handler(tauri::generate_handler![
             ottid_healthcheck,
@@ -303,6 +330,7 @@ pub fn run() {
             show_tongue_menu,
             overlay::overlay_layout,
             overlay::overlay_set_regions,
+            overlay::overlay_regions_epoch,
             overlay::overlay_drag_start,
             overlay::overlay_drag_end,
             overlay::overlay_set_placement,
@@ -435,7 +463,6 @@ pub fn run() {
                 .icon(tauri::include_image!("icons/tray.png"))
                 .tooltip("Ottid · אוטיד")
                 .menu(&menu)
-                .on_menu_event(|app, event| handle_menu_event(app, event.id.as_ref()))
                 .build(app)?;
             // Keep the menu alive and reachable for the right-click context menu.
             app.manage(menu);
@@ -538,6 +565,9 @@ fn show_tutorial(app: &tauri::AppHandle, restart: bool) {
         return;
     };
     let _ = window.show();
+    // A minimized window stays minimized through `show`, and `set_focus`
+    // passes it over.
+    let _ = window.unminimize();
     let _ = window.set_focus();
     if restart {
         let _ = window.emit("tutorial:open", ());
@@ -553,6 +583,8 @@ fn show_hub(app: &tauri::AppHandle) {
         return;
     };
     let _ = window.show();
+    // As for the tutorial: `show` leaves a minimized window minimized.
+    let _ = window.unminimize();
     let _ = window.set_focus();
 }
 
@@ -604,6 +636,32 @@ fn build_app_menu(
 /// Dispatch a menu selection — shared by the tray menu and the overlay's
 /// right-click context menu, which carry the same item ids.
 fn handle_menu_event(app: &tauri::AppHandle, id: &str) {
+    // From the overlay's menu, settle the front too (see `show_tongue_menu`).
+    let handback = app.state::<ottid_core::overlay::Handback>();
+    match id {
+        // One of our windows takes the front from the overlay. Settle after:
+        // if it couldn't (it is gone, or Windows refused), the front still
+        // goes back to the user's app.
+        "tutorial" | "settings" => {
+            run_menu_item(app, id);
+            handback.settle(false);
+        }
+        // Explorer opens in its own time, after this returns: keep the front
+        // so it may take it.
+        "logs" => {
+            handback.settle(true);
+            run_menu_item(app, id);
+        }
+        // Anything else hands the front back before it runs (hiding the
+        // overlay first would leave Windows to pick the next window).
+        _ => {
+            handback.settle(false);
+            run_menu_item(app, id);
+        }
+    }
+}
+
+fn run_menu_item(app: &tauri::AppHandle, id: &str) {
     if let Some(code) = id.strip_prefix(overlay::MENU_PREFIX) {
         if let Some(placement) = Placement::from_code(code) {
             // Off the main thread: it saves the settings file.
