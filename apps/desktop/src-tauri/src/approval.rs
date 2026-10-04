@@ -4,11 +4,13 @@
 //! The queue and its rules are `ottid_core::approval`, unit-tested there.
 //! This module adds what needs Tauri:
 //!
-//! - the reply channel back to each asker, async (command mode) or blocking
-//!   (the recipe runtime's synchronous gate);
+//! - the reply channel back to each asker, async (command mode, and a coding
+//!   agent through the hooks bridge of ADR-0049) or blocking (the recipe
+//!   runtime's synchronous gate);
 //! - the `approval:changed` and `approval:nudge` events the card listens to,
 //!   and the commands it answers with;
-//! - the timer that denies a request nobody answers;
+//! - the timer that denies a request nobody answers, or hands an agent's
+//!   back to the agent's own prompt;
 //! - two global hotkeys, registered only while a request is pending, since
 //!   the overlay never has keyboard focus (ADR-0044);
 //! - showing a hidden overlay while a request waits, so the card can be seen;
@@ -55,6 +57,10 @@ enum Reply {
     Async(oneshot::Sender<Decision>),
     /// A blocking asker parks its thread on it.
     Blocking(mpsc::SyncSender<Decision>),
+    /// A coding agent awaits it through the hooks bridge (ADR-0049). `None`
+    /// means nobody answered: the agent asks in its own prompt instead.
+    #[cfg(feature = "agent-hooks")]
+    Agent(oneshot::Sender<Option<Decision>>),
 }
 
 impl Reply {
@@ -65,6 +71,27 @@ impl Reply {
             }
             Reply::Blocking(tx) => {
                 let _ = tx.try_send(decision);
+            }
+            #[cfg(feature = "agent-hooks")]
+            Reply::Agent(tx) => {
+                let _ = tx.send(Some(decision));
+            }
+        }
+    }
+
+    /// Nobody answered in time. Ottid's own askers take that as Deny. An
+    /// agent has a prompt of its own to fall back on, so its request goes
+    /// back there undecided rather than denied.
+    fn lapse(self) -> &'static str {
+        match self {
+            #[cfg(feature = "agent-hooks")]
+            Reply::Agent(tx) => {
+                let _ = tx.send(None);
+                "left to the agent's own prompt"
+            }
+            other => {
+                other.send(Decision::Deny);
+                "denied"
             }
         }
     }
@@ -132,6 +159,22 @@ pub async fn ask(app: &AppHandle, request: Request) -> Decision {
         id: Some(id),
     };
     let decision = rx.await.unwrap_or(Decision::Deny);
+    pending.id = None;
+    decision
+}
+
+/// Ask the user for a coding agent (ADR-0049) and wait for the answer:
+/// `None` if nobody answered in time. If the caller is dropped first (the
+/// agent's hook went away), the card is taken down.
+#[cfg(feature = "agent-hooks")]
+pub async fn ask_agent(app: &AppHandle, request: Request) -> Option<Decision> {
+    let (tx, rx) = oneshot::channel();
+    let id = submit(app, request, Reply::Agent(tx));
+    let mut pending = Pending {
+        app: app.clone(),
+        id: Some(id),
+    };
+    let decision = rx.await.unwrap_or(None);
     pending.id = None;
     decision
 }
@@ -253,7 +296,8 @@ fn changed(app: &AppHandle) {
     let _ = app.emit_to(overlay::WINDOW, EVENT_CHANGED, card);
 }
 
-/// Deny `id` when its time on screen is up, unless it is answered first.
+/// Lapse `id` when its time on screen is up, unless it is answered first:
+/// Ottid's own request is denied, an agent's goes back to the agent.
 fn spawn_timeout(app: AppHandle, id: Id) {
     tauri::async_runtime::spawn(async move {
         loop {
@@ -271,8 +315,8 @@ fn spawn_timeout(app: AppHandle, id: Id) {
                 }
             };
             if let Some(answered) = expired {
-                tracing::warn!(target: LOG, id, "approval timed out; denied");
-                answered.reply.send(answered.decision);
+                let outcome = answered.reply.lapse();
+                tracing::warn!(target: LOG, id, outcome, "approval timed out");
                 changed(&app);
                 return;
             }
@@ -524,6 +568,24 @@ pub async fn approval_answer(
 #[cfg(debug_assertions)]
 #[tauri::command]
 pub async fn approval_preview(app: AppHandle, sample: String) -> String {
+    // A Claude Code request, as the hooks bridge shows one. The answer is
+    // `ask` when the card's time runs out.
+    #[cfg(feature = "agent-hooks")]
+    if sample == "agent" {
+        let request = Request::for_agent(
+            ottid_core::agent_bridge::AGENT,
+            "Bash",
+            &serde_json::json!({
+                "command": "git push --force-with-lease origin feat/מסלול-חדש",
+                "description": "Push the rebased branch"
+            }),
+            Some("C:\\Users\\דנה\\ottid"),
+        );
+        return match ask_agent(&app, request).await {
+            Some(decision) => decision.code().to_string(),
+            None => "ask".to_string(),
+        };
+    }
     let command = match sample.as_str() {
         "long" => (1..=40)
             .map(|n| format!("Write-Output \"שורה {n} של {}\"", 40))
