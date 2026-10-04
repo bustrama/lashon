@@ -64,6 +64,21 @@ pub const NAME_CHARS: Bounds = Bounds::new(1.0, 32.0);
 /// Characters in an id.
 pub const ID_CHARS: Bounds = Bounds::new(1.0, 40.0);
 
+/// How far the engine moves an eye from where a creature puts it. The lamp
+/// must stay clear of an eye wherever it goes, so the validator needs these;
+/// the engine (`lib/creature/engine/eyes.ts`) clamps to them, and the schema
+/// publishes them on `Eyes` as `x-ottid-eye-motion`, which the frontend's
+/// tests compare with the engine's.
+///
+/// The widest an eye gets (a startle), as a scale of its radii.
+pub const EYE_SCALE_MAX: f64 = 1.25;
+/// How far an eye shifts toward the gaze, per unit of `radius_x` and of
+/// `radius_y`, at full bend.
+pub const EYE_SHIFT_X: f64 = 0.72;
+pub const EYE_SHIFT_Y: f64 = 0.4;
+/// The gaze, clamped to ±1, bends through `sin(gaze × EYE_GAZE_BEND)`.
+pub const EYE_GAZE_BEND: f64 = 0.9;
+
 /// A `creature.json`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -131,9 +146,16 @@ pub struct Hands {
 }
 
 /// Two eyes, mirrored about the midline. Positions are from the body's
-/// centre, y down.
+/// centre, y down. The engine scales and shifts them as `x-ottid-eye-motion`
+/// says, and the lamp must stay clear of them wherever they go.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(extend("x-ottid-eye-motion" = {
+    "scale_max": EYE_SCALE_MAX,
+    "shift_x": EYE_SHIFT_X,
+    "shift_y": EYE_SHIFT_Y,
+    "gaze_bend": EYE_GAZE_BEND
+}))]
 pub struct Eyes {
     pub style: EyeStyle,
     pub colour: EyeColour,

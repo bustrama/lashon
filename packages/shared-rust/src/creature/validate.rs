@@ -11,7 +11,7 @@
 //! - a kebab-case id, and display names that are plain text
 //! - a palm wider than its arm
 //! - the lamp inside the body, at least as large as the body is tall, and
-//!   never under an eye
+//!   never under an eye, wherever the engine moves it
 //! - the eyes inside the body
 //! - gestures that need a prop only in the state that has it
 //!
@@ -21,9 +21,10 @@
 use std::fmt;
 
 use super::schema::{
-    Bounds, Creature, Gesture, ARM_RADIUS, ARM_SOFTNESS, BODY_RADIUS_X, BODY_RADIUS_Y, BODY_WOBBLE,
-    EYE_RADIUS_X, EYE_RADIUS_Y, EYE_X, EYE_Y, ID_CHARS, LAMP_RADIUS, LAMP_X, LAMP_Y,
-    MAX_FILE_BYTES, NAME_CHARS, PALM_RADIUS, PALM_SOFTNESS, SCHEMA_VERSION,
+    Bounds, Creature, Eyes, Gesture, Lamp, ARM_RADIUS, ARM_SOFTNESS, BODY_RADIUS_X, BODY_RADIUS_Y,
+    BODY_WOBBLE, EYE_GAZE_BEND, EYE_RADIUS_X, EYE_RADIUS_Y, EYE_SCALE_MAX, EYE_SHIFT_X,
+    EYE_SHIFT_Y, EYE_X, EYE_Y, ID_CHARS, LAMP_RADIUS, LAMP_X, LAMP_Y, MAX_FILE_BYTES, NAME_CHARS,
+    PALM_RADIUS, PALM_SOFTNESS, SCHEMA_VERSION,
 };
 
 /// The lamp's centre must sit inside this fraction of the body ellipse, so
@@ -31,9 +32,6 @@ use super::schema::{
 const LAMP_INNER: f64 = 0.4;
 /// The eyes must sit inside this fraction of the body ellipse.
 const EYES_INNER: f64 = 0.85;
-/// The largest the engine scales the eyes (a startle). The lamp's centre must
-/// stay outside the eyes even then.
-const EYE_SCALE_MAX: f64 = 1.25;
 
 /// Why a name is not plain text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -120,7 +118,9 @@ impl CreatureIssue {
             LampSmallerThanBody => {
                 "lamp.radius must be at least body.radius_y, so the lamp fills the body".to_string()
             }
-            LampUnderEye => "the lamp's centre must not be under an eye".to_string(),
+            LampUnderEye => {
+                "the lamp's centre must not be under an eye, wherever the eyes look".to_string()
+            }
             EyesOutsideBody => "the eyes must sit inside the body".to_string(),
             GestureNeedsProp { state, gesture } => format!(
                 "poses.{state} cannot be {gesture:?}: that gesture needs the notepad, which only \
@@ -167,7 +167,7 @@ impl CreatureIssue {
             LampSmallerThanBody => {
                 "lamp.radius צריך להיות לפחות body.radius_y, כדי שהמנורה תמלא את הגוף".to_string()
             }
-            LampUnderEye => "מרכז המנורה לא יכול להיות מתחת לעין".to_string(),
+            LampUnderEye => "מרכז המנורה לא יכול להיות מתחת לעין, לא משנה לאן העיניים מסתכלות".to_string(),
             EyesOutsideBody => "העיניים צריכות להיות בתוך הגוף".to_string(),
             GestureNeedsProp { state, gesture } => format!(
                 "poses.{state} לא יכול להיות {gesture:?}: המחווה הזו צריכה את הפנקס, ורק להכתבה יש פנקס"
@@ -280,14 +280,7 @@ fn check(c: &Creature) -> Vec<CreatureIssue> {
         if c.lamp.radius < ry {
             issues.push(CreatureIssue::LampSmallerThanBody);
         }
-        let (erx, ery) = (
-            c.eyes.radius_x * EYE_SCALE_MAX,
-            c.eyes.radius_y * EYE_SCALE_MAX,
-        );
-        let under_eye = [-c.eyes.x, c.eyes.x]
-            .iter()
-            .any(|&ex| ellipse_norm(c.lamp.x - ex, c.lamp.y - c.eyes.y, erx, ery) <= 1.0);
-        if under_eye {
+        if lamp_under_an_eye(&c.lamp, &c.eyes) {
             issues.push(CreatureIssue::LampUnderEye);
         }
         let outer_x = c.eyes.x + c.eyes.radius_x;
@@ -337,6 +330,27 @@ fn name_problem(name: &str) -> Option<NameProblem> {
         return Some(NameProblem::ControlCharacter);
     }
     None
+}
+
+/// Whether an eye can cover the lamp's centre anywhere the engine moves it:
+/// scaled up to [`EYE_SCALE_MAX`] and shifted toward the gaze by up to
+/// [`EYE_SHIFT_X`] and [`EYE_SHIFT_Y`] of its radii, at full bend.
+///
+/// The eye's centre ranges over a rectangle around where the creature puts
+/// it, so the closest it gets to the lamp is that place moved as far toward
+/// the lamp as the rectangle allows. The eye narrows a little as it looks
+/// aside; the full-size eye at every shift is a slightly larger, safe bound.
+fn lamp_under_an_eye(lamp: &Lamp, eyes: &Eyes) -> bool {
+    let bend = EYE_GAZE_BEND.sin();
+    let reach_x = EYE_SHIFT_X * bend * eyes.radius_x;
+    let reach_y = EYE_SHIFT_Y * bend * eyes.radius_y;
+    let (rx, ry) = (eyes.radius_x * EYE_SCALE_MAX, eyes.radius_y * EYE_SCALE_MAX);
+    let closest = |d: f64, reach: f64| (d.abs() - reach).max(0.0);
+    [-eyes.x, eyes.x].iter().any(|&ex| {
+        let dx = closest(lamp.x - ex, reach_x);
+        let dy = closest(lamp.y - eyes.y, reach_y);
+        ellipse_norm(dx, dy, rx, ry) <= 1.0
+    })
 }
 
 /// The point's "radius" in an ellipse: 1 on the outline, 0 at the centre.
@@ -513,6 +527,30 @@ mod tests {
         v["lamp"]["x"] = serde_json::json!(4);
         v["lamp"]["y"] = serde_json::json!(4);
         assert_eq!(issues_of(&v), vec![CreatureIssue::LampUnderEye]);
+    }
+
+    #[test]
+    fn the_lamp_is_never_under_an_eye_wherever_it_looks() {
+        // Clear of the eyes at rest, even startled (the old check passed it),
+        // but an eye looking toward the midline slides over the lamp.
+        let mut v = default_value();
+        v["eyes"]["x"] = serde_json::json!(12);
+        v["eyes"]["radius_x"] = serde_json::json!(4);
+        v["lamp"]["x"] = serde_json::json!(6);
+        v["lamp"]["y"] = serde_json::json!(0);
+        let creature: Creature = serde_json::from_value(v.clone()).unwrap();
+        let startled_at_rest = ellipse_norm(
+            creature.lamp.x - creature.eyes.x,
+            creature.lamp.y - creature.eyes.y,
+            creature.eyes.radius_x * EYE_SCALE_MAX,
+            creature.eyes.radius_y * EYE_SCALE_MAX,
+        );
+        assert!(startled_at_rest > 1.0, "{startled_at_rest}");
+        assert_eq!(issues_of(&v), vec![CreatureIssue::LampUnderEye]);
+
+        // The same lamp is clear once the eyes can't reach it.
+        v["lamp"]["x"] = serde_json::json!(0);
+        assert!(validate_value(&v).is_ok());
     }
 
     #[test]

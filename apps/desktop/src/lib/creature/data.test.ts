@@ -12,6 +12,7 @@ import {
 	EYE_COLOUR_TOKEN,
 	GESTURES
 } from './data';
+import { EYE_MOTION } from './engine/eyes';
 import { lampToken } from './engine/lamp';
 import { CREATURE_TOKENS, parseColour } from './engine/palette';
 
@@ -42,6 +43,10 @@ describe('the creature file mirror', () => {
 		expect(Object.keys(DEFAULT_CREATURE).sort()).toEqual([...schema.required].sort());
 		expect(DEFAULT_CREATURE.schema).toBe(1);
 		for (const state of CREATURE_STATES) expect(GESTURES).toContain(DEFAULT_CREATURE.poses[state]);
+	});
+
+	it('moves the eyes within the limits the validator checks the lamp against', () => {
+		expect({ ...EYE_MOTION }).toEqual(schema.$defs.Eyes['x-ottid-eye-motion']);
 	});
 });
 

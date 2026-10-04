@@ -3,6 +3,7 @@
 // also draws the whole creature at lower fidelity when the WebView has no
 // WebGL: a plain silhouette with the lamp, which still shows the state.
 import { BODY_COLOUR_TOKEN, EYE_COLOUR_TOKEN, type CreatureData } from '../data';
+import { placeEye } from './eyes';
 import type { Frame } from './frame';
 import { PEN_DIR, PEN_GRIP, PEN_LENGTH, SIDES, type Pad } from './geometry';
 import { css, type Palette, type Rgba } from './palette';
@@ -76,19 +77,10 @@ export function drawEyes(g: CanvasRenderingContext2D, f: Frame, creature: Creatu
 	const colour = palette[EYE_COLOUR_TOKEN[creature.eyes.colour]];
 	const blinkLid = e.blink > 0 ? 1 - Math.abs(Math.cos(e.blink * Math.PI)) : 0;
 	const lt = Math.max(e.lt, blinkLid);
-	const gx = Math.sin(e.gx * 0.9);
-	const gy = Math.sin(e.gy * 0.9);
-	const { radius_x: ER, radius_y: EH, x: SEP, y: EY } = creature.eyes;
 	toLocal(g, f);
-	g.translate(0, EY);
 	const glowPx = 4 * f.stage.unit * f.stage.dpr;
 	for (const side of SIDES) {
-		const er = ER * e.sc;
-		const eh = EH * e.sc;
-		const px = side * SEP + 0.72 * ER * gx;
-		const py = 0.4 * EH * gy;
-		const rw = er * (1 - 0.22 * Math.abs(gx));
-		const rh = eh * (1 - 0.15 * Math.abs(gy));
+		const { x: px, y: py, rx: rw, ry: rh } = placeEye(creature.eyes, e, side);
 		withLids(g, px, py, rw, rh, side, lt, e.tilt, e.lb, () => {
 			g.shadowColor = css(colour, 0.85);
 			g.shadowBlur = glowPx;

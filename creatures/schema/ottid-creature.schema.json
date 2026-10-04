@@ -90,7 +90,7 @@
     },
     "Eyes": {
       "additionalProperties": false,
-      "description": "Two eyes, mirrored about the midline. Positions are from the body's\ncentre, y down.",
+      "description": "Two eyes, mirrored about the midline. Positions are from the body's\ncentre, y down. The engine scales and shifts them as `x-ottid-eye-motion`\nsays, and the lamp must stay clear of them wherever they go.",
       "properties": {
         "colour": {
           "$ref": "#/$defs/EyeColour"
@@ -132,7 +132,13 @@
         "x",
         "y"
       ],
-      "type": "object"
+      "type": "object",
+      "x-ottid-eye-motion": {
+        "gaze_bend": 0.9,
+        "scale_max": 1.25,
+        "shift_x": 0.72,
+        "shift_y": 0.4
+      }
     },
     "Gesture": {
       "description": "The engine's gesture library. Each gesture sets the hands, the lids, the\ngaze and the body's squash; the engine supplies time, voice level and\nplacement. Gestures happen on the outline (the silhouette rule).",

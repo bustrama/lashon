@@ -55,7 +55,10 @@ The frontend had no unit-test framework.
    how the fields fit together:
    - the palm is wider than the arm;
    - the lamp's centre is in the inner 40% of the body and never under an eye,
-     even a startled one, and its glow reaches at least the body's half-height;
+     even a startled one looking toward it, and its glow reaches at least the
+     body's half-height. The engine clamps how far it scales and shifts an
+     eye to the limits the validator checks, and the schema publishes them
+     (`x-ottid-eye-motion` on `Eyes`);
    - the eyes sit inside the body;
    - `write` is used only in dictation, the one state with the notepad;
    - names are plain text, with no control or bidi-override characters.
