@@ -11,7 +11,8 @@
 //! - the timer that denies a request nobody answers;
 //! - two global hotkeys, registered only while a request is pending, since
 //!   the overlay never has keyboard focus (ADR-0044);
-//! - showing a hidden overlay while a request waits, so the card can be seen.
+//! - showing a hidden overlay while a request waits, so the card can be seen;
+//! - calling off a recipe's blocking requests when its take is cancelled.
 //!
 //! Locks: `queue` is held only for quick queue operations. `side` orders the
 //! slow changes that follow the queue (hotkeys, the window), which round-trip
@@ -23,8 +24,8 @@ use std::sync::{mpsc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use ottid_core::approval::{
-    Decision, Id, Queue, Refusal, Request, Shown, ALLOW_ACCELERATOR, ALLOW_KEYS, DENY_ACCELERATOR,
-    DENY_KEYS,
+    Cancel, Decision, Id, Queue, Refusal, Request, Shown, ALLOW_ACCELERATOR, ALLOW_KEYS,
+    DENY_ACCELERATOR, DENY_KEYS,
 };
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
@@ -127,16 +128,40 @@ pub async fn ask(app: &AppHandle, request: Request) -> Decision {
 }
 
 /// Ask the user and block this thread until the answer, for the recipe
-/// runtime's synchronous confirmation gate.
-pub fn ask_blocking(app: &AppHandle, request: Request) -> Decision {
+/// runtime's synchronous confirmation gate. [`cancel`] with the same
+/// `Cancel` calls it off: the card is taken down and the answer is Deny.
+pub fn ask_blocking(app: &AppHandle, request: Request, cancelled: &Cancel) -> Decision {
+    if cancelled.is_cancelled() {
+        return Decision::Deny;
+    }
     let (tx, rx) = mpsc::sync_channel(1);
     let id = submit(app, request, Reply::Blocking(tx));
-    match rx.recv_timeout(BLOCKING_BACKSTOP) {
+    if !cancelled.wait_on(id) {
+        withdraw(app, id);
+        return Decision::Deny;
+    }
+    let decision = match rx.recv_timeout(BLOCKING_BACKSTOP) {
         Ok(decision) => decision,
+        // Withdrawn, which drops the sender, or the backstop ran out.
         Err(_) => {
             withdraw(app, id);
             Decision::Deny
         }
+    };
+    if cancelled.done(id) {
+        Decision::Deny
+    } else {
+        decision
+    }
+}
+
+/// Call off the blocking requests asked with `cancelled`: withdraw the one
+/// being waited on, which answers it Deny, and deny any asked after. Safe
+/// to call on any thread.
+pub fn cancel(app: &AppHandle, cancelled: &Cancel) {
+    if let Some(id) = cancelled.cancel() {
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move { withdraw(&app, id) });
     }
 }
 

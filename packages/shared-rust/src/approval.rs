@@ -19,6 +19,7 @@
 //!   after it was shown.
 
 use std::collections::VecDeque;
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
@@ -378,6 +379,70 @@ impl<T> Queue<T> {
     }
 }
 
+/// Calls off the requests a task asked for, when the task can't be stopped
+/// where it waits: the recipe runtime blocks a thread on each answer, so
+/// aborting a voice-triggered take leaves that thread waiting, and a later
+/// Allow would still run the step.
+///
+/// Cancelling hands back the request being waited on, for the broker to
+/// withdraw, and denies whatever the task asks after that. An answer that
+/// races the cancel doesn't count either.
+#[derive(Debug, Clone, Default)]
+pub struct Cancel(Arc<Mutex<CancelState>>);
+
+#[derive(Debug, Default)]
+struct CancelState {
+    cancelled: bool,
+    waiting: Option<Id>,
+}
+
+impl Cancel {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn state(&self) -> MutexGuard<'_, CancelState> {
+        // Two plain fields: a panic elsewhere leaves them consistent.
+        self.0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// Call the task's requests off. Returns the one it is waiting on, if
+    /// any, to withdraw.
+    pub fn cancel(&self) -> Option<Id> {
+        let mut state = self.state();
+        state.cancelled = true;
+        state.waiting.take()
+    }
+
+    /// Whether the task was called off.
+    pub fn is_cancelled(&self) -> bool {
+        self.state().cancelled
+    }
+
+    /// The task now waits on `id`. False if it was called off already: then
+    /// withdraw `id` at once and deny it.
+    pub fn wait_on(&self, id: Id) -> bool {
+        let mut state = self.state();
+        if state.cancelled {
+            return false;
+        }
+        state.waiting = Some(id);
+        true
+    }
+
+    /// The wait on `id` is over. Whether the task was called off meanwhile,
+    /// in which case its answer must be taken as Deny.
+    pub fn done(&self, id: Id) -> bool {
+        let mut state = self.state();
+        if state.waiting == Some(id) {
+            state.waiting = None;
+        }
+        state.cancelled
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -666,5 +731,47 @@ mod tests {
             Decision::Deny
         );
         assert!(serde_json::from_value::<Decision>(json!("yes")).is_err());
+    }
+
+    #[test]
+    fn cancel_hands_back_the_request_being_waited_on() {
+        let cancel = Cancel::new();
+        assert!(cancel.wait_on(7));
+        assert_eq!(cancel.cancel(), Some(7));
+        // Its answer arrives anyway (the withdrawal denied it, or it raced
+        // the cancel): it doesn't count.
+        assert!(cancel.done(7));
+        assert!(cancel.is_cancelled());
+    }
+
+    #[test]
+    fn cancel_refuses_what_the_task_asks_next() {
+        let cancel = Cancel::new();
+        assert_eq!(cancel.cancel(), None);
+        assert!(!cancel.wait_on(8));
+        assert!(cancel.done(8));
+        // Cancelling again has nothing more to withdraw.
+        assert_eq!(cancel.cancel(), None);
+    }
+
+    #[test]
+    fn an_answer_before_any_cancel_counts() {
+        let cancel = Cancel::new();
+        assert!(cancel.wait_on(1));
+        assert!(!cancel.done(1));
+        assert!(cancel.wait_on(2));
+        assert!(!cancel.done(2));
+        // Cancelling after the last answer withdraws nothing.
+        assert_eq!(cancel.cancel(), None);
+        assert!(cancel.is_cancelled());
+    }
+
+    #[test]
+    fn clones_share_one_cancel() {
+        let task = Cancel::new();
+        let canceller = task.clone();
+        assert!(task.wait_on(3));
+        assert_eq!(canceller.cancel(), Some(3));
+        assert!(task.done(3));
     }
 }

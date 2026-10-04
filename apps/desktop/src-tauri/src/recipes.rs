@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use serde::Serialize;
 use tauri::AppHandle;
 
-use ottid_core::approval::{Decision, Request};
+use ottid_core::approval::{Cancel, Decision, Request};
 use ottid_core::recipes::storage::{
     collect_hub_listings, delete_user_recipe as core_delete_user_recipe, duplicate_to_user,
     find_recipe_by_id, load_recipe, update_recipe_comment as core_update_recipe_comment,
@@ -89,7 +89,8 @@ pub async fn run_recipe(
     let permission_count = recipe.permissions.len();
     let id_for_log = recipe.id.clone();
 
-    let confirm = CardConfirm::new(app.clone());
+    // The Hub has no way to cancel a run, so nothing calls this off.
+    let confirm = CardConfirm::new(app.clone(), Cancel::new());
     let run = execute_recipe(&recipe, args, &confirm)
         .await
         .map_err(|err| format_runtime_error(&err))?;
@@ -220,20 +221,24 @@ fn format_runtime_error(err: &RuntimeError) -> String {
 ///
 /// `pub(crate)` so the M9 dispatcher in `command_mode.rs` reuses it:
 /// voice-triggered and Hub-triggered recipes both ask through the card
-/// (ADR-0028's "one modal per concern, not per trigger").
+/// (ADR-0028's "one modal per concern, not per trigger"). Aborting a
+/// voice-triggered take doesn't reach a thread parked here, so the take
+/// calls its `Cancel` too: the card comes down and the step is denied.
 pub(crate) struct CardConfirm {
     app: AppHandle,
+    cancelled: Cancel,
 }
 
 impl CardConfirm {
-    pub(crate) fn new(app: AppHandle) -> Self {
-        Self { app }
+    pub(crate) fn new(app: AppHandle, cancelled: Cancel) -> Self {
+        Self { app, cancelled }
     }
 }
 
 impl ConfirmHandler for CardConfirm {
     fn confirm(&self, prompt: &str) -> ConfirmDecision {
-        match crate::approval::ask_blocking(&self.app, Request::for_recipe_step(prompt)) {
+        let request = Request::for_recipe_step(prompt);
+        match crate::approval::ask_blocking(&self.app, request, &self.cancelled) {
             Decision::Allow => ConfirmDecision::Allow,
             Decision::Deny => ConfirmDecision::Deny,
         }

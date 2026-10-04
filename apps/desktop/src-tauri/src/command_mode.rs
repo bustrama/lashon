@@ -25,7 +25,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_store::StoreExt;
 
-use ottid_core::approval::{Decision, Request};
+use ottid_core::approval::{Cancel, Decision, Request};
 use ottid_core::command_mode::{dispatch, AlwaysAllow, CommandProgressHandler, ConfirmHandler};
 use ottid_core::recipes::{
     storage::collect_recipes, try_recipe_cascade, CascadeMatcher, CommandRoute,
@@ -79,22 +79,36 @@ struct CommandTranscriptEvent {
 }
 
 /// Tauri-managed state pointing at the **single** in-flight dispatcher
-/// task. When a new take starts, the old task is aborted so two
+/// task. When a new take starts, the old task is stopped so two
 /// chains can't fight over the foreground app. The cancel command
-/// reaches into this same state and aborts the current task.
+/// reaches into this same state and stops the current task.
 #[derive(Default)]
-pub struct ActiveDispatch(std::sync::Mutex<Option<tauri::async_runtime::JoinHandle<()>>>);
+pub struct ActiveDispatch(std::sync::Mutex<Option<Take>>);
+
+/// A take in flight: its task, and the approvals its recipe steps ask
+/// for. A recipe step waits for the card on a blocked thread, which
+/// aborting the task doesn't reach, so stopping calls those off too.
+struct Take {
+    task: tauri::async_runtime::JoinHandle<()>,
+    approvals: Cancel,
+}
+
+impl Take {
+    fn stop(self, app: &AppHandle) {
+        self.task.abort();
+        crate::approval::cancel(app, &self.approvals);
+    }
+}
 
 impl ActiveDispatch {
-    fn replace(&self, task: tauri::async_runtime::JoinHandle<()>) {
+    fn replace(&self, app: &AppHandle, take: Take) {
         if let Ok(mut slot) = self.0.lock() {
-            if let Some(prev) = slot.take() {
-                prev.abort();
+            if let Some(prev) = slot.replace(take) {
+                prev.stop(app);
             }
-            *slot = Some(task);
         }
     }
-    fn take(&self) -> Option<tauri::async_runtime::JoinHandle<()>> {
+    fn take(&self) -> Option<Take> {
         self.0.lock().ok().and_then(|mut slot| slot.take())
     }
 }
@@ -113,8 +127,10 @@ pub fn dispatch_transcript(app: AppHandle, transcript: String) {
         },
     );
     let app_for_task = app.clone();
+    let approvals = Cancel::new();
+    let take_approvals = approvals.clone();
     let task = tauri::async_runtime::spawn(async move {
-        if let Err(err) = run(&app_for_task, transcript).await {
+        if let Err(err) = run(&app_for_task, transcript, take_approvals).await {
             tracing::error!("command_mode: dispatch failed: {err:#}");
             let _ = app_for_task.emit(
                 "command:result",
@@ -130,11 +146,11 @@ pub fn dispatch_transcript(app: AppHandle, transcript: String) {
             let _ = app_for_task.emit("command:state", "idle");
         }
     });
-    // Tauri's app state holds the JoinHandle so `cancel_command` can
-    // abort the take in flight (M8.2). The previous task is aborted
-    // by `replace` — only one take runs at a time.
+    // Tauri's app state holds the take so `cancel_command` can stop
+    // it (M8.2). The previous take is stopped by `replace` — only one
+    // take runs at a time.
     let state = app.state::<ActiveDispatch>();
-    state.replace(task);
+    state.replace(&app, Take { task, approvals });
 }
 
 /// Cancel the in-flight Command-mode take, if any. Aborts the
@@ -149,10 +165,10 @@ pub async fn cancel_command(app: AppHandle) -> Result<(), String> {
     // `state::<ActiveDispatch>()` is always Some — wired in
     // `apps/desktop/src-tauri/src/lib.rs`'s `.manage(...)` call.
     let state = app.state::<ActiveDispatch>();
-    let Some(handle) = state.take() else {
+    let Some(take) = state.take() else {
         return Ok(());
     };
-    handle.abort();
+    take.stop(&app);
     // Tell the tongue we're done; surface a friendly Hebrew message.
     // Done after abort so the user can't see lingering progress events
     // racing the cancellation.
@@ -168,7 +184,7 @@ pub async fn cancel_command(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-async fn run(app: &AppHandle, transcript: String) -> anyhow::Result<()> {
+async fn run(app: &AppHandle, transcript: String, approvals: Cancel) -> anyhow::Result<()> {
     let take_started = std::time::Instant::now();
     // Structural log of inputs — sizes only, no transcript content
     // (`.claude/rules/security.md`).
@@ -220,7 +236,7 @@ async fn run(app: &AppHandle, transcript: String) -> anyhow::Result<()> {
     );
     let matcher = CascadeMatcher::default_phase_1c_v1();
     let recipe_confirm: std::sync::Arc<dyn RecipeConfirmHandler> =
-        std::sync::Arc::new(crate::recipes::CardConfirm::new(app.clone()));
+        std::sync::Arc::new(crate::recipes::CardConfirm::new(app.clone(), approvals));
     match try_recipe_cascade(&matcher, &recipes, recipe_confirm, &transcript).await {
         Ok(CommandRoute::Recipe {
             recipe_id,

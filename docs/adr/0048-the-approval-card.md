@@ -64,6 +64,12 @@ how many are waiting.
 - **Timeout.** A request on screen for 30 s without an answer is denied.
 - **Withdrawal.** If the asker goes away (a new take cancels the command-mode
   task), its request is withdrawn.
+- **Cancelling a voice-triggered recipe.** The recipe runtime waits for the
+  card on a blocked thread, which aborting the take doesn't reach: a later
+  Allow would still have run the step. So each take carries an
+  `ottid_core::approval::Cancel`. Cancelling the take, or starting a new one,
+  withdraws the request it waits on, which answers it Deny, and denies any it
+  asks after. An answer that races the cancel is taken as Deny too.
 
 The frontend's gate is for the user. The broker enforces the same rules on
 its own, so a frontend bug or a hotkey cannot get round them.
