@@ -18,7 +18,7 @@ pub mod pointer;
 pub mod regions;
 
 pub use drag::Drags;
-pub use foreground::Foreground;
+pub use foreground::{Foreground, Handback};
 pub use gaze::{gaze_toward, Gaze, GAZE_FALLOFF};
 pub use geometry::{Point, Rect};
 pub use hit_test::{decide, ClickThrough, Decision, Sample, HIT_MARGIN};

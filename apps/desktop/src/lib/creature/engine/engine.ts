@@ -112,17 +112,33 @@ export function createEngine(
 		if (!visible) return;
 		pending += last ? (now - last) / 1000 : 0;
 		last = now;
+		// At rest, skip frames down to IDLE_FPS; the time still counts.
+		if (!(calm() && now - lastDrawn < 1000 / IDLE_FPS - 2)) {
+			const dt = Math.min(0.1, pending);
+			pending = 0;
+			lastDrawn = now;
+			drawFrame(dt);
+		}
+		// One bad frame must not stop the creature, or its lamp.
+		schedule();
+	}
+
+	/** Whether the last frame drawn threw. */
+	let failing = false;
+
+	/**
+	 * Draw a frame, and say whether it drew. A frame that throws is logged,
+	 * once for a run of failing frames rather than at every frame.
+	 */
+	function drawFrame(dt: number): boolean {
 		try {
-			// At rest, skip frames down to IDLE_FPS; the time still counts.
-			if (!(calm() && now - lastDrawn < 1000 / IDLE_FPS - 2)) {
-				const dt = Math.min(0.1, pending);
-				pending = 0;
-				lastDrawn = now;
-				draw(dt);
-			}
-		} finally {
-			// One bad frame must not stop the creature, or its lamp.
-			schedule();
+			draw(dt);
+			failing = false;
+			return true;
+		} catch (err) {
+			if (!failing) console.error('creature: drawing a frame failed', err);
+			failing = true;
+			return false;
 		}
 	}
 
@@ -140,20 +156,15 @@ export function createEngine(
 		if (retry) cancelAnimationFrame(retry);
 		retry = 0;
 		if (!visible) return;
-		try {
-			draw(0);
-		} catch (err) {
-			// A frame that throws must not break whoever asked for it (an effect
-			// in Creature.svelte). Under reduced motion no loop draws again, and
-			// the lamp would keep showing the last state: try again next frame,
-			// as the loop would.
-			console.error('creature: drawing a frame failed', err);
-			if (latest.reduced) {
-				retry = requestAnimationFrame(() => {
-					retry = 0;
-					drawOnce();
-				});
-			}
+		// A frame that throws must not break whoever asked for it (an effect
+		// in Creature.svelte). Under reduced motion no loop draws again, and
+		// the lamp would keep showing the last state: try again next frame,
+		// as the loop would.
+		if (!drawFrame(0) && latest.reduced) {
+			retry = requestAnimationFrame(() => {
+				retry = 0;
+				drawOnce();
+			});
 		}
 	}
 

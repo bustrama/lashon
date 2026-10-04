@@ -21,8 +21,10 @@
 
 use std::fmt;
 
-use icu_properties::props::DefaultIgnorableCodePoint;
-use icu_properties::CodePointSetData;
+use icu_properties::props::{
+    DefaultIgnorableCodePoint, Emoji, EmojiModifier, ExtendedPictographic, GeneralCategory,
+};
+use icu_properties::{CodePointMapData, CodePointSetData};
 
 use super::schema::{
     Bounds, Creature, Eyes, Gesture, Lamp, ARM_RADIUS, ARM_SOFTNESS, BODY_RADIUS_X, BODY_RADIUS_Y,
@@ -42,10 +44,11 @@ const EYES_INNER: f64 = 0.85;
 pub enum NameProblem {
     Empty,
     TooLong,
-    /// A character that doesn't show as itself: a control character, a line
-    /// or paragraph separator, or one Unicode makes invisible by default (a
-    /// zero-width space, a bidi embedding, override or isolate, a tag
-    /// character, a filler).
+    /// A character that doesn't show as itself: a control or format
+    /// character, a line or paragraph separator, or one Unicode makes
+    /// invisible by default (a zero-width space, a bidi embedding, override
+    /// or isolate, a tag character, a filler). Emoji sequences keep their
+    /// joiners and variation selectors.
     HiddenCharacter,
 }
 
@@ -356,30 +359,74 @@ fn name_problem(name: &str) -> Option<NameProblem> {
     if name.chars().count() as f64 > NAME_CHARS.max {
         return Some(NameProblem::TooLong);
     }
-    if name.chars().any(is_hidden) {
+    if has_hidden_character(name) {
         return Some(NameProblem::HiddenCharacter);
     }
     None
 }
 
-/// A character a name may not hold, because it doesn't show as itself.
+/// Whether a name holds a character that doesn't show as itself.
 ///
-/// - Control characters, and the line and paragraph separators, which break
-///   a name across lines.
+/// - Control and format characters (general categories Cc and Cf), and the
+///   line and paragraph separators (Zl, Zp), which break a name across
+///   lines. Format characters include the zero-width spaces and joiners,
+///   the bidi embeddings, overrides and isolates that make a name display as
+///   something else, and the interlinear annotation characters.
 /// - Unicode's Default_Ignorable_Code_Point characters, which render as
-///   nothing: zero-width spaces and joiners, the bidi embeddings, overrides
-///   and isolates that make a name display as something else, the Arabic
-///   letter mark, variation selectors, tag characters and fillers. That also
-///   rules out emoji joined into one with a zero-width joiner.
+///   nothing: besides most format characters, the variation selectors, the
+///   combining grapheme joiner, tag characters and fillers.
+/// - U+2800 BRAILLE PATTERN BLANK, a symbol whose glyph is empty: it passes
+///   for a space it isn't. It is the one such character no Unicode property
+///   marks.
 ///
-/// The left-to-right and right-to-left marks (U+200E, U+200F) are allowed:
-/// they are how a Hebrew name with an English word in it reads right.
-fn is_hidden(c: char) -> bool {
+/// Allowed among these:
+/// - the left-to-right and right-to-left marks (U+200E, U+200F): they are
+///   how a Hebrew name with an English word in it reads right;
+/// - emoji as an emoji picker types them (Unicode TS #51): a text or emoji
+///   variation selector (U+FE0E, U+FE0F) right after an emoji character, as
+///   in ❤️, and a zero-width joiner between two emoji, as in 👩‍💻 or 🏳️‍🌈.
+///   Tag characters stay out, even in the flag sequences that use them:
+///   they can carry text no one sees.
+fn has_hidden_character(name: &str) -> bool {
+    let chars: Vec<char> = name.chars().collect();
+    (0..chars.len()).any(|i| {
+        let before = i.checked_sub(1).map(|j| chars[j]);
+        is_hidden(chars[i], before, chars.get(i + 1).copied())
+    })
+}
+
+/// [`has_hidden_character`] for one character, between `before` and `after`.
+fn is_hidden(c: char, before: Option<char>, after: Option<char>) -> bool {
     const MARKS: [char; 2] = ['\u{200E}', '\u{200F}'];
-    let invisible = CodePointSetData::new::<DefaultIgnorableCodePoint>();
-    c.is_control()
-        || matches!(c, '\u{2028}' | '\u{2029}')
-        || (invisible.contains(c) && !MARKS.contains(&c))
+    const BRAILLE_BLANK: char = '\u{2800}';
+    let unseen = matches!(
+        CodePointMapData::<GeneralCategory>::new().get(c),
+        GeneralCategory::Control
+            | GeneralCategory::Format
+            | GeneralCategory::LineSeparator
+            | GeneralCategory::ParagraphSeparator
+    ) || CodePointSetData::new::<DefaultIgnorableCodePoint>().contains(c)
+        || c == BRAILLE_BLANK;
+    if !unseen || MARKS.contains(&c) {
+        return false;
+    }
+    let emoji = |c: char| CodePointSetData::new::<Emoji>().contains(c);
+    let pictographic = |c: char| CodePointSetData::new::<ExtendedPictographic>().contains(c);
+    match c {
+        // A variation selector shows its emoji as text or as an emoji.
+        '\u{FE0E}' | '\u{FE0F}' => !before.is_some_and(emoji),
+        // A joiner makes one emoji of two: after an emoji (with its skin
+        // tone or presentation selector) and before a pictograph.
+        '\u{200D}' => {
+            let joins_from = before.is_some_and(|b| {
+                pictographic(b)
+                    || CodePointSetData::new::<EmojiModifier>().contains(b)
+                    || b == '\u{FE0F}'
+            });
+            !(joins_from && after.is_some_and(pictographic))
+        }
+        _ => true,
+    }
 }
 
 /// Whether an eye can cover the lamp's centre anywhere the engine moves it:
@@ -583,6 +630,20 @@ mod tests {
             ("hangul filler", "\u{3164}"),
             ("only invisible", "\u{200B}\u{200B}"),
             ("control", "Ot\u{0007}tid"),
+            ("interlinear annotation anchor", "Ot\u{FFF9}tid"),
+            ("interlinear annotation separator", "Ot\u{FFFA}tid"),
+            ("interlinear annotation terminator", "Ottid\u{FFFB}"),
+            ("braille pattern blank", "Ot\u{2800}tid"),
+            ("only braille pattern blanks", "\u{2800}\u{2800}"),
+            ("joiner from an emoji to a letter", "🦦\u{200D}Ottid"),
+            ("joiner from a letter to an emoji", "Ottid\u{200D}🦦"),
+            ("joiner after the last emoji", "Ottid 👩\u{200D}"),
+            ("emoji selector on a letter", "Ot\u{FE0F}tid"),
+            ("text selector on a letter", "אוטיד\u{FE0E}"),
+            (
+                "tag characters in a flag",
+                "🏴\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}",
+            ),
         ];
         for (what, name) in hidden {
             let mut v = default_value();
@@ -608,6 +669,97 @@ mod tests {
             "Ottid 🦦",             // an emoji on its own
         ];
         for name in plain {
+            let mut v = default_value();
+            v["name"]["he"] = serde_json::json!(name);
+            assert!(validate_value(&v).is_ok(), "{name:?}");
+        }
+    }
+
+    #[test]
+    fn names_keep_emoji_as_the_emoji_panel_types_them() {
+        let emoji = [
+            ("a heart", "Ottid \u{2764}\u{FE0F}"),
+            ("a sun", "\u{2600}\u{FE0F} שמשי"),
+            ("a smile as text", "\u{263A}\u{FE0E}"),
+            ("a keycap", "1\u{FE0F}\u{20E3}"),
+            ("a coder", "\u{1F469}\u{200D}\u{1F4BB} Coder"),
+            (
+                "a coder with a skin tone",
+                "\u{1F469}\u{1F3FD}\u{200D}\u{1F4BB}",
+            ),
+            ("a family", "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}"),
+            ("a rainbow flag", "\u{1F3F3}\u{FE0F}\u{200D}\u{1F308}"),
+            ("a polar bear", "\u{1F43B}\u{200D}\u{2744}\u{FE0F}"),
+            ("a flag of letters", "\u{1F1EE}\u{1F1F1}"),
+        ];
+        for (what, name) in emoji {
+            let mut v = default_value();
+            v["name"]["en"] = serde_json::json!(name);
+            assert!(validate_value(&v).is_ok(), "{what}: {name:?}");
+        }
+    }
+
+    #[test]
+    fn names_keep_every_hebrew_letter_point_and_accent() {
+        // Every letter, and every combining mark of the Hebrew block on a
+        // letter: the niqqud (vowel points, dagesh, shin and sin dots, rafe,
+        // meteg) and the cantillation accents.
+        let gc = CodePointMapData::<GeneralCategory>::new();
+        let hebrew = '\u{0591}'..='\u{05F4}';
+        let letters: String = hebrew
+            .clone()
+            .filter(|&c| gc.get(c) == GeneralCategory::OtherLetter)
+            .collect();
+        // 27 letters, the yod triangle and 3 Yiddish ligatures.
+        assert_eq!(letters.chars().count(), 31, "{letters}");
+        let marks: Vec<char> = hebrew
+            .filter(|&c| gc.get(c) == GeneralCategory::NonspacingMark)
+            .collect();
+        assert!(marks.contains(&'\u{05B4}') && marks.contains(&'\u{0596}'));
+        for chunk in letters.chars().collect::<Vec<_>>().chunks(16) {
+            let name: String = chunk.iter().collect();
+            let mut v = default_value();
+            v["name"]["he"] = serde_json::json!(name);
+            assert!(validate_value(&v).is_ok(), "{name:?}");
+        }
+        for mark in marks {
+            let name = format!("\u{05D0}{mark}\u{05D1}");
+            let mut v = default_value();
+            v["name"]["he"] = serde_json::json!(name);
+            assert!(validate_value(&v).is_ok(), "U+{:04X}", mark as u32);
+        }
+        // A word with points, an accent and a maqaf, as written.
+        let mut v = default_value();
+        v["name"]["he"] = serde_json::json!(
+            "\u{05D1}\u{05BC}\u{05B0}\u{05E8}\u{05B5}\u{05D0}\u{05E9}\u{05C1}\u{05B4}\u{0596}\u{05D9}\u{05EA}\u{05BE}\u{05D0}"
+        );
+        assert!(validate_value(&v).is_ok());
+    }
+
+    #[test]
+    fn names_keep_every_hebrew_punctuation_mark() {
+        // The maqaf, paseq, sof pasuq, nun hafukha, geresh and gershayim.
+        let gc = CodePointMapData::<GeneralCategory>::new();
+        let marks: Vec<char> = ('\u{0591}'..='\u{05F4}')
+            .filter(|&c| {
+                matches!(
+                    gc.get(c),
+                    GeneralCategory::DashPunctuation | GeneralCategory::OtherPunctuation
+                )
+            })
+            .collect();
+        assert_eq!(
+            marks,
+            ['\u{05BE}', '\u{05C0}', '\u{05C3}', '\u{05C6}', '\u{05F3}', '\u{05F4}']
+        );
+        for mark in marks {
+            let name = format!("\u{05D0}{mark}\u{05D1}");
+            let mut v = default_value();
+            v["name"]["he"] = serde_json::json!(name);
+            assert!(validate_value(&v).is_ok(), "U+{:04X}", mark as u32);
+        }
+        // As written: a geresh in a borrowed sound, gershayim in an acronym.
+        for name in ["צ\u{05F3}יפס", "צה\u{05F4}ל"] {
             let mut v = default_value();
             v["name"]["he"] = serde_json::json!(name);
             assert!(validate_value(&v).is_ok(), "{name:?}");

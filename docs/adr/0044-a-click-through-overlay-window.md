@@ -65,8 +65,9 @@ character, artwork, icons, sounds and media, so we ported mechanics only.
    takes no clicks before the poll's next look), and without a layout or a
    global cursor. The frontend only reports **regions**: every element marked
    `data-interactive="<name>"`, measured in physical pixels relative to the
-   window, with the scale they were measured at. Each report carries the
-   page's id and a count, and the poll drops one older than the last it
+   window, with the scale they were measured at. Each report carries an
+   epoch the poll handed the page, later for a reloaded page than for any
+   before it, and a count. The poll drops a report older than the last it
    applied, since async commands can be handled out of order. The poll
    rescales them if the window has since moved to a display with another
    scale, adds an 8 px margin, and keeps the mouse while a drag is held.
