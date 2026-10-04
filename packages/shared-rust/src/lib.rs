@@ -5,6 +5,7 @@
 //! link only the networking stack and run cleanly on every OS. See
 //! `docs/adr/0003-core-logic-in-a-tauri-independent-crate.md`.
 
+pub mod approval;
 pub mod audio;
 #[cfg(feature = "command-mode")]
 pub mod command_mode;

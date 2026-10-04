@@ -1,14 +1,15 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { register, unregisterAll } from '@tauri-apps/plugin-global-shortcut';
+	import { register, unregister } from '@tauri-apps/plugin-global-shortcut';
 	import { invoke } from '@tauri-apps/api/core';
-	import { emit, listen } from '@tauri-apps/api/event';
+	import { listen } from '@tauri-apps/api/event';
 	import { t } from '$lib/i18n';
 	import type { DictationState, DictationPartial } from '$lib/dictation';
 	import { getSetting, DEFAULTS } from '$lib/settings';
 	import { creatureState, type CommandState, type TakeMode } from '$lib/creature';
 	import Overlay from '$lib/overlay/Overlay.svelte';
 	import { IslandHold } from '$lib/overlay/island';
+	import type { ApprovalCard, ApprovalDecision, ApprovalNudge } from '$lib/overlay/approval';
 	import DebugSurface from '$lib/components/DebugSurface.svelte';
 	import { FULL_EDITION } from '$lib/edition';
 
@@ -90,27 +91,28 @@
 	let commandTranscript = $state<string | null>(null);
 	let commandCancellable = $state(false);
 
-	// M8 confirmation card. When the Rust dispatcher needs the user's yes/no
-	// before executing a destructive tool, it emits `command:confirm`; the
-	// island shows Allow/Deny. For `run_command` the Rust side also fills
-	// `command_preview` / `cwd_preview` so the card can render the literal
-	// shell command as an untruncated code block instead of the JSON args
-	// preview the other destructive tools use (`docs/stories/m8-os-tools.md`).
-	type ConfirmRequest = {
-		id: string;
-		tool: string;
-		args_preview: string;
-		command_preview?: string;
-		cwd_preview?: string;
-	};
-	let confirmRequest = $state<ConfirmRequest | null>(null);
+	// The approval card (docs/adr/0048). The Rust broker holds the queue of
+	// requests that wait for the user's yes or no (a command-mode tool, a
+	// recipe step) and sends the one to show on `approval:changed`, or null
+	// when none waits. The answer goes back to the broker, which also takes
+	// it from the hotkeys and denies the request when its time runs out.
+	let approval = $state<ApprovalCard | null>(null);
+	// An early press of the Allow hotkey, for the card to explain.
+	let approvalNudge = $state<ApprovalNudge | null>(null);
+
+	function answerApproval(id: number, decision: ApprovalDecision): void {
+		void invoke('approval_answer', { id, decision }).catch(() => {});
+	}
+	function armApproval(id: number): void {
+		void invoke('approval_armed', { id }).catch(() => {});
+	}
 
 	const current = $derived(
 		creatureState({
 			dictation: dictationState,
 			takeMode,
 			commandState,
-			confirming: !!confirmRequest,
+			confirming: !!approval,
 			woke
 		})
 	);
@@ -172,40 +174,62 @@
 		);
 	}
 
+	// The chords this page registered, so it can take back exactly those: the
+	// plugin's `unregisterAll` would also drop the approval card's hotkeys,
+	// which the Rust shell registers while a card is pending.
+	const registered = new Set<string>();
+	function add(chord: string, handler: (event: { state: string }) => void): Promise<void> {
+		return register(chord, handler).then(() => void registered.add(chord));
+	}
+
 	function registerShortcuts(): void {
-		void register(DEBUG_SHORTCUT, (event) => {
+		void add(DEBUG_SHORTCUT, (event) => {
 			if (event.state === 'Pressed') {
 				debugVisible = !debugVisible;
 			}
-		});
+		}).catch(() => {});
 		// `validate_hotkey` is only a policy gate — a chord can still fail to
 		// register (most often an OS-level conflict with another app). If it
 		// does, fall back to the default so dictation is never left without a
 		// working hotkey.
-		void register(dictationShortcut, onDictationEdge).catch((err) => {
+		void add(dictationShortcut, onDictationEdge).catch((err) => {
 			console.warn(`dictation hotkey "${dictationShortcut}" could not be registered:`, err);
 			if (dictationShortcut !== DEFAULTS['hotkeys.dictation']) {
 				dictationShortcut = DEFAULTS['hotkeys.dictation'];
-				void register(dictationShortcut, onDictationEdge).catch(() => {});
+				void add(dictationShortcut, onDictationEdge).catch(() => {});
 			}
 		});
 		// Command mode is full-edition only — the free dictation build has no
 		// command backend, so don't register the chord (it would shadow Ctrl+`
 		// globally and error on press). See docs/adr/0034.
-		if (FULL_EDITION) void register(commandShortcut, onCommandEdge).catch((err) => {
+		if (FULL_EDITION) void add(commandShortcut, onCommandEdge).catch((err) => {
 			console.warn(`command hotkey "${commandShortcut}" could not be registered:`, err);
 			if (commandShortcut !== DEFAULTS['hotkeys.command']) {
 				commandShortcut = DEFAULTS['hotkeys.command'];
-				void register(commandShortcut, onCommandEdge).catch(() => {});
+				void add(commandShortcut, onCommandEdge).catch(() => {});
 			}
 		});
 	}
 
-	// Clear every registration, then register the current chords fresh — used
-	// on mount and whenever the dictation hotkey is rebound. Re-registering
-	// over a live shortcut fails, so the slate is always cleared first.
+	// Take back this page's chords, then register the current ones fresh —
+	// used on mount and whenever a hotkey is rebound. Re-registering over a
+	// live shortcut fails, so the old ones go first. A dev remount starts with
+	// an empty `registered` while the old chords stay live, so the current
+	// and default chords are taken back too; one that isn't registered just
+	// fails on its own.
 	function refreshShortcuts(): void {
-		void unregisterAll().finally(registerShortcuts);
+		const chords = new Set([
+			...registered,
+			DEBUG_SHORTCUT,
+			dictationShortcut,
+			commandShortcut,
+			DEFAULTS['hotkeys.dictation'],
+			DEFAULTS['hotkeys.command']
+		]);
+		registered.clear();
+		void Promise.allSettled([...chords].map((chord) => unregister(chord))).then(
+			registerShortcuts
+		);
 	}
 
 	function onCommandResult(payload: {
@@ -311,18 +335,6 @@
 		}
 	}
 
-	async function allowConfirm(): Promise<void> {
-		if (!confirmRequest) return;
-		await emit('command:confirm:reply', { id: confirmRequest.id, decision: 'allow' });
-		confirmRequest = null;
-	}
-
-	async function denyConfirm(): Promise<void> {
-		if (!confirmRequest) return;
-		await emit('command:confirm:reply', { id: confirmRequest.id, decision: 'deny' });
-		confirmRequest = null;
-	}
-
 	onMount(() => {
 		// The Rust dictation worker drives the creature's listening states.
 		const stateUnlisten = listen<DictationState>('dictation:state', (event) => {
@@ -341,7 +353,7 @@
 				takeMode === 'dictation' &&
 				commandState === 'idle' &&
 				!commandTranscript &&
-				!confirmRequest
+				!approval
 			) {
 				takeMode = 'idle';
 			}
@@ -351,14 +363,30 @@
 		const partialUnlisten = listen<DictationPartial>('dictation:partial', (event) => {
 			partial = event.payload;
 		});
-		// M8 — command-mode result + confirmation events from Rust.
+		// M8 — the command-mode result from Rust.
 		const commandResultUnlisten = listen<{
 			text: string;
 			tool_summaries: string[];
 			turns: number;
 		}>('command:result', (event) => onCommandResult(event.payload));
-		const commandConfirmUnlisten = listen<ConfirmRequest>('command:confirm', (event) => {
-			confirmRequest = event.payload;
+		// The approval card. Ask for the current one only once subscribed,
+		// and let any event that lands first win. The free edition has no
+		// broker: the command fails and no card ever shows.
+		let approvalHeard = false;
+		const approvalUnlisten = listen<ApprovalCard | null>('approval:changed', (event) => {
+			approvalHeard = true;
+			approval = event.payload;
+		});
+		void approvalUnlisten
+			.then(() => invoke<ApprovalCard | null>('approval_current'))
+			.then((card) => {
+				if (!approvalHeard) approval = card;
+			})
+			.catch(() => {});
+		const nudgeUnlisten = listen<Omit<ApprovalNudge, 'n'>>('approval:nudge', (event) => {
+			const { id, kind } = event.payload;
+			const n = approvalNudge?.id === id ? approvalNudge.n + 1 : 1;
+			approvalNudge = { id, n, kind };
 		});
 		// M8.1 — live progress feedback. `command:state` flips the
 		// indicator on/off; `command:tool` rolls the per-tool flash.
@@ -439,7 +467,8 @@
 			void stateUnlisten.then((unlisten) => unlisten());
 			void partialUnlisten.then((unlisten) => unlisten());
 			void commandResultUnlisten.then((unlisten) => unlisten());
-			void commandConfirmUnlisten.then((unlisten) => unlisten());
+			void approvalUnlisten.then((unlisten) => unlisten());
+			void nudgeUnlisten.then((unlisten) => unlisten());
 			void commandStateUnlisten.then((unlisten) => unlisten());
 			void commandToolUnlisten.then((unlisten) => unlisten());
 			void commandTranscriptUnlisten.then((unlisten) => unlisten());
@@ -461,9 +490,11 @@
 	state={current}
 	wakeArmed={wakeActive}
 	mode={takeMode === 'idle' ? null : takeMode}
-	announcement={current === 'idle' && wakeActive
-		? $t('creature.wakeArmed')
-		: $t(`creature.states.${current}`)}
+	announcement={approval
+		? $t('creature.states.confirm')
+		: current === 'idle' && wakeActive
+			? $t('creature.wakeArmed')
+			: $t(`creature.states.${current}`)}
 	island={{
 		listening: dictationState === 'capturing',
 		takeMode,
@@ -474,9 +505,10 @@
 		commandTranscript,
 		commandCancellable,
 		commandFlash,
-		confirmRequest,
-		onAllow: () => void allowConfirm(),
-		onDeny: () => void denyConfirm(),
+		approval,
+		approvalNudge,
+		onApprovalArmed: armApproval,
+		onApprovalAnswer: answerApproval,
 		onCancel: () => void cancelCommand()
 	}}
 	extra={debugVisible ? debugCard : undefined}

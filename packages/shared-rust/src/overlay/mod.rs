@@ -13,6 +13,7 @@ pub mod foreground;
 pub mod gaze;
 pub mod geometry;
 pub mod hit_test;
+pub mod keyboard;
 pub mod placement;
 pub mod pointer;
 pub mod regions;

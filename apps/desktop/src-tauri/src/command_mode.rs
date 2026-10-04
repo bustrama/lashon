@@ -7,9 +7,9 @@
 //!    URL from `settings.json`, the same way `test_llm_prompt` does.
 //! 2. Build a fresh provider instance (cheap; HTTP client only).
 //! 3. Build the Phase-1 `ToolRegistry`.
-//! 4. Pick a `ConfirmHandler` — `EventBasedConfirm` that emits
-//!    `command:confirm` and awaits a `command:confirm:reply` event from
-//!    the tongue.
+//! 4. Pick a `ConfirmHandler` — `CardConfirm`, which asks through the
+//!    approval card (`crate::approval`, docs/adr/0048) and awaits the
+//!    user's answer.
 //! 5. Spawn `ottid_core::command_mode::dispatch` on the Tauri async
 //!    runtime; emit the result as a `command:result` event the tongue
 //!    flashes.
@@ -20,13 +20,12 @@
 
 use std::pin::Pin;
 use std::sync::Arc;
-use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Listener, Manager};
+use serde::Serialize;
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_store::StoreExt;
-use tokio::sync::oneshot;
 
+use ottid_core::approval::{Cancel, Decision, Request};
 use ottid_core::command_mode::{dispatch, AlwaysAllow, CommandProgressHandler, ConfirmHandler};
 use ottid_core::recipes::{
     storage::collect_recipes, try_recipe_cascade, CascadeMatcher, CommandRoute,
@@ -50,38 +49,6 @@ struct CommandResultEvent {
     text: String,
     tool_summaries: Vec<String>,
     turns: usize,
-}
-
-/// Payload of the `command:confirm` event. The tongue renders a modal
-/// asking the user to allow / deny the named tool.
-#[derive(Debug, Clone, Serialize)]
-struct CommandConfirmRequest {
-    /// Correlation id — the tongue echoes this back in its reply so
-    /// concurrent confirm prompts can't be confused.
-    id: String,
-    tool: String,
-    /// Best-effort JSON-stringified args. The tongue truncates to a
-    /// readable preview in its modal for everything except
-    /// `run_command`, which uses the `command_preview` field below for
-    /// untruncated code-block rendering.
-    args_preview: String,
-    /// Set when `tool == "run_command"`: the literal command line and
-    /// resolved cwd, rendered as `<code>` in the modal so the user can
-    /// read every character before approving. The Rust side picks this
-    /// up from the args; the Svelte modal switches its preview render
-    /// path on its presence.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    command_preview: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    cwd_preview: Option<String>,
-}
-
-/// Payload of the `command:confirm:reply` event the tongue emits.
-#[derive(Debug, Deserialize)]
-struct CommandConfirmReply {
-    id: String,
-    /// `"allow"` or `"deny"` — anything else is treated as `"deny"`.
-    decision: String,
 }
 
 /// Payload of the `command:tool` event. The tongue rolls the
@@ -112,22 +79,36 @@ struct CommandTranscriptEvent {
 }
 
 /// Tauri-managed state pointing at the **single** in-flight dispatcher
-/// task. When a new take starts, the old task is aborted so two
+/// task. When a new take starts, the old task is stopped so two
 /// chains can't fight over the foreground app. The cancel command
-/// reaches into this same state and aborts the current task.
+/// reaches into this same state and stops the current task.
 #[derive(Default)]
-pub struct ActiveDispatch(std::sync::Mutex<Option<tauri::async_runtime::JoinHandle<()>>>);
+pub struct ActiveDispatch(std::sync::Mutex<Option<Take>>);
+
+/// A take in flight: its task, and the approvals its recipe steps ask
+/// for. A recipe step waits for the card on a blocked thread, which
+/// aborting the task doesn't reach, so stopping calls those off too.
+struct Take {
+    task: tauri::async_runtime::JoinHandle<()>,
+    approvals: Cancel,
+}
+
+impl Take {
+    fn stop(self, app: &AppHandle) {
+        self.task.abort();
+        crate::approval::cancel(app, &self.approvals);
+    }
+}
 
 impl ActiveDispatch {
-    fn replace(&self, task: tauri::async_runtime::JoinHandle<()>) {
+    fn replace(&self, app: &AppHandle, take: Take) {
         if let Ok(mut slot) = self.0.lock() {
-            if let Some(prev) = slot.take() {
-                prev.abort();
+            if let Some(prev) = slot.replace(take) {
+                prev.stop(app);
             }
-            *slot = Some(task);
         }
     }
-    fn take(&self) -> Option<tauri::async_runtime::JoinHandle<()>> {
+    fn take(&self) -> Option<Take> {
         self.0.lock().ok().and_then(|mut slot| slot.take())
     }
 }
@@ -146,8 +127,10 @@ pub fn dispatch_transcript(app: AppHandle, transcript: String) {
         },
     );
     let app_for_task = app.clone();
+    let approvals = Cancel::new();
+    let take_approvals = approvals.clone();
     let task = tauri::async_runtime::spawn(async move {
-        if let Err(err) = run(&app_for_task, transcript).await {
+        if let Err(err) = run(&app_for_task, transcript, take_approvals).await {
             tracing::error!("command_mode: dispatch failed: {err:#}");
             let _ = app_for_task.emit(
                 "command:result",
@@ -163,11 +146,11 @@ pub fn dispatch_transcript(app: AppHandle, transcript: String) {
             let _ = app_for_task.emit("command:state", "idle");
         }
     });
-    // Tauri's app state holds the JoinHandle so `cancel_command` can
-    // abort the take in flight (M8.2). The previous task is aborted
-    // by `replace` — only one take runs at a time.
+    // Tauri's app state holds the take so `cancel_command` can stop
+    // it (M8.2). The previous take is stopped by `replace` — only one
+    // take runs at a time.
     let state = app.state::<ActiveDispatch>();
-    state.replace(task);
+    state.replace(&app, Take { task, approvals });
 }
 
 /// Cancel the in-flight Command-mode take, if any. Aborts the
@@ -182,10 +165,10 @@ pub async fn cancel_command(app: AppHandle) -> Result<(), String> {
     // `state::<ActiveDispatch>()` is always Some — wired in
     // `apps/desktop/src-tauri/src/lib.rs`'s `.manage(...)` call.
     let state = app.state::<ActiveDispatch>();
-    let Some(handle) = state.take() else {
+    let Some(take) = state.take() else {
         return Ok(());
     };
-    handle.abort();
+    take.stop(&app);
     // Tell the tongue we're done; surface a friendly Hebrew message.
     // Done after abort so the user can't see lingering progress events
     // racing the cancellation.
@@ -201,7 +184,7 @@ pub async fn cancel_command(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-async fn run(app: &AppHandle, transcript: String) -> anyhow::Result<()> {
+async fn run(app: &AppHandle, transcript: String, approvals: Cancel) -> anyhow::Result<()> {
     let take_started = std::time::Instant::now();
     // Structural log of inputs — sizes only, no transcript content
     // (`.claude/rules/security.md`).
@@ -253,7 +236,7 @@ async fn run(app: &AppHandle, transcript: String) -> anyhow::Result<()> {
     );
     let matcher = CascadeMatcher::default_phase_1c_v1();
     let recipe_confirm: std::sync::Arc<dyn RecipeConfirmHandler> =
-        std::sync::Arc::new(crate::recipes::EventBasedConfirm::new(app.clone()));
+        std::sync::Arc::new(crate::recipes::CardConfirm::new(app.clone(), approvals));
     match try_recipe_cascade(&matcher, &recipes, recipe_confirm, &transcript).await {
         Ok(CommandRoute::Recipe {
             recipe_id,
@@ -362,10 +345,9 @@ async fn run(app: &AppHandle, transcript: String) -> anyhow::Result<()> {
     let registry = Arc::new(phase_one_registry());
     let ui_language = read_setting(app, "ui.language").unwrap_or_else(|| "he".into());
 
-    // Pick the confirmation handler. Phase-1 tools are all safe so the
-    // event-based handler never actually emits; we wire it anyway so
-    // M8.2's destructive tools just work.
-    let confirm: Arc<dyn ConfirmHandler> = Arc::new(EventBasedConfirm::new(app.clone()));
+    // Destructive tools (run_command, file_delete, …) ask through the
+    // approval card before they run.
+    let confirm: Arc<dyn ConfirmHandler> = Arc::new(CardConfirm::new(app.clone()));
     // Progress handler emits `command:state` (`thinking` / `idle`) and
     // `command:tool` events to the tongue so the user sees what's
     // happening at every step of the tool chain (M8.1).
@@ -515,100 +497,32 @@ fn build_llm_provider(
     Ok(Arc::new(provider))
 }
 
-/// A confirmation handler that emits `command:confirm` to the tongue
-/// and waits for `command:confirm:reply`. Default 30s timeout — past
-/// that the dispatcher gets a Deny so a forgotten modal can't wedge
-/// the take forever.
-struct EventBasedConfirm {
+/// The command-mode confirmation gate: asks through the approval card
+/// (`crate::approval`) and waits for the answer. The card shows the full
+/// request and denies it after 30 s unanswered; if the take is aborted
+/// first, the card is taken down.
+struct CardConfirm {
     app: AppHandle,
 }
 
-impl EventBasedConfirm {
+impl CardConfirm {
     fn new(app: AppHandle) -> Self {
         Self { app }
     }
 }
 
-impl ConfirmHandler for EventBasedConfirm {
+impl ConfirmHandler for CardConfirm {
     fn confirm<'a>(
         &'a self,
         tool_name: &'a str,
         args: &'a serde_json::Value,
     ) -> Pin<Box<dyn std::future::Future<Output = ConfirmDecision> + Send + 'a>> {
-        let app = self.app.clone();
-        let tool_name = tool_name.to_string();
-        let args_preview = args.to_string();
-        // For `run_command` the modal must show the full literal
-        // command (and the resolved cwd, if set) as a code block, no
-        // truncation — the user needs to read every character before
-        // approving a shell command. For every other destructive tool
-        // the existing JSON-preview path is enough.
-        let (command_preview, cwd_preview) = if tool_name == "run_command" {
-            let command = args
-                .get("command")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            let cwd = args
-                .get("cwd")
-                .and_then(|v| v.as_str())
-                .filter(|s| !s.trim().is_empty())
-                .map(|s| s.to_string());
-            (command, cwd)
-        } else {
-            (None, None)
-        };
+        let request = Request::for_tool(tool_name, args);
         Box::pin(async move {
-            let id = format!(
-                "confirm-{}-{}",
-                std::process::id(),
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_nanos())
-                    .unwrap_or(0)
-            );
-            let (tx, rx) = oneshot::channel::<ConfirmDecision>();
-            let tx = std::sync::Mutex::new(Some(tx));
-            let id_clone = id.clone();
-            let handler = app.listen("command:confirm:reply", move |event| {
-                let Ok(reply) = serde_json::from_str::<CommandConfirmReply>(event.payload()) else {
-                    return;
-                };
-                if reply.id != id_clone {
-                    return;
-                }
-                let decision = if reply.decision == "allow" {
-                    ConfirmDecision::Allow
-                } else {
-                    ConfirmDecision::Deny
-                };
-                if let Some(tx) = tx.lock().unwrap().take() {
-                    let _ = tx.send(decision);
-                }
-            });
-            if let Err(err) = app.emit(
-                "command:confirm",
-                CommandConfirmRequest {
-                    id: id.clone(),
-                    tool: tool_name,
-                    args_preview,
-                    command_preview,
-                    cwd_preview,
-                },
-            ) {
-                tracing::warn!("command_mode: failed to emit confirm request: {err}");
-                app.unlisten(handler);
-                return ConfirmDecision::Deny;
+            match crate::approval::ask(&self.app, request).await {
+                Decision::Allow => ConfirmDecision::Allow,
+                Decision::Deny => ConfirmDecision::Deny,
             }
-            let decision = match tokio::time::timeout(Duration::from_secs(30), rx).await {
-                Ok(Ok(d)) => d,
-                Ok(Err(_)) => ConfirmDecision::Deny,
-                Err(_) => {
-                    tracing::warn!("command_mode: confirmation timed out");
-                    ConfirmDecision::Deny
-                }
-            };
-            app.unlisten(handler);
-            decision
         })
     }
 }

@@ -8,6 +8,8 @@
 //! capture, transcription, and text injection to the ottid-core crate.
 
 #[cfg(feature = "command-mode")]
+mod approval;
+#[cfg(feature = "command-mode")]
 mod command_mode;
 mod dictation;
 #[cfg(feature = "command-mode")]
@@ -131,8 +133,12 @@ async fn install_wake_model(id: String) -> Result<String, String> {
 /// The menu brings the overlay to the front (Windows closes a popup on a
 /// click elsewhere only when its owner is in front). The front goes back to
 /// the user's app once the item is known, or the next dictation types into
-/// the overlay; an item that opens a window keeps it instead (see
-/// `ottid_core::overlay::Handback`).
+/// the overlay. The exceptions open a window that takes the front instead.
+/// Settings and Tutorial open one of ours, and the front goes back after
+/// them only if it couldn't take it. The logs folder opens in the file
+/// manager in its own time, so the front is left for it, unless the folder
+/// couldn't be opened. See `handle_menu_event` and
+/// `ottid_core::overlay::Handback`.
 #[tauri::command]
 fn show_tongue_menu(window: tauri::Window, menu: tauri::State<'_, Menu<tauri::Wry>>) {
     use tauri::menu::ContextMenu;
@@ -306,7 +312,8 @@ pub fn run() {
     #[cfg(feature = "command-mode")]
     let builder = builder
         .manage(LlamaServerState::default())
-        .manage(command_mode::ActiveDispatch::default());
+        .manage(command_mode::ActiveDispatch::default())
+        .manage(approval::Approvals::default());
 
     builder
         // Every menu selection arrives here once: the tray's and the
@@ -345,6 +352,14 @@ pub fn run() {
             command_mode::command_mode_dispatch_text,
             #[cfg(feature = "command-mode")]
             command_mode::cancel_command,
+            #[cfg(feature = "command-mode")]
+            approval::approval_current,
+            #[cfg(feature = "command-mode")]
+            approval::approval_armed,
+            #[cfg(feature = "command-mode")]
+            approval::approval_answer,
+            #[cfg(all(feature = "command-mode", debug_assertions))]
+            approval::approval_preview,
             #[cfg(feature = "command-mode")]
             llm::get_llm_providers,
             #[cfg(feature = "command-mode")]
@@ -636,10 +651,10 @@ fn handle_menu_event(app: &tauri::AppHandle, id: &str) {
             handback.settle(false);
         }
         // Explorer opens in its own time, after this returns: keep the front
-        // so it may take it.
+        // so it may take it. If the folder couldn't be opened, nothing will.
         "logs" => {
-            handback.settle(true);
-            run_menu_item(app, id);
+            let opened = open_logs_folder(app);
+            handback.settle(opened);
         }
         // Anything else hands the front back before it runs (hiding the
         // overlay first would leave Windows to pick the next window).
@@ -660,15 +675,24 @@ fn run_menu_item(app: &tauri::AppHandle, id: &str) {
         return;
     }
     match id {
-        "show" => focus_main_window(app),
+        "show" => {
+            // The user's choice outlasts an approval card that showed Ottid.
+            #[cfg(feature = "command-mode")]
+            approval::forget_reveal(app);
+            focus_main_window(app)
+        }
         "hide" => {
+            #[cfg(feature = "command-mode")]
+            approval::forget_reveal(app);
             if let Some(window) = app.get_webview_window(overlay::WINDOW) {
                 let _ = window.hide();
             }
         }
         "tutorial" => show_tutorial(app, true),
         "settings" => show_hub(app),
-        "logs" => open_logs_folder(app),
+        "logs" => {
+            open_logs_folder(app);
+        }
         "quit" => app.exit(0),
         _ => {}
     }
@@ -689,19 +713,21 @@ fn focus_main_window(app: &tauri::AppHandle) {
 /// Open the diagnostic-logs directory in the OS file manager (issue #13) so a
 /// user hitting an error can attach the logs to a bug report without hunting
 /// through `%LOCALAPPDATA%`. Wired to the tray / context-menu "Open logs
-/// folder" item.
-fn open_logs_folder(app: &tauri::AppHandle) {
+/// folder" item. Returns whether the file manager was asked to open it.
+fn open_logs_folder(app: &tauri::AppHandle) -> bool {
     use tauri_plugin_opener::OpenerExt;
     let Some(dir) = logs_dir(app) else {
         tracing::warn!("could not resolve the logs directory to open");
-        return;
+        return false;
     };
     if let Err(err) = app
         .opener()
         .open_path(dir.to_string_lossy().to_string(), None::<&str>)
     {
         tracing::warn!("could not open the logs directory: {err:#}");
+        return false;
     }
+    true
 }
 
 /// Point `ottid-core` at the bundled STT sidecar and the per-user model

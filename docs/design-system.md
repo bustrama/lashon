@@ -44,14 +44,14 @@ which is authoritative. Use the tokens and never hardcode a colour.
 --vellum-text #0e1418   --vellum-mute 62%   --vellum-faint 38%
 
 /* Brand: locked */
---peach      #f7c8a3    eyes, resting lamp, confirm
+--peach      #f7c8a3    eyes, resting lamp
 
 /* Mode chroma: evenly spaced hues, so one glance reads the mode */
 --saffron    #e8b14a    dictation: gold, pen and ink
 --garnet     #4d8df0    command: cobalt blue (the name is historical)
 --indigo     #a47bd9    chat: wisteria violet
 --hearth     #d97a4a    recipe match: terracotta, solid, never pulsing
---aqua       #3fcbc0    an agent needs you (Phase C)
+--aqua       #3fcbc0    needs you: the approval card, agents (Phase C)
 
 /* System */
 --state-success #5fb887 done
@@ -100,8 +100,42 @@ Contrast: text tokens meet WCAG AA at 14 px and above on their own background.
 | **Conversation panel** | Slide-out reply view for chat mode | During and after a chat |
 | **Agent panel** | Slide-out terminal for external agents | While an agent runs |
 
-The approval card shows the **full** command and arms its buttons only after a
-700 ms delay, so a stray keypress cannot approve it. Phase B finalizes it.
+### The approval card
+
+Before a destructive step runs, from a command-mode tool, a recipe step or
+later an agent, the island shows the approval card
+([ADR-0048](adr/0048-the-approval-card.md)).
+
+- **The whole request, never cut off.** For `run_command` the card shows the
+  command and its folder; for any other tool, every argument. The text is
+  monospace, left to right in its own bidi isolate, and scrolls inside the
+  card when it is long. The bottom edge fades while there is more to read.
+- **In the order it runs.** Each Hebrew word is its own isolate, so Hebrew
+  reads right to left inside the word while the arguments, path folders and
+  operators stay in left-to-right order. Plain bidi would swap two Hebrew
+  arguments and mirror a `>` between them.
+- **Hidden characters show by code point.** A bidi override, a zero-width
+  character, a look-alike space or filler, or a combining mark that isn't on
+  a Hebrew letter is drawn as a small `--saffron` badge such as `U+202E`,
+  never obeyed. Niqqud on Hebrew letters shows as it is, up to five
+  different marks on a letter; a repeated mark, or one past that, is a badge.
+- **The look.** Dark glass with an `--aqua` border and glow, matching the
+  creature's lamp. Allow is rose (`--state-error`): it runs something that
+  can't be taken back. It stays dim until it arms, and fills from the inline
+  start while the arm delay runs. Once armed, holding its hotkey fills it
+  again, darker. Deny is a quiet outline. Each button shows its hotkey.
+- **Allow arms** 700 ms after the whole text has been on screen: the card has
+  finished opening and the end has been seen. A click before that says what
+  is missing and doesn't count. Deny works at once.
+- **Pointer only.** The buttons never take focus, so Enter or Space can't
+  press them. The keyboard answers with the hotkeys.
+- **Allow from the keyboard takes a hold** of a second, so a tap meant for
+  another app never approves. A tap swaps the countdown line for "hold it
+  for a second", in `--aqua`.
+- **Time limit.** A line under the buttons counts down the 30 s, after which
+  the request is denied.
+- **Several requests.** One card shows at a time, with "N waiting" in its
+  header. The next one replaces it in place.
 
 ## Ottid, the creature
 
@@ -245,6 +279,12 @@ bundled one is [`creatures/ottid/creature.json`](../creatures/ottid/creature.jso
   non-activating, and the mouse passes through it everywhere except the
   creature and its cards ([ADR-0044](adr/0044-a-click-through-overlay-window.md)).
   Its keyboard paths are the global hotkeys, the tray menu and the Hub.
+- While an approval card is pending, holding **Ctrl+Shift+Y** for a second
+  allows and **Ctrl+Shift+N** denies. They are physical keys, so they work
+  under any layout, and they are registered only while a card is pending.
+  Pressing Ctrl+Shift+Y before Allow arms scrolls on through a long request. An
+  assertive live region reads the whole request, the hotkeys and the time
+  limit once, when the card appears.
 
 ## States
 
@@ -262,10 +302,10 @@ ripple, its stretch and the lamp's strength. It also sets the writing speed
 | **Transcribing** | `--state-cloud`, flowing | Down at the side | One hand scribbles beside the body | After release, STT running |
 | **Thinking** | `--state-cloud`, slow pulse | Up and away, heavy lids | One hand scratches the head (above the outline) | LLM planning or cleanup |
 | **Tool** | `--garnet`, ticking | Darting, down | Both hands hammer in turn, like pistons | Command-mode tool running |
-| **Confirm** | `--peach`, steady | Pleading tilt, wide open | Both hands open toward the user ("ok?") | Waiting for approval; the card is next to Ottid |
+| **Confirm** | `--peach`, steady | Pleading tilt, wide open | Both hands open toward the user ("ok?") | Not entered by the app: a pending approval shows **Needs you** ([ADR-0048](adr/0048-the-approval-card.md)). Creatures still define it. |
 | **Wake** *(event)* | Flash in the mode's colour, then steady | Wide | Startled hop with both hands up, then the listening pose | Wake word heard |
 | **Error** *(event)* | `--state-error`, flash that fades | Sad: lids low, tilted | Flinches and squashes, hands droop | Any failure |
-| **Agent needs you** | `--aqua`, fast pulse | Wide, toward the user | Waves again and again, hopping | Claude Code waits for permission or input (Phase C) |
+| **Agent needs you** | `--aqua`, fast pulse | Wide, toward the user | Waves again and again, hopping | An approval waits on the card; later, Claude Code waits for permission or input (Phase C) |
 | **Agent done** *(event)* | `--state-success`, flash that fades | Smiling | Cheers with both hands up and hops | Claude Code finished (Phase C) |
 
 States not designed yet are built from the same vocabulary: a lamp colour from

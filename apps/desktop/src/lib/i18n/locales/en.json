@@ -176,7 +176,8 @@
 				"no-modifier": "A shortcut must include a modifier key — Ctrl, Alt or Shift.",
 				"no-key": "A shortcut must include one key besides the modifiers.",
 				"malformed": "That combination isn't valid. Try another.",
-				"reserved": "That combination is reserved by the operating system. Choose another."
+				"reserved": "That combination is reserved by the operating system. Choose another.",
+				"approval": "That combination is reserved for Ottid's approval card. Choose another."
 			}
 		},
 		"wakeword": {
@@ -385,13 +386,6 @@
 		}
 	},
 	"command": {
-		"confirm": {
-			"question": "Ottid wants to run `{tool}`. Allow?",
-			"requires": "Requires confirmation",
-			"allow": "Allow",
-			"deny": "Deny",
-			"cwd": "Working directory"
-		},
 		"progress": {
 			"thinking": "Ottid is thinking…"
 		},
@@ -439,6 +433,35 @@
 		"tierD": {
 			"name": "Minimal",
 			"desc": "Basic hardware. Local dictation; other capabilities via the cloud."
+		}
+	},
+	"approval": {
+		"eyebrow": "Ottid needs your approval",
+		"question": {
+			"command": "Run this command?",
+			"tool": "Use {tool}?"
+		},
+		"source": {
+			"recipe": "A recipe step"
+		},
+		"cwd": "In folder",
+		"allow": "Allow",
+		"deny": "Deny",
+		"scrollToEnd": "Scroll to the end of the command to allow it",
+		"expires": "Denied automatically in {seconds}s",
+		"waiting": "{count} more waiting",
+		"hiddenChar": "hidden character",
+		"hiddenCharTitle": "A character that doesn't show on screen: {code}",
+		"announce": {
+			"command": "The command",
+			"details": "The details",
+			"allowKey": "To allow, hold {keys} for a second.",
+			"denyKey": "To deny: {keys}.",
+			"timeout": "With no answer, the request is denied in {seconds} seconds."
+		},
+		"nudge": {
+			"more": "Showing more of the command. Allow works once all of it has been shown.",
+			"wait": "Allow is available in a moment."
 		}
 	},
 	"creature": {
