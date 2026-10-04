@@ -5,8 +5,8 @@
 Accepted — 2026-10-04. Phase B, part 2. Implements the renderer of
 [ADR-0040](0040-the-overlay-becomes-a-living-creature.md) and the kit tier of
 [ADR-0041](0041-user-authored-creatures-are-data.md). It fills the stage
-contract that ADR-0044 (the click-through overlay window, Phase B part 1, in
-review) defines in `lib/creature/types.ts`.
+contract that ADR-0044 (the click-through overlay window, Phase B part 1)
+defines in `lib/creature/types.ts`.
 
 ## Context
 
@@ -121,17 +121,14 @@ The frontend had no unit-test framework.
    and that its sources contain no colour literals.
 10. **Vitest 4.1.11** runs the frontend unit tests in Node (`npm test`), and CI
     runs it after the type-check.
-11. **Integration.** Until ADR-0044's overlay lands, the creature replaces the
-    mark in the existing `Tongue.svelte`. It stands in the float placement, the
-    lifecycle events map to its state through `state.ts`, the smoothed
-    `dictation:level` drives it, `wake:detected` shows the wake event for
-    900 ms, and the wake-word setting shows as wake-armed. The live region
-    announces the twelve states (`creature.states.*`, Hebrew and English), and
-    at rest with the wake word armed it says the microphone is listening for
-    it (`creature.wakeArmed`). The
-    ADR-0044 branch deletes `Tongue.svelte` and mounts the creature through
-    `lib/creature/index.ts`, so whichever branch merges second keeps that
-    deletion and points the index at `Creature.svelte`.
+11. **Integration.** ADR-0044's overlay (`lib/overlay/Overlay.svelte`) mounts
+    the creature through `lib/creature/index.ts`, which exports
+    `Creature.svelte`. The overlay route maps the lifecycle events to its state
+    through `state.ts`, the overlay feeds it the smoothed `dictation:level`,
+    `wake:detected` shows the wake event for 900 ms, and the wake-word setting
+    shows as wake-armed. The overlay's live region announces the twelve states
+    (`creature.states.*`, Hebrew and English), and at rest with the wake word
+    armed it says the microphone is listening for it (`creature.wakeArmed`).
 12. **A development lab.** `npm run dev` serves `/creature-lab`: every state
     side by side, in any placement, with a simulated voice, gaze, hover, pokes
     and drag, and the frame cost per creature. A release build compiles it out,

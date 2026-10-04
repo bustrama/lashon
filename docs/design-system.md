@@ -12,9 +12,9 @@ lamp.
 
 The product was called Lashon until v1.1
 ([ADR-0042](adr/0042-rename-the-product-to-ottid.md)). The overlay is the
-`main` window ([ADR-0044](adr/0044-a-click-through-overlay-window.md)); until the
-WebGL creature lands it draws a stand-in, the mark with a lamp halo. Older docs
-call it "the tongue".
+`main` window ([ADR-0044](adr/0044-a-click-through-overlay-window.md)), and it
+draws the WebGL creature ([ADR-0045](adr/0045-the-creature-engine.md)). Older
+docs call it "the tongue".
 The creature itself is
 [ADR-0040](adr/0040-the-overlay-becomes-a-living-creature.md), and user-made
 creatures are [ADR-0041](adr/0041-user-authored-creatures-are-data.md).
