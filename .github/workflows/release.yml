@@ -1,36 +1,43 @@
 name: Release
 
-# Triggered on `v*` tag pushes (e.g., v0.6.0, v1.0.0).
-# Each OS runner freezes the Python STT sidecar with PyInstaller, then builds
-# and uploads an OS-appropriate installer to the GitHub Release.
+# Triggered on `v*` tag pushes (e.g., v1.2.0). The Windows runner freezes the
+# Python STT sidecar with PyInstaller, then builds the NSIS installer and the
+# portable zip and uploads them to a *draft* GitHub Release. Nothing is
+# published from here: the owner smoke-tests a real install of the draft's
+# installer and publishes it by hand (docs/releasing.md).
 #
-# Auto-update signing (added in feat/auto-update):
-#   tauri-plugin-updater requires two GitHub Actions secrets before the first
-#   signed release. Set them once with:
+# Signing (docs/adr/0043) — a release is signed twice, independently:
 #
-#     # Store the private key content as a secret:
-#     gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/ottid.key
+#   - Authenticode, with Azure Artifact Signing: every PE image in the build
+#     (the app exe, the installer and uninstaller, the NSIS plugins, and every
+#     unsigned exe/dll/pyd of the frozen sidecar). GitHub OIDC logs in to
+#     Azure, so no signing secret exists. Lives in the `release` environment:
+#       secrets   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+#       variables ARTIFACT_SIGNING_ENDPOINT, ARTIFACT_SIGNING_ACCOUNT,
+#                 ARTIFACT_SIGNING_PROFILE
+#   - the updater's minisign signature over the finished installer
+#     (docs/adr/0017), from the `release` environment's secrets
+#     TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD.
 #
-#     # Set the password (use an empty string if the key has no password):
-#     gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD
-#
-#   The public key committed in tauri.conf.json (plugins.updater.pubkey) is
-#   derived from the same keypair and is safe to commit. See
-#   docs/adr/0017-auto-update-via-tauri-plugin-updater.md for key rotation
-#   instructions.
-#
-#   Cross-OS sidecars + bundling all landed in v0.6.0. The matrix below
-#   builds Windows NSIS + portable zip, macOS x64 + aarch64 DMGs, and the
-#   Linux AppImage.
+# A run signs when all of the above exist and fails loudly when any is missing
+# — unless it is explicitly marked as an unsigned pre-release: a tag carrying
+# `-unsigned` (v1.2.0-unsigned.1), or a manual run with `allow_unsigned`
+# ticked. Such a build skips both signatures, is released as a pre-release (so
+# the `/releases/latest` updater feed never serves it), and says so in its
+# release notes.
 
 on:
   push:
     tags:
       - 'v*'
-  # Manual dispatch — used for debugging macOS / sidecar issues without
-  # cutting a tag. Triggers a build that publishes to a draft release (the
-  # tauri-action default), which can be discarded after inspection.
+  # Manual dispatch — for debugging the build without cutting a tag. It still
+  # creates a draft release, which can be discarded after inspection.
   workflow_dispatch:
+    inputs:
+      allow_unsigned:
+        description: 'Allow an unsigned pre-release build when signing is not configured'
+        type: boolean
+        default: false
 
 # A newer tag push cancels any in-flight release run for the same ref.
 concurrency:
@@ -51,21 +58,89 @@ env:
   TAURI_ACTION_SHA: 84b9d35b5fc46c1e45415bdb6144030364f7ebc5
 
 jobs:
+  # ── Signing gate ─────────────────────────────────────────────────────────────
+  # Decides, before the long build starts, whether this run signs. It fails the
+  # run when signing is not configured and the run is not an explicitly
+  # unsigned pre-release (docs/adr/0043).
+  signing:
+    name: signing gate
+    runs-on: ubuntu-24.04
+    # The signing secrets and variables live in this environment. Its
+    # deployment rules decide which refs may sign (tags `v*`, and `main` for
+    # manual runs), and Azure trusts only this environment's OIDC subject.
+    environment: release
+    permissions: {}
+    outputs:
+      sign: ${{ steps.gate.outputs.sign }}
+      prerelease: ${{ steps.gate.outputs.prerelease }}
+    steps:
+      - name: Decide whether this build is signed
+        id: gate
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          ALLOW_UNSIGNED_INPUT: ${{ inputs.allow_unsigned || false }}
+          HAS_AUTHENTICODE: >-
+            ${{ secrets.AZURE_CLIENT_ID != '' && secrets.AZURE_TENANT_ID != ''
+            && secrets.AZURE_SUBSCRIPTION_ID != '' && vars.ARTIFACT_SIGNING_ENDPOINT != ''
+            && vars.ARTIFACT_SIGNING_ACCOUNT != '' && vars.ARTIFACT_SIGNING_PROFILE != '' }}
+          HAS_UPDATER_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+        run: |
+          allow_unsigned=false
+          case "$EVENT" in
+            push)              [[ "$REF_NAME" == *-unsigned* ]] && allow_unsigned=true ;;
+            workflow_dispatch) [[ "$ALLOW_UNSIGNED_INPUT" == true ]] && allow_unsigned=true ;;
+          esac
+
+          missing=()
+          [[ "$HAS_AUTHENTICODE" == true ]] \
+            || missing+=("Authenticode (AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID, ARTIFACT_SIGNING_ENDPOINT/_ACCOUNT/_PROFILE)")
+          [[ "$HAS_UPDATER_KEY" == true ]] \
+            || missing+=("the updater key (TAURI_SIGNING_PRIVATE_KEY)")
+
+          if (( ${#missing[@]} == 0 )); then
+            sign=true
+            echo "Signing is configured: Authenticode + updater signature."
+          elif [[ "$allow_unsigned" == true ]]; then
+            sign=false
+            echo "::warning title=Unsigned pre-release::Not signed — missing ${missing[*]}. This build is marked as a pre-release and the in-app updater will not serve it."
+          else
+            echo "::error title=Signing is not configured::Missing in the 'release' environment: ${missing[*]}. A release is never published unsigned (docs/adr/0043). For a deliberate unsigned pre-release, push a tag containing '-unsigned' (e.g. v1.2.0-unsigned.1) or tick 'allow_unsigned' on a manual run."
+            exit 1
+          fi
+
+          echo "sign=$sign" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$allow_unsigned" >> "$GITHUB_OUTPUT"
+
   # ── Per-OS build matrix ──────────────────────────────────────────────────────
   build:
     name: build (${{ matrix.os }})
+    needs: signing
     runs-on: ${{ matrix.os }}
+    environment: release
+    permissions:
+      contents: write   # create the GitHub Release and upload assets
+      id-token: write   # GitHub OIDC → Azure, for Artifact Signing
+    env:
+      # Read by scripts/sign-windows.ps1 (docs/adr/0043) — from the sidecar
+      # step, from inside `tauri build`, and for the portable exe. Empty, and
+      # unused, on an unsigned pre-release.
+      ARTIFACT_SIGNING_ENDPOINT: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+      ARTIFACT_SIGNING_ACCOUNT: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
+      ARTIFACT_SIGNING_PROFILE: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          # v1.0.0 ships the free (dictation-only) edition, Windows-only and
-          # unsigned (docs/adr/0039). `--no-default-features` drops command mode
-          # (ADR-0034); `--no-sign` skips updater signing (no key yet); the
-          # frontend free flag is VITE_OTTID_EDITION in the build step env.
+          # The free (dictation-only) edition, Windows-only (ADR-0033,
+          # ADR-0039). `--no-default-features` drops command mode (ADR-0034);
+          # the frontend free flag is VITE_OTTID_EDITION in the build step env.
+          # The signing arguments are added per run (the `tauri-args` step).
           - os: windows-2022
             sidecar_name: ottid-stt.exe
-            tauri_args: --bundles nsis --no-sign -- --no-default-features
+            bundles: nsis
+            cargo_args: --no-default-features
           # macOS (macos-14 / macos-13 DMGs) and the Linux AppImage are dropped
           # for v1.0.0 — Windows-first (ADR-0033). Re-add the per-arch macOS
           # matrix entries (and the Linux libfuse2 remediation, PRs #50–#52)
@@ -250,6 +325,83 @@ jobs:
         working-directory: apps/desktop
         run: npm ci
 
+      # ── Authenticode signing (docs/adr/0043) ─────────────────────────────────
+      #
+      # signtool and the Artifact Signing dlib come from nuget.org, pinned to an
+      # exact version and to the SHA-512 nuget.org records for that package.
+      # Tauri's own already-signed check runs signtool too, so it gets the same
+      # pinned copy (TAURI_WINDOWS_SIGNTOOL_PATH).
+
+      - name: Install the signing tools
+        if: runner.os == 'Windows' && needs.signing.outputs.sign == 'true'
+        shell: pwsh
+        run: |
+          $tools = Join-Path $env:RUNNER_TEMP 'signing-tools'
+          New-Item -ItemType Directory -Force $tools | Out-Null
+          $packages = @(
+            @{ Id = 'microsoft.windows.sdk.buildtools'; Version = '10.0.28000.2705'
+               Sha512 = '47kp42eMb8rF3bjDuZHVkzGRb9Fr7wyFZDIT2sWr3StwnTCoDHIisDe0SPWGwerwVUw/eQQO/OxDb0YYHbfNvA==' }
+            @{ Id = 'microsoft.artifactsigning.client'; Version = '1.0.128'
+               Sha512 = 'mPBqaR9Pwvoi8Z3PhVZzPphgf775GjEsRTubB5jMkIja4KyzbjibVSoRtNIyAyR4W4VBwrUQkackwFvF31y/lQ==' }
+          )
+          foreach ($p in $packages) {
+            # A .nupkg is a zip; the .zip name lets Expand-Archive take it.
+            $nupkg = Join-Path $tools "$($p.Id).$($p.Version).zip"
+            Invoke-WebRequest -Uri "https://api.nuget.org/v3-flatcontainer/$($p.Id)/$($p.Version)/$($p.Id).$($p.Version).nupkg" -OutFile $nupkg
+            $sha512 = [Convert]::ToBase64String([Security.Cryptography.SHA512]::HashData([IO.File]::ReadAllBytes($nupkg)))
+            if ($sha512 -ne $p.Sha512) { throw "$($p.Id) $($p.Version): SHA-512 mismatch ($sha512)" }
+            Expand-Archive -LiteralPath $nupkg -DestinationPath (Join-Path $tools $p.Id)
+          }
+          $signtool = Join-Path $tools 'microsoft.windows.sdk.buildtools\bin\10.0.28000.0\x64\signtool.exe'
+          $dlib = Join-Path $tools 'microsoft.artifactsigning.client\bin\x64\Azure.CodeSigning.Dlib.dll'
+          foreach ($f in $signtool, $dlib) { if (-not (Test-Path $f)) { throw "missing $f" } }
+          "OTTID_SIGNTOOL=$signtool" >> $env:GITHUB_ENV
+          "OTTID_SIGNING_DLIB=$dlib" >> $env:GITHUB_ENV
+          "TAURI_WINDOWS_SIGNTOOL_PATH=$signtool" >> $env:GITHUB_ENV
+
+      # The OIDC assertion azure/login trades in lives only minutes, but the
+      # Artifact Signing access token it buys lives about an hour, and `az`
+      # caches it for every signtool process that follows. So log in and fetch
+      # that token right before the signing starts — the sidecar step, then the
+      # Tauri build, then the portable exe all reuse it.
+      - name: Log in to Azure (GitHub OIDC)
+        if: runner.os == 'Windows' && needs.signing.outputs.sign == 'true'
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Fetch the Artifact Signing access token
+        if: runner.os == 'Windows' && needs.signing.outputs.sign == 'true'
+        run: az account get-access-token --scope https://codesigning.azure.net/.default --output none
+
+      # Every PE image in the staged resources that is not already validly
+      # signed (by Microsoft, NVIDIA, …): the sidecar's exe, dlls and pyd
+      # modules, and llama-server when a full-edition build stages it. Tauri
+      # would sign only the exe/dll ones, one process per file, and leave the
+      # pyd modules unsigned — and Smart App Control checks every module.
+      - name: Sign the bundled binaries
+        if: runner.os == 'Windows' && needs.signing.outputs.sign == 'true'
+        shell: pwsh
+        run: ./scripts/sign-windows.ps1 -Tree apps/desktop/src-tauri/binaries
+
+      # Signed: merge tauri.signing.conf.json, whose signCommand runs
+      # scripts/sign-windows.ps1 for the app exe, the NSIS plugins, the
+      # installer and the uninstaller; the updater .sig follows from the
+      # TAURI_SIGNING_* key. Unsigned pre-release: `--no-sign` skips both.
+      # The --config path is absolute because tauri-action and the Tauri CLI
+      # resolve relative ones from different directories.
+      - name: Choose the Tauri build arguments
+        id: tauri-args
+        run: |
+          if [[ "${{ needs.signing.outputs.sign }}" == true ]]; then
+            signing="--config ${GITHUB_WORKSPACE//\\//}/apps/desktop/src-tauri/tauri.signing.conf.json"
+          else
+            signing="--no-sign"
+          fi
+          echo "args=--bundles ${{ matrix.bundles }} $signing -- ${{ matrix.cargo_args }}" >> "$GITHUB_OUTPUT"
+
       # ── Tauri build & release upload ─────────────────────────────────────────
       #
       # tauri-apps/tauri-action@SHA:
@@ -274,10 +426,9 @@ jobs:
           # command-mode Rust. Both are required — the Vite build can't see the
           # Cargo feature flags.
           VITE_OTTID_EDITION: free
-          # Minisign signing key for tauri-plugin-updater.
-          # Set these secrets before cutting the first v0.6.0+ release:
-          #   gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/ottid.key
-          #   gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+          # Minisign key for tauri-plugin-updater (docs/adr/0017). The CLI
+          # signs the installer after Authenticode has, so the .sig covers the
+          # final bytes. Ignored under `--no-sign`.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # linuxdeploy and its plugins ship as AppImages whose runtime mounts
@@ -304,44 +455,63 @@ jobs:
             - **Wake word:** still "Hey Lashon" until a model for the new name
               is trained.
 
-            **Unsigned build (docs/adr/0039):** Windows SmartScreen will warn on
-            first launch — click **More info → Run anyway**. A signed release
-            follows once code-signing is wired.
+            ${{ needs.signing.outputs.sign == 'true' && '**Signed build:** the installer and the app are code-signed. A new release can still meet a Windows SmartScreen notice for its first days, until Microsoft has seen enough installs of it.' || '**Unsigned pre-release (docs/adr/0043):** Windows SmartScreen will warn on first launch — click **More info → Run anyway**. The in-app updater does not offer this build.' }}
 
             A fresh install downloads the Hebrew STT model + CUDA runtime
             (~2.8 GB) into the app's data directory on first launch.
           releaseDraft: true
-          # Non-prerelease — the GitHub `/releases/latest/download/...`
-          # redirect (which tauri-plugin-updater fetches) excludes
-          # prereleases, so marking every release as prerelease=true broke
-          # the in-app updater for v0.6.0. Newer Mn.x releases are public
-          # releases; if a pre-release becomes useful later, set this to
-          # true on that one tag's release page after publishing.
-          prerelease: false
+          # A normal release is never a pre-release: the GitHub
+          # `/releases/latest/download/...` redirect, which tauri-plugin-updater
+          # fetches, skips pre-releases (that broke the in-app updater for
+          # v0.6.0). Only an explicitly unsigned build is one — which is exactly
+          # what keeps the updater from ever serving it.
+          prerelease: ${{ needs.signing.outputs.prerelease == 'true' }}
           projectPath: apps/desktop
-          # Tauri target + bundle args are matrix-driven (per-OS + per-arch).
-          args: ${{ matrix.tauri_args }}
+          args: ${{ steps.tauri-args.outputs.args }}
 
       # ── Windows portable zip (post-build step) ───────────────────────────────
       #
       # Packages the release .exe + the pristine frozen sidecar bundle into a
       # portable zip per ADR-0012. Built from src-tauri/binaries/ (not from
       # target/release/binaries/) to avoid shipping CUDA libs that a prior run
-      # may have extracted there.
+      # may have extracted there. The sidecar there is already signed (the
+      # step above); the exe is not — after bundling, Tauri restores
+      # target/release/ottid.exe to its unsigned build — so the staged copy is
+      # signed here.
 
       - name: Package the Windows portable zip
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+          SIGN: ${{ needs.signing.outputs.sign }}
         run: |
           $version = (Get-Content apps/desktop/src-tauri/tauri.conf.json | ConvertFrom-Json).version
           $stage = "$env:RUNNER_TEMP\ottid-portable"
           Remove-Item -Recurse -Force $stage -ErrorAction SilentlyContinue
           New-Item -ItemType Directory "$stage\binaries" | Out-Null
           Copy-Item target\release\ottid.exe $stage
+          if ($env:SIGN -eq 'true') { ./scripts/sign-windows.ps1 "$stage\ottid.exe" }
           Copy-Item -Recurse apps\desktop\src-tauri\binaries\ottid-stt "$stage\binaries\ottid-stt"
           $zip = "target\release\bundle\Ottid-${version}-windows-x64-portable.zip"
           Compress-Archive -Path "$stage\*" -DestinationPath $zip -Force
           echo "PORTABLE_ZIP=$zip" >> $env:GITHUB_ENV
+
+      # Proves the signing end to end: installs the installer silently into a
+      # scratch folder — which is the only way to see the uninstaller NSIS
+      # writes at install time — and fails unless the installer and every PE
+      # image installed, plus every one in the portable tree, carries a valid
+      # signature. The installer is already on the draft release by now; a red
+      # run means that draft must not be published.
+      - name: Verify the Authenticode signatures
+        if: runner.os == 'Windows' && needs.signing.outputs.sign == 'true'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem target\release\bundle\nsis\*-setup.exe | Select-Object -First 1
+          $installDir = "$env:RUNNER_TEMP\ottid-install-check"
+          $p = Start-Process -FilePath $installer.FullName -ArgumentList '/S', "/D=$installDir" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "silent install exited with $($p.ExitCode)" }
+          if (-not (Test-Path "$installDir\uninstall.exe")) { throw "no uninstall.exe in $installDir" }
+          ./scripts/sign-windows.ps1 -Verify $installer.FullName $installDir "$env:RUNNER_TEMP\ottid-portable"
 
       - name: Upload Windows portable zip to the release
         if: runner.os == 'Windows'
