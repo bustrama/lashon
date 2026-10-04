@@ -109,3 +109,28 @@ Any architectural decision, trade-off, or reversal is recorded as an ADR in
 
 See [`docs/architecture.md`](docs/architecture.md) for how the pieces fit
 together.
+
+### Dev runs don't adopt pre-rename data
+
+A release build carries an old *Lashon* install over to *Ottid*
+([ADR-0042](docs/adr/0042-rename-the-product-to-ottid.md)). Debug builds don't
+([ADR-0046](docs/adr/0046-debug-builds-leave-pre-rename-data-alone.md)). This
+covers `npm run tauri dev`, `cargo run` and `cargo test`. They leave these in
+place, so a dev run can't move or delete your installed app's data:
+
+- the `dev.lashon.desktop` app dirs
+- the keys under the `lashon` keychain service
+- the `lashon/recipes` dir
+
+The startup log says when the carry-over is off. A dev run still uses the same
+`app.ottid.desktop` dirs and `ottid` keychain service as an installed Ottid.
+
+To exercise the carry-over in a dev run, set `OTTID_ADOPT_LEGACY=1`. Only the
+value `1` opts in. This moves your real data, just as a release build would:
+
+```powershell
+$env:OTTID_ADOPT_LEGACY = "1"; npm run tauri dev
+```
+
+The variable stays set for the rest of that PowerShell session. Clear it with
+`Remove-Item Env:OTTID_ADOPT_LEGACY` before your next ordinary dev run.

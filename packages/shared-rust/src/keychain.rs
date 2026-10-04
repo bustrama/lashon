@@ -54,12 +54,19 @@ fn env_fallback_name(key_name: &str) -> String {
 /// `keyring` call errors; callers surface that to the Hub as a toast and
 /// the env-var fallback continues to work for headless deployments.
 pub fn store_key(key_name: &str, secret: &str) -> Result<()> {
+    store_key_with(key_name, secret, crate::legacy::carry_over_enabled())
+}
+
+/// [`store_key`], with the pre-rename carry-over switch passed in.
+fn store_key_with(key_name: &str, secret: &str, carry_over: bool) -> Result<()> {
     tracing::debug!(key_name, "keychain: storing key (value redacted)");
     entry(key_name)?
         .set_password(secret)
         .with_context(|| format!("writing keychain entry for {key_name}"))?;
     // A pre-rename copy would only be a stale duplicate of a secret.
-    forget_legacy_key(key_name);
+    if carry_over {
+        forget_legacy_key(key_name);
+    }
     Ok(())
 }
 
@@ -74,6 +81,11 @@ pub fn store_key(key_name: &str, secret: &str) -> Result<()> {
 /// **Never** returned to the frontend. The Rust provider impls call this;
 /// the Tauri command surface exposes `has_api_key` only.
 pub fn read_key(key_name: &str) -> Result<Option<String>> {
+    read_key_with(key_name, crate::legacy::carry_over_enabled())
+}
+
+/// [`read_key`], with the pre-rename carry-over switch passed in.
+fn read_key_with(key_name: &str, carry_over: bool) -> Result<Option<String>> {
     // Environment variable wins — the documented headless / CI escape hatch.
     if let Ok(value) = std::env::var(env_fallback_name(key_name)) {
         if !value.is_empty() {
@@ -83,14 +95,16 @@ pub fn read_key(key_name: &str) -> Result<Option<String>> {
     }
     match entry(key_name)?.get_password() {
         Ok(secret) => Ok(Some(secret)),
-        Err(keyring::Error::NoEntry) => adopt_legacy_key(key_name),
+        Err(keyring::Error::NoEntry) if carry_over => adopt_legacy_key(key_name),
+        Err(keyring::Error::NoEntry) => Ok(None),
         Err(err) => Err(err).with_context(|| format!("reading keychain entry for {key_name}")),
     }
 }
 
 /// Keys saved before the rename live under the old service name
 /// (docs/adr/0042). On the first read that misses, move the key across:
-/// store it under [`SERVICE`], then drop the old entry.
+/// store it under [`SERVICE`], then drop the old entry. Only called with the
+/// carry-over on (docs/adr/0046).
 fn adopt_legacy_key(key_name: &str) -> Result<Option<String>> {
     let legacy = legacy_entry(key_name)?;
     let secret = match legacy.get_password() {
@@ -105,7 +119,7 @@ fn adopt_legacy_key(key_name: &str) -> Result<Option<String>> {
         key_name,
         "keychain: adopting a key stored before the rename"
     );
-    store_key(key_name, &secret)?;
+    store_key_with(key_name, &secret, true)?;
     Ok(Some(secret))
 }
 
@@ -144,11 +158,19 @@ pub fn has_key(key_name: &str) -> bool {
 
 /// Remove a stored key. Idempotent: deleting a non-existent key is `Ok(())`.
 ///
-/// Also removes a pre-rename copy, or [`read_key`] would adopt the deleted
-/// key straight back.
+/// With the carry-over on, also removes a pre-rename copy, or [`read_key`]
+/// would adopt the deleted key straight back.
 pub fn delete_key(key_name: &str) -> Result<()> {
+    delete_key_with(key_name, crate::legacy::carry_over_enabled())
+}
+
+/// [`delete_key`], with the pre-rename carry-over switch passed in. With it
+/// off, nothing adopts the old copy, so it stays.
+fn delete_key_with(key_name: &str, carry_over: bool) -> Result<()> {
     tracing::debug!(key_name, "keychain: deleting key");
-    forget_legacy_key(key_name);
+    if carry_over {
+        forget_legacy_key(key_name);
+    }
     match entry(key_name)?.delete_credential() {
         Ok(()) => Ok(()),
         Err(keyring::Error::NoEntry) => Ok(()),
@@ -250,15 +272,17 @@ mod tests {
     #[test]
     #[ignore = "needs a running OS keychain"]
     fn pre_rename_key_is_adopted_on_read_and_deleted_with_the_key() {
+        // `cargo test` is a debug build, where the carry-over is off, so
+        // turn it on explicitly.
         let key_name = "test.legacy-adopt";
-        let _ = delete_key(key_name);
+        let _ = delete_key_with(key_name, true);
         legacy_entry(key_name)
             .unwrap()
             .set_password("sk-old")
             .expect("seed legacy");
 
         assert_eq!(
-            read_key(key_name).expect("read"),
+            read_key_with(key_name, true).expect("read"),
             Some("sk-old".to_string())
         );
         // Now stored under the current service, and the old copy is gone.
@@ -271,7 +295,36 @@ mod tests {
             Err(keyring::Error::NoEntry)
         ));
 
-        delete_key(key_name).expect("delete");
-        assert_eq!(read_key(key_name).expect("read after delete"), None);
+        delete_key_with(key_name, true).expect("delete");
+        assert_eq!(
+            read_key_with(key_name, true).expect("read after delete"),
+            None
+        );
+    }
+
+    #[test]
+    #[ignore = "needs a running OS keychain"]
+    fn pre_rename_key_is_left_alone_without_the_carry_over() {
+        // What a dev run does: the installed app's old key is never read,
+        // moved or deleted.
+        let key_name = "test.legacy-untouched";
+        let _ = delete_key_with(key_name, true);
+        legacy_entry(key_name)
+            .unwrap()
+            .set_password("sk-old")
+            .expect("seed legacy");
+
+        assert_eq!(read_key_with(key_name, false).expect("read"), None);
+        store_key_with(key_name, "sk-new", false).expect("store");
+        delete_key_with(key_name, false).expect("delete");
+        assert_eq!(
+            legacy_entry(key_name)
+                .unwrap()
+                .get_password()
+                .expect("old key still there"),
+            "sk-old"
+        );
+
+        delete_key_with(key_name, true).expect("clean up");
     }
 }

@@ -11,10 +11,16 @@
 //! moves the identifier dirs before the builder runs, the recipes resolver
 //! moves the recipes dir, and the keychain reads through to the old service.
 //! [`adopt_dir`] is the shared, retry-safe move.
+//!
+//! Every consumer asks [`carry_over_enabled`] first (docs/adr/0046). On a
+//! developer's machine the pre-rename data belongs to their real installed
+//! app, so debug builds leave it alone unless the developer opts in.
 
+use std::ffi::OsStr;
 use std::fs;
 use std::io;
 use std::path::Path;
+use std::sync::OnceLock;
 
 /// The bundle identifier the app used before the rename.
 pub const LEGACY_IDENTIFIER: &str = "dev.lashon.desktop";
@@ -25,6 +31,32 @@ pub const LEGACY_DIR_NAME: &str = "lashon";
 
 /// The OS-keychain service name used before the rename.
 pub const LEGACY_KEYCHAIN_SERVICE: &str = "lashon";
+
+/// Set to `1` to let a debug build carry the pre-rename data over.
+pub const ADOPT_LEGACY_ENV: &str = "OTTID_ADOPT_LEGACY";
+
+/// Whether this process may touch the pre-rename data at all: move its
+/// directories, adopt its keychain keys, or delete them (docs/adr/0046).
+///
+/// Always true in release builds, which is what users run. False in debug
+/// builds (`npm run tauri dev`, `cargo run`, `cargo test`) unless
+/// [`ADOPT_LEGACY_ENV`] is `1`. Read once per process, so every consumer
+/// sees the same answer.
+pub fn carry_over_enabled() -> bool {
+    static CACHE: OnceLock<bool> = OnceLock::new();
+    *CACHE.get_or_init(|| {
+        carry_over_allowed(
+            cfg!(debug_assertions),
+            std::env::var_os(ADOPT_LEGACY_ENV).as_deref(),
+        )
+    })
+}
+
+/// The rule behind [`carry_over_enabled`], with the build kind and the
+/// opt-in value passed in so it can be tested.
+fn carry_over_allowed(debug_build: bool, opt_in: Option<&OsStr>) -> bool {
+    !debug_build || opt_in == Some(OsStr::new("1"))
+}
 
 /// What [`adopt_dir`] did.
 #[derive(Debug, PartialEq, Eq)]
@@ -91,6 +123,40 @@ mod tests {
     fn write(path: &Path, body: &str) {
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(path, body).unwrap();
+    }
+
+    #[test]
+    fn release_builds_always_carry_over() {
+        assert!(carry_over_allowed(false, None));
+        assert!(carry_over_allowed(false, Some(OsStr::new("0"))));
+    }
+
+    #[test]
+    fn debug_builds_carry_over_only_when_opted_in() {
+        assert!(!carry_over_allowed(true, None));
+        assert!(carry_over_allowed(true, Some(OsStr::new("1"))));
+    }
+
+    #[test]
+    fn debug_opt_in_accepts_only_1() {
+        // Anything else leaves the real data alone: a guard on someone's
+        // installed app should fail closed.
+        for value in ["", "0", "true", "yes", " 1", "11"] {
+            assert!(
+                !carry_over_allowed(true, Some(OsStr::new(value))),
+                "{value:?} must not opt in"
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    fn test_builds_leave_legacy_data_alone() {
+        // `cargo test` is a debug build: a test that reaches a consumer
+        // must not move the developer's real data.
+        if std::env::var_os(ADOPT_LEGACY_ENV).is_none() {
+            assert!(!carry_over_enabled());
+        }
     }
 
     #[test]
