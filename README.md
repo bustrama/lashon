@@ -44,9 +44,22 @@ without explicit consent.
 
 ## Install
 
-No installer is published yet — for now Ottid is built from source (see
-below); a signed Windows installer is on the way. Watch the
-[Releases page](https://github.com/bustrama/ottid/releases) for the first build.
+Download the installer from the
+[latest release](https://github.com/bustrama/ottid/releases/latest): the file
+ending in `_x64-setup.exe`. If you'd rather not install, the release also has
+a portable `.zip`.
+
+- **Windows only, for v1.x.** There are no macOS or Linux builds yet.
+- **Unsigned, for now.** The installer isn't code-signed yet, so Windows
+  SmartScreen stops it with "Windows protected your PC". Click **More info**,
+  then **Run anyway**. A signed build is on the way. Until then you can read
+  the source, or build it yourself (below).
+- **The free dictation edition.** The published build does dictation only.
+  Command mode and recipes are left out of it; a build from source includes
+  them.
+- **Upgrading from Lashon?** That was Ottid's old name. Run the Ottid
+  installer: it removes the old app and keeps your settings, history and
+  downloaded models.
 
 On **first run** Ottid downloads the ~1.6 GB Hebrew speech model; on an NVIDIA
 GPU it also fetches the CUDA runtime for faster transcription. After that it
@@ -80,8 +93,8 @@ Ottid is built in three phases:
    coding agents.
 3. **Voice response** — Hebrew-perfect text-to-speech for confirmations and chat.
 
-Dictation and command mode are built and working; the current focus is
-packaging and a signed installer for the first release.
+Dictation and command mode are built and working, and the dictation edition
+ships as a Windows installer. The current focus is code-signing it.
 
 The full roadmap — scope, milestones, and per-phase workstreams — lives in
 [`docs/roadmap.md`](docs/roadmap.md). Active work is tracked as stories in
