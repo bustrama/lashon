@@ -21,7 +21,8 @@
 
 use std::sync::Mutex;
 
-/// The window that was in front before the overlay's menu opened.
+/// The window that was in front before the overlay took the front (to open
+/// its menu, say).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Foreground(isize);
 
@@ -42,7 +43,7 @@ impl Foreground {
         if !given {
             // The next dictation would type into the overlay. No window
             // titles: they can hold document names.
-            tracing::warn!("could not give the foreground back after the overlay's menu");
+            tracing::warn!("could not give the foreground back to the window that had it");
         }
         given
     }
