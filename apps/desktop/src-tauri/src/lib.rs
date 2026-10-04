@@ -320,6 +320,7 @@ pub fn run() {
             show_tongue_menu,
             overlay::overlay_layout,
             overlay::overlay_set_regions,
+            overlay::overlay_regions_epoch,
             overlay::overlay_drag_start,
             overlay::overlay_drag_end,
             overlay::overlay_set_placement,
