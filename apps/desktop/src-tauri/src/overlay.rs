@@ -388,7 +388,7 @@ fn poll(app: AppHandle) {
         let Some(window) = app.get_webview_window(WINDOW) else {
             continue;
         };
-        if !visible || tick % VISIBILITY_EVERY == 0 {
+        if !visible || tick.is_multiple_of(VISIBILITY_EVERY) {
             let now = window.is_visible().unwrap_or(false);
             if now != visible {
                 // Hiding and showing can reset the window's styles: decide
@@ -416,7 +416,7 @@ fn poll(app: AppHandle) {
             continue;
         }
 
-        if tick % DISPLAYS_EVERY == 0 {
+        if tick.is_multiple_of(DISPLAYS_EVERY) {
             check_displays(&app, &window);
         }
 
