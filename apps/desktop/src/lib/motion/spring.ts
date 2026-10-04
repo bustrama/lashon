@@ -2,54 +2,56 @@
 // Raillé: `Spring` and `cubicBezier` in windows/src/core/anim.ts. See
 // THIRD-PARTY-NOTICES.
 //
-// Damped springs, as docs/design-system.md specifies them:
+// Damped springs, as docs/design-system.md ("Motion") specifies them:
 // a = −ω²(x − target) − 2ζωv with ω = 2π / response, integrated in fixed
-// 240 Hz sub-steps so a dropped frame never destabilises them.
+// 240 Hz sub-steps so a long or dropped frame never destabilises them. The
+// creature and the island share them.
+//
+// Plain records rather than a class: the creature steps about twenty of these
+// every frame, and its simulation snapshots and snaps them in bulk.
 
-const SUBSTEP = 1 / 240;
+export const SUBSTEP_HZ = 240;
 
-export class Spring {
-	value: number;
-	target: number;
-	velocity = 0;
-	private omega: number;
-	private zeta: number;
+export interface Spring {
+	/** Current value. */
+	x: number;
+	/** Velocity, per second. */
+	v: number;
+	/** Target. */
+	t: number;
+	/** Angular frequency ω, rad/s. */
+	w: number;
+	/** Damping ratio ζ. */
+	z: number;
+}
 
-	constructor(value: number, response = 0.5, damping = 0.72) {
-		this.value = value;
-		this.target = value;
-		this.omega = (2 * Math.PI) / response;
-		this.zeta = damping;
+/** A spring at rest at `x`. `response` is in seconds. */
+export function spring(x: number, response: number, damping: number): Spring {
+	return { x, v: 0, t: x, w: (2 * Math.PI) / response, z: damping };
+}
+
+/** Advance by `dt` seconds in sub-steps of at most 1/240 s. */
+export function stepSpring(s: Spring, dt: number): void {
+	if (!(dt > 0)) return;
+	// The epsilon keeps 1/60 s at exactly four sub-steps despite rounding.
+	const n = Math.max(1, Math.ceil(dt * SUBSTEP_HZ - 1e-9));
+	const h = dt / n;
+	for (let i = 0; i < n; i++) {
+		const a = -s.w * s.w * (s.x - s.t) - 2 * s.z * s.w * s.v;
+		s.v += a * h;
+		s.x += s.v * h;
 	}
+}
 
-	configure(response: number, damping: number): void {
-		this.omega = (2 * Math.PI) / response;
-		this.zeta = damping;
-	}
+/** Jump to the target and stop (reduced motion). */
+export function snapSpring(s: Spring): void {
+	s.x = s.t;
+	s.v = 0;
+}
 
-	/** Jump to `value` and stop. */
-	set(value: number): void {
-		this.value = value;
-		this.target = value;
-		this.velocity = 0;
-	}
-
-	get settled(): boolean {
-		return Math.abs(this.target - this.value) < 1e-3 && Math.abs(this.velocity) < 1e-2;
-	}
-
-	/** Advance by `dt` seconds. */
-	step(dt: number): void {
-		const steps = Math.max(1, Math.ceil(dt / SUBSTEP));
-		const h = dt / steps;
-		for (let i = 0; i < steps; i++) {
-			const acc =
-				-this.omega * this.omega * (this.value - this.target) -
-				2 * this.zeta * this.omega * this.velocity;
-			this.velocity += acc * h;
-			this.value += this.velocity * h;
-		}
-	}
+/** Close enough to the target, and slow enough, to stop drawing for it. */
+export function isSettled(s: Spring, epsilon = 1e-3): boolean {
+	return Math.abs(s.x - s.t) < epsilon && Math.abs(s.v) < epsilon * 10;
 }
 
 export type Easing = (t: number) => number;
@@ -83,13 +85,13 @@ export const CLOSE_MS = 340;
  * The spring is simulated once; `duration` is when it settles.
  */
 export function springEasing(response = 0.5, damping = 0.72): { easing: Easing; duration: number } {
-	const spring = new Spring(0, response, damping);
-	spring.target = 1;
+	const s = spring(0, response, damping);
+	s.t = 1;
 	const samples = [0];
 	const dt = 1 / 120;
-	while (!spring.settled && samples.length < 600) {
-		spring.step(dt);
-		samples.push(spring.value);
+	while (!isSettled(s) && samples.length < 600) {
+		stepSpring(s, dt);
+		samples.push(s.x);
 	}
 	samples[samples.length - 1] = 1;
 	const last = samples.length - 1;

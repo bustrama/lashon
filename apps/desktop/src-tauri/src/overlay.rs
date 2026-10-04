@@ -22,8 +22,8 @@ use std::time::Duration;
 
 use ottid_core::overlay::{
     self, decide, default_anchor, gaze_toward, legacy_anchor, pick_monitor, pointer, snap,
-    switch_anchor, ClickThrough, Frame, Gaze, Layout, Monitor, Placement, Point, Rect, Region,
-    RegionSet, Sample, GAZE_FALLOFF,
+    switch_anchor, ClickThrough, Drags, Frame, Gaze, Layout, Monitor, Placement, Point, Rect,
+    Region, RegionSet, Sample, Stamp, GAZE_FALLOFF,
 };
 use serde::{Deserialize, Serialize};
 use tauri::menu::CheckMenuItem;
@@ -55,9 +55,6 @@ const VISIBILITY_EVERY: u32 = 15;
 const DISPLAYS_EVERY: u32 = 30;
 /// Gaze changes smaller than this aren't worth an event.
 const GAZE_STEP: f64 = 0.02;
-/// A drag ends by itself once the button has been seen up this many ticks
-/// in a row, in case the webview never reports the release.
-const RELEASED_TICKS: u8 = 2;
 
 #[derive(Default)]
 pub struct OverlayState {
@@ -72,18 +69,12 @@ struct Inner {
     anchor: Option<Point>,
     regions: RegionSet,
     clicks: ClickThrough,
-    drag: Option<Drag>,
+    drags: Drags,
     monitors: Vec<Monitor>,
     primary: usize,
     layout: Option<Layout>,
     hover: Option<String>,
     gaze: Option<Gaze>,
-}
-
-struct Drag {
-    /// Stage centre minus cursor at the start of the drag.
-    offset: Point,
-    released: u8,
 }
 
 /// What `relayout` decided the window and the frontend need.
@@ -115,7 +106,7 @@ impl Inner {
             self.placement,
             anchor,
             &self.monitors[index],
-            self.drag.is_some(),
+            self.drags.is_active(),
         ))
     }
 
@@ -126,7 +117,7 @@ impl Inner {
         let Some(next) = self.compute() else {
             return Plan::default();
         };
-        if self.drag.is_none() {
+        if !self.drags.is_active() {
             self.anchor = Some(next.stage.center());
         }
         let prev = self.layout.replace(next.clone());
@@ -157,49 +148,52 @@ pub async fn overlay_layout(
 
 /// The frontend's interactive rectangles: physical pixels relative to the
 /// window, measured at `scale`. The cursor poll hit-tests against them from
-/// the next tick on.
+/// the next tick on. `source` and `seq` stamp the report, so one handled
+/// after a report the page sent later is dropped.
 #[tauri::command]
 pub async fn overlay_set_regions(
     state: tauri::State<'_, OverlayState>,
     regions: Vec<Region>,
     scale: f64,
+    source: u32,
+    seq: u64,
 ) -> Result<(), String> {
     state
         .lock()
         .regions
-        .replace(regions, scale)
+        .replace_in_order(regions, scale, Stamp { source, seq })
         .map(|_| ())
         .map_err(|err| err.to_string())
 }
 
 /// Start dragging the creature. The poll moves the window with the cursor
-/// until `overlay_drag_end` (or until it sees the button released).
+/// until `overlay_drag_end` brings back the token this returns (or until
+/// the poll sees the button released). The frontend sends the end only once
+/// this has answered: the runtime may handle the two in either order.
 #[tauri::command]
-pub async fn overlay_drag_start(app: AppHandle) -> Result<(), String> {
+pub async fn overlay_drag_start(app: AppHandle) -> Result<u64, String> {
     let Some(cursor) = read_cursor(&app) else {
         return Err("the cursor position is not available".into());
     };
     let state = app.state::<OverlayState>();
-    let plan = {
+    let (plan, token) = {
         let mut inner = state.lock();
         let Some(center) = inner.layout.as_ref().map(|l| l.stage.center()) else {
             return Err("the overlay has no layout yet".into());
         };
-        inner.drag = Some(Drag {
-            offset: center - cursor,
-            released: 0,
-        });
-        inner.relayout()
+        let token = inner.drags.start(center - cursor);
+        (inner.relayout(), token)
     };
     carry_out(&app, plan);
-    Ok(())
+    Ok(token)
 }
 
-/// Drop the creature: snap to the taskbar or the ceiling when close to
-/// either, and remember where it is.
+/// Drop the creature dragged since the start that returned `token`: snap to
+/// the taskbar or the ceiling when close to either, and remember where it
+/// is. The end of an older drag changes nothing.
 #[tauri::command]
-pub async fn overlay_drag_end(app: AppHandle) -> Result<(), String> {
-    end_drag(&app);
+pub async fn overlay_drag_end(app: AppHandle, token: u64) -> Result<(), String> {
+    end_drag(&app, token);
     Ok(())
 }
 
@@ -256,6 +250,11 @@ pub fn init(app: &AppHandle) {
     }
     sync_menu(app, placement);
     if let Some(window) = app.get_webview_window(WINDOW) {
+        // Until the poll first looks at the cursor, the large transparent
+        // window would take every click on what lies under it: let them
+        // through from the start.
+        let ignore = state.lock().clicks.update(false);
+        set_click_through(&state, &window, ignore);
         // The window is created hidden so it never flashes at a default
         // position. `focus: false` makes this first show non-activating.
         let _ = window.show();
@@ -272,7 +271,7 @@ pub fn set_placement(app: &AppHandle, placement: Placement) {
             let anchor = switch_anchor(layout, placement);
             inner.anchor = Some(anchor);
         }
-        inner.drag = None;
+        inner.drags.cancel();
         inner.placement = placement;
         let plan = inner.relayout();
         (plan, inner.anchor)
@@ -296,11 +295,11 @@ pub fn sync_menu(app: &AppHandle, placement: Placement) {
     }
 }
 
-fn end_drag(app: &AppHandle) {
+fn end_drag(app: &AppHandle, token: u64) {
     let state = app.state::<OverlayState>();
     let (plan, placement, anchor) = {
         let mut inner = state.lock();
-        if inner.drag.take().is_none() {
+        if !inner.drags.end(token) {
             return;
         }
         if let Some(layout) = inner.layout.clone() {
@@ -376,7 +375,7 @@ fn poll(app: AppHandle) {
     let mut visible = false;
 
     loop {
-        let dragging = state.lock().drag.is_some();
+        let dragging = state.lock().drags.is_active();
         std::thread::sleep(if !visible {
             HIDDEN_TICK
         } else if dragging {
@@ -389,16 +388,24 @@ fn poll(app: AppHandle) {
         let Some(window) = app.get_webview_window(WINDOW) else {
             continue;
         };
-        if !visible || tick % VISIBILITY_EVERY == 0 {
+        if !visible || tick.is_multiple_of(VISIBILITY_EVERY) {
             let now = window.is_visible().unwrap_or(false);
             if now != visible {
                 // Hiding and showing can reset the window's styles: decide
-                // the flag afresh, and start over with nothing hovered.
-                let was_hovering = {
+                // the flag afresh, and start over with nothing hovered. A
+                // hidden window lets clicks through, so that when it is shown
+                // again it takes none until the poll has looked.
+                let (was_hovering, ignore) = {
                     let mut inner = state.lock();
                     inner.clicks.invalidate();
-                    inner.hover.take().is_some()
+                    let ignore = if now {
+                        None
+                    } else {
+                        inner.clicks.update(false)
+                    };
+                    (inner.hover.take().is_some(), ignore)
                 };
+                set_click_through(&state, &window, ignore);
                 if was_hovering {
                     let _ = app.emit_to(WINDOW, "overlay:hover", HoverPayload { region: None });
                 }
@@ -409,7 +416,7 @@ fn poll(app: AppHandle) {
             continue;
         }
 
-        if tick % DISPLAYS_EVERY == 0 {
+        if tick.is_multiple_of(DISPLAYS_EVERY) {
             check_displays(&app, &window);
         }
 
@@ -418,41 +425,32 @@ fn poll(app: AppHandle) {
             // cursor is must not block the desktop under it. Ottid stays
             // visible and its hotkeys work; only the mouse passes through.
             let ignore = state.lock().clicks.update(false);
-            if let Some(ignore) = ignore {
-                if window.set_ignore_cursor_events(ignore).is_err() {
-                    state.lock().clicks.failed();
-                }
-            }
+            set_click_through(&state, &window, ignore);
             continue;
         };
         let button = pointer::primary_button_down();
 
-        let mut released = false;
-        let (plan, ignore, hover, gaze) = {
+        let (released, plan, ignore, hover, gaze) = 'decide: {
             let mut inner = state.lock();
             let mut plan = None;
-            if let Some(drag) = inner.drag.as_mut() {
-                drag.released = match button {
-                    Some(false) => drag.released.saturating_add(1),
-                    _ => 0,
-                };
-                if drag.released >= RELEASED_TICKS {
-                    released = true;
-                } else {
-                    let anchor = cursor + drag.offset;
-                    inner.anchor = Some(anchor);
+            let released = inner.drags.observe_button(button);
+            if released.is_none() {
+                if let Some(offset) = inner.drags.offset() {
+                    inner.anchor = Some(cursor + offset);
                     plan = Some(inner.relayout());
                 }
             }
             let Some(layout) = inner.layout.clone() else {
-                continue;
+                // No layout to hit-test against (no displays read yet): the
+                // window must not block the desktop under it.
+                break 'decide (released, plan, inner.clicks.update(false), None, None);
             };
             let sample = Sample {
                 cursor,
                 origin: Point::new(layout.window.x, layout.window.y),
                 scale: layout.monitor.scale,
             };
-            let decision = decide(&inner.regions, &sample, inner.drag.is_some());
+            let decision = decide(&inner.regions, &sample, inner.drags.is_active());
             let ignore = inner.clicks.update(decision.accept);
             let hover = if inner.hover != decision.region {
                 inner.hover = decision.region.clone();
@@ -468,26 +466,33 @@ fn poll(app: AppHandle) {
             } else {
                 None
             };
-            (plan, ignore, hover, gaze)
+            (released, plan, ignore, hover, gaze)
         };
 
-        if released {
-            end_drag(&app);
+        if let Some(token) = released {
+            end_drag(&app, token);
         }
         if let Some(plan) = plan {
             carry_out(&app, plan);
         }
-        if let Some(ignore) = ignore {
-            if window.set_ignore_cursor_events(ignore).is_err() {
-                state.lock().clicks.failed();
-            }
-        }
+        set_click_through(&state, &window, ignore);
         if let Some(region) = hover {
             let _ = app.emit_to(WINDOW, "overlay:hover", HoverPayload { region });
         }
         if let Some(gaze) = gaze {
             let _ = app.emit_to(WINDOW, "overlay:gaze", gaze);
         }
+    }
+}
+
+/// Tell the OS what `ClickThrough::update` decided, if anything. A failed
+/// call leaves the flag unknown, so the next tick sets it again.
+fn set_click_through(state: &OverlayState, window: &tauri::WebviewWindow, ignore: Option<bool>) {
+    let Some(ignore) = ignore else {
+        return;
+    };
+    if window.set_ignore_cursor_events(ignore).is_err() {
+        state.lock().clicks.failed();
     }
 }
 

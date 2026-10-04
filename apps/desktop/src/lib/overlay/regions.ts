@@ -9,9 +9,17 @@
 // Rectangles go out in physical pixels relative to the window, with the scale
 // they were measured at, so the poll can hit-test them against the global
 // cursor without a round trip. A report is sent only when something changed.
+//
+// Reports go out through async commands, which the shell may handle out of
+// order, so each is stamped and the poll drops one older than the last it
+// applied. `SOURCE` names this page and `seq` counts its reports, across every
+// reporter on it; a reloaded page picks a new source and counts from 1 again.
 import { invoke } from '@tauri-apps/api/core';
 
 const SELECTOR = '[data-interactive]';
+
+const SOURCE = crypto.getRandomValues(new Uint32Array(1))[0];
+let seq = 0;
 
 interface Region {
 	id: string;
@@ -85,8 +93,9 @@ export function reportRegions(root: HTMLElement): RegionReporter {
 		const key = JSON.stringify([scale, regions]);
 		if (key === last) return;
 		last = key;
+		seq += 1;
 		// Outside Tauri (a browser preview) there is no poll to tell.
-		void invoke('overlay_set_regions', { regions, scale }).catch(() => {
+		void invoke('overlay_set_regions', { regions, scale, source: SOURCE, seq }).catch(() => {
 			last = '';
 		});
 	}

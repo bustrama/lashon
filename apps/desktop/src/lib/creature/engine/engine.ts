@@ -132,10 +132,29 @@ export function createEngine(
 		raf = requestAnimationFrame(tick);
 	}
 
+	/** A retry of a frame that threw, waiting for the next animation frame. */
+	let retry = 0;
+
 	/** Draw one frame now (reduced motion, or a change while paused). */
 	function drawOnce(): void {
+		if (retry) cancelAnimationFrame(retry);
+		retry = 0;
 		if (!visible) return;
-		draw(0);
+		try {
+			draw(0);
+		} catch (err) {
+			// A frame that throws must not break whoever asked for it (an effect
+			// in Creature.svelte). Under reduced motion no loop draws again, and
+			// the lamp would keep showing the last state: try again next frame,
+			// as the loop would.
+			console.error('creature: drawing a frame failed', err);
+			if (latest.reduced) {
+				retry = requestAnimationFrame(() => {
+					retry = 0;
+					drawOnce();
+				});
+			}
+		}
 	}
 
 	function setVisible(next: boolean): void {
@@ -249,6 +268,8 @@ export function createEngine(
 		destroy() {
 			if (raf) cancelAnimationFrame(raf);
 			raf = 0;
+			if (retry) cancelAnimationFrame(retry);
+			retry = 0;
 			visible = false;
 			clearInterval(statsTimer);
 			io.disconnect();

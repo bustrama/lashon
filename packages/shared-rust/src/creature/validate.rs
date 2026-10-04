@@ -8,10 +8,11 @@
 //!
 //! - the file size cap and the schema version
 //! - every number inside its [`Bounds`]
-//! - a kebab-case id, and display names that are plain text
+//! - a kebab-case id that can name a folder on every OS, and display names
+//!   that are plain text
 //! - a palm wider than its arm
 //! - the lamp inside the body, at least as large as the body is tall, and
-//!   never under an eye
+//!   never under an eye, wherever the engine moves it
 //! - the eyes inside the body
 //! - gestures that need a prop only in the state that has it
 //!
@@ -20,10 +21,14 @@
 
 use std::fmt;
 
+use icu_properties::props::DefaultIgnorableCodePoint;
+use icu_properties::CodePointSetData;
+
 use super::schema::{
-    Bounds, Creature, Gesture, ARM_RADIUS, ARM_SOFTNESS, BODY_RADIUS_X, BODY_RADIUS_Y, BODY_WOBBLE,
-    EYE_RADIUS_X, EYE_RADIUS_Y, EYE_X, EYE_Y, ID_CHARS, LAMP_RADIUS, LAMP_X, LAMP_Y,
-    MAX_FILE_BYTES, NAME_CHARS, PALM_RADIUS, PALM_SOFTNESS, SCHEMA_VERSION,
+    Bounds, Creature, Eyes, Gesture, Lamp, ARM_RADIUS, ARM_SOFTNESS, BODY_RADIUS_X, BODY_RADIUS_Y,
+    BODY_WOBBLE, EYE_GAZE_BEND, EYE_RADIUS_X, EYE_RADIUS_Y, EYE_SCALE_MAX, EYE_SHIFT_X,
+    EYE_SHIFT_Y, EYE_X, EYE_Y, ID_CHARS, LAMP_RADIUS, LAMP_X, LAMP_Y, MAX_FILE_BYTES, NAME_CHARS,
+    PALM_RADIUS, PALM_SOFTNESS, SCHEMA_VERSION,
 };
 
 /// The lamp's centre must sit inside this fraction of the body ellipse, so
@@ -31,17 +36,17 @@ use super::schema::{
 const LAMP_INNER: f64 = 0.4;
 /// The eyes must sit inside this fraction of the body ellipse.
 const EYES_INNER: f64 = 0.85;
-/// The largest the engine scales the eyes (a startle). The lamp's centre must
-/// stay outside the eyes even then.
-const EYE_SCALE_MAX: f64 = 1.25;
 
 /// Why a name is not plain text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NameProblem {
     Empty,
     TooLong,
-    /// A control character, or a bidi embedding, override or isolate.
-    ControlCharacter,
+    /// A character that doesn't show as itself: a control character, a line
+    /// or paragraph separator, or one Unicode makes invisible by default (a
+    /// zero-width space, a bidi embedding, override or isolate, a tag
+    /// character, a filler).
+    HiddenCharacter,
 }
 
 /// One specific complaint about a creature file.
@@ -58,6 +63,11 @@ pub enum CreatureIssue {
         found: u32,
     },
     InvalidId {
+        id: String,
+    },
+    /// The id is a device name Windows reserves, and the id is also the
+    /// creature's folder name.
+    ReservedId {
         id: String,
     },
     InvalidName {
@@ -96,13 +106,18 @@ impl CreatureIssue {
                 "id {id:?} must be 1–{} characters of a–z, 0–9 and '-', starting with a letter",
                 ID_CHARS.max
             ),
+            ReservedId { id } => format!(
+                "id {id:?} is a device name Windows reserves (con, prn, aux, nul, com0–com9, \
+                 lpt0–lpt9), and the id is also the creature's folder name; pick another"
+            ),
             InvalidName { lang, problem } => match problem {
                 NameProblem::Empty => format!("name.{lang} is empty"),
                 NameProblem::TooLong => {
                     format!("name.{lang} is longer than {} characters", NAME_CHARS.max)
                 }
-                NameProblem::ControlCharacter => format!(
-                    "name.{lang} contains a control character or a bidi override; use plain text"
+                NameProblem::HiddenCharacter => format!(
+                    "name.{lang} contains an invisible or control character (such as a \
+                     zero-width space, a line break or a bidi override); use plain text"
                 ),
             },
             OutOfRange {
@@ -120,7 +135,9 @@ impl CreatureIssue {
             LampSmallerThanBody => {
                 "lamp.radius must be at least body.radius_y, so the lamp fills the body".to_string()
             }
-            LampUnderEye => "the lamp's centre must not be under an eye".to_string(),
+            LampUnderEye => {
+                "the lamp's centre must not be under an eye, wherever the eyes look".to_string()
+            }
             EyesOutsideBody => "the eyes must sit inside the body".to_string(),
             GestureNeedsProp { state, gesture } => format!(
                 "poses.{state} cannot be {gesture:?}: that gesture needs the notepad, which only \
@@ -143,13 +160,18 @@ impl CreatureIssue {
                 "המזהה {id:?} צריך להכיל 1–{} תווים מתוך a–z, ‏0–9 ו-'-', ולהתחיל באות",
                 ID_CHARS.max
             ),
+            ReservedId { id } => format!(
+                "המזהה {id:?} הוא שם התקן ש-Windows שומרת לעצמה (con, prn, aux, nul, com0–com9, \
+                 lpt0–lpt9), והמזהה הוא גם שם התיקייה של היצור. בחרו מזהה אחר"
+            ),
             InvalidName { lang, problem } => match problem {
                 NameProblem::Empty => format!("השם name.{lang} ריק"),
                 NameProblem::TooLong => {
                     format!("השם name.{lang} ארוך מ-{} תווים", NAME_CHARS.max)
                 }
-                NameProblem::ControlCharacter => format!(
-                    "השם name.{lang} מכיל תו בקרה או תו כיווניות. כתבו טקסט רגיל"
+                NameProblem::HiddenCharacter => format!(
+                    "השם name.{lang} מכיל תו בלתי נראה או תו בקרה (כמו רווח ברוחב אפס, ירידת \
+                     שורה או תו כיווניות). כתבו טקסט רגיל"
                 ),
             },
             OutOfRange {
@@ -167,7 +189,7 @@ impl CreatureIssue {
             LampSmallerThanBody => {
                 "lamp.radius צריך להיות לפחות body.radius_y, כדי שהמנורה תמלא את הגוף".to_string()
             }
-            LampUnderEye => "מרכז המנורה לא יכול להיות מתחת לעין".to_string(),
+            LampUnderEye => "מרכז המנורה לא יכול להיות מתחת לעין, לא משנה לאן העיניים מסתכלות".to_string(),
             EyesOutsideBody => "העיניים צריכות להיות בתוך הגוף".to_string(),
             GestureNeedsProp { state, gesture } => format!(
                 "poses.{state} לא יכול להיות {gesture:?}: המחווה הזו צריכה את הפנקס, ורק להכתבה יש פנקס"
@@ -232,6 +254,8 @@ fn check(c: &Creature) -> Vec<CreatureIssue> {
     }
     if !is_valid_id(&c.id) {
         issues.push(CreatureIssue::InvalidId { id: c.id.clone() });
+    } else if is_reserved_on_windows(&c.id) {
+        issues.push(CreatureIssue::ReservedId { id: c.id.clone() });
     }
     for (lang, name) in [("he", &c.name.he), ("en", &c.name.en)] {
         if let Some(problem) = name_problem(name) {
@@ -280,14 +304,7 @@ fn check(c: &Creature) -> Vec<CreatureIssue> {
         if c.lamp.radius < ry {
             issues.push(CreatureIssue::LampSmallerThanBody);
         }
-        let (erx, ery) = (
-            c.eyes.radius_x * EYE_SCALE_MAX,
-            c.eyes.radius_y * EYE_SCALE_MAX,
-        );
-        let under_eye = [-c.eyes.x, c.eyes.x]
-            .iter()
-            .any(|&ex| ellipse_norm(c.lamp.x - ex, c.lamp.y - c.eyes.y, erx, ery) <= 1.0);
-        if under_eye {
+        if lamp_under_an_eye(&c.lamp, &c.eyes) {
             issues.push(CreatureIssue::LampUnderEye);
         }
         let outer_x = c.eyes.x + c.eyes.radius_x;
@@ -322,6 +339,15 @@ fn is_valid_id(id: &str) -> bool {
         && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
+/// A device name Windows reserves: no file or folder can take it, in any
+/// case or with any extension. A valid id is lowercase letters, digits and
+/// hyphens, so only the bare names can occur. Windows also reserves `COM`
+/// and `LPT` with a superscript digit, which an id can't hold.
+fn is_reserved_on_windows(id: &str) -> bool {
+    matches!(id, "con" | "prn" | "aux" | "nul")
+        || matches!(id.as_bytes(), [b'c', b'o', b'm', d] | [b'l', b'p', b't', d] if d.is_ascii_digit())
+}
+
 fn name_problem(name: &str) -> Option<NameProblem> {
     let trimmed = name.trim();
     if trimmed.is_empty() {
@@ -330,13 +356,51 @@ fn name_problem(name: &str) -> Option<NameProblem> {
     if name.chars().count() as f64 > NAME_CHARS.max {
         return Some(NameProblem::TooLong);
     }
-    // Explicit embeddings, overrides and isolates can make a name display as
-    // something else. The marks (U+200E, U+200F) are harmless and allowed.
-    let spoofing = |c: char| matches!(c, '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}');
-    if name.chars().any(|c| c.is_control() || spoofing(c)) {
-        return Some(NameProblem::ControlCharacter);
+    if name.chars().any(is_hidden) {
+        return Some(NameProblem::HiddenCharacter);
     }
     None
+}
+
+/// A character a name may not hold, because it doesn't show as itself.
+///
+/// - Control characters, and the line and paragraph separators, which break
+///   a name across lines.
+/// - Unicode's Default_Ignorable_Code_Point characters, which render as
+///   nothing: zero-width spaces and joiners, the bidi embeddings, overrides
+///   and isolates that make a name display as something else, the Arabic
+///   letter mark, variation selectors, tag characters and fillers. That also
+///   rules out emoji joined into one with a zero-width joiner.
+///
+/// The left-to-right and right-to-left marks (U+200E, U+200F) are allowed:
+/// they are how a Hebrew name with an English word in it reads right.
+fn is_hidden(c: char) -> bool {
+    const MARKS: [char; 2] = ['\u{200E}', '\u{200F}'];
+    let invisible = CodePointSetData::new::<DefaultIgnorableCodePoint>();
+    c.is_control()
+        || matches!(c, '\u{2028}' | '\u{2029}')
+        || (invisible.contains(c) && !MARKS.contains(&c))
+}
+
+/// Whether an eye can cover the lamp's centre anywhere the engine moves it:
+/// scaled up to [`EYE_SCALE_MAX`] and shifted toward the gaze by up to
+/// [`EYE_SHIFT_X`] and [`EYE_SHIFT_Y`] of its radii, at full bend.
+///
+/// The eye's centre ranges over a rectangle around where the creature puts
+/// it, so the closest it gets to the lamp is that place moved as far toward
+/// the lamp as the rectangle allows. The eye narrows a little as it looks
+/// aside; the full-size eye at every shift is a slightly larger, safe bound.
+fn lamp_under_an_eye(lamp: &Lamp, eyes: &Eyes) -> bool {
+    let bend = EYE_GAZE_BEND.sin();
+    let reach_x = EYE_SHIFT_X * bend * eyes.radius_x;
+    let reach_y = EYE_SHIFT_Y * bend * eyes.radius_y;
+    let (rx, ry) = (eyes.radius_x * EYE_SCALE_MAX, eyes.radius_y * EYE_SCALE_MAX);
+    let closest = |d: f64, reach: f64| (d.abs() - reach).max(0.0);
+    [-eyes.x, eyes.x].iter().any(|&ex| {
+        let dx = closest(lamp.x - ex, reach_x);
+        let dy = closest(lamp.y - eyes.y, reach_y);
+        ellipse_norm(dx, dy, rx, ry) <= 1.0
+    })
 }
 
 /// The point's "radius" in an ellipse: 1 on the outline, 0 at the centre.
@@ -452,6 +516,32 @@ mod tests {
     }
 
     #[test]
+    fn rejects_ids_windows_reserves_for_devices() {
+        let digits = ('0'..='9').flat_map(|d| [format!("com{d}"), format!("lpt{d}")]);
+        let reserved: Vec<String> = ["con", "prn", "aux", "nul"]
+            .map(String::from)
+            .into_iter()
+            .chain(digits)
+            .collect();
+        assert_eq!(reserved.len(), 24);
+        for id in &reserved {
+            let mut v = default_value();
+            v["id"] = serde_json::json!(id);
+            assert_eq!(
+                issues_of(&v),
+                vec![CreatureIssue::ReservedId { id: id.clone() }],
+                "id {id:?}"
+            );
+        }
+        // Only the bare names are reserved.
+        for id in ["console", "com", "com10", "lpt-1", "nul-2"] {
+            let mut v = default_value();
+            v["id"] = serde_json::json!(id);
+            assert!(validate_value(&v).is_ok(), "id {id:?}");
+        }
+    }
+
+    #[test]
     fn names_are_plain_text_in_both_languages() {
         let mut v = default_value();
         v["name"]["he"] = serde_json::json!("   ");
@@ -465,7 +555,7 @@ mod tests {
                 },
                 CreatureIssue::InvalidName {
                     lang: "en",
-                    problem: NameProblem::ControlCharacter
+                    problem: NameProblem::HiddenCharacter
                 },
             ]
         );
@@ -474,6 +564,54 @@ mod tests {
         let mut v = default_value();
         v["name"]["he"] = serde_json::json!("בלובי \u{200F}Blob");
         assert!(validate_value(&v).is_ok());
+    }
+
+    #[test]
+    fn names_hold_no_invisible_characters() {
+        let hidden = [
+            ("zero-width space", "אוטי\u{200B}ד"),
+            ("zero-width joiner", "Ot\u{200D}tid"),
+            ("word joiner", "Ot\u{2060}tid"),
+            ("byte order mark", "\u{FEFF}Ottid"),
+            ("soft hyphen", "Ot\u{00AD}tid"),
+            ("line separator", "Ot\u{2028}tid"),
+            ("paragraph separator", "Ottid\u{2029}"),
+            ("arabic letter mark", "אוטיד\u{061C}"),
+            ("isolate", "\u{2067}Ottid\u{2069}"),
+            ("tag characters", "Ottid\u{E0041}\u{E007F}"),
+            ("variation selector", "Ottid\u{FE0F}"),
+            ("hangul filler", "\u{3164}"),
+            ("only invisible", "\u{200B}\u{200B}"),
+            ("control", "Ot\u{0007}tid"),
+        ];
+        for (what, name) in hidden {
+            let mut v = default_value();
+            v["name"]["en"] = serde_json::json!(name);
+            assert_eq!(
+                issues_of(&v),
+                vec![CreatureIssue::InvalidName {
+                    lang: "en",
+                    problem: NameProblem::HiddenCharacter
+                }],
+                "{what}"
+            );
+        }
+    }
+
+    #[test]
+    fn names_keep_what_hebrew_and_english_text_needs() {
+        let plain = [
+            "אוֹטִיד",                // niqqud: combining marks that show
+            "\u{200E}Ottid אוטיד",  // a left-to-right mark
+            "בלובי \u{200F}Blob",   // a right-to-left mark
+            "Ottid 2 — the Otter!", // punctuation and spaces
+            "Ottid 🦦",             // an emoji on its own
+        ];
+        for name in plain {
+            let mut v = default_value();
+            v["name"]["he"] = serde_json::json!(name);
+            assert!(validate_value(&v).is_ok(), "{name:?}");
+        }
     }
 
     #[test]
@@ -513,6 +651,30 @@ mod tests {
         v["lamp"]["x"] = serde_json::json!(4);
         v["lamp"]["y"] = serde_json::json!(4);
         assert_eq!(issues_of(&v), vec![CreatureIssue::LampUnderEye]);
+    }
+
+    #[test]
+    fn the_lamp_is_never_under_an_eye_wherever_it_looks() {
+        // Clear of the eyes at rest, even startled (the old check passed it),
+        // but an eye looking toward the midline slides over the lamp.
+        let mut v = default_value();
+        v["eyes"]["x"] = serde_json::json!(12);
+        v["eyes"]["radius_x"] = serde_json::json!(4);
+        v["lamp"]["x"] = serde_json::json!(6);
+        v["lamp"]["y"] = serde_json::json!(0);
+        let creature: Creature = serde_json::from_value(v.clone()).unwrap();
+        let startled_at_rest = ellipse_norm(
+            creature.lamp.x - creature.eyes.x,
+            creature.lamp.y - creature.eyes.y,
+            creature.eyes.radius_x * EYE_SCALE_MAX,
+            creature.eyes.radius_y * EYE_SCALE_MAX,
+        );
+        assert!(startled_at_rest > 1.0, "{startled_at_rest}");
+        assert_eq!(issues_of(&v), vec![CreatureIssue::LampUnderEye]);
+
+        // The same lamp is clear once the eyes can't reach it.
+        v["lamp"]["x"] = serde_json::json!(0);
+        assert!(validate_value(&v).is_ok());
     }
 
     #[test]
@@ -560,6 +722,7 @@ mod tests {
             },
             CreatureIssue::UnsupportedSchema { found: 9 },
             CreatureIssue::InvalidId { id: "X".into() },
+            CreatureIssue::ReservedId { id: "con".into() },
             CreatureIssue::InvalidName {
                 lang: "he",
                 problem: NameProblem::TooLong,

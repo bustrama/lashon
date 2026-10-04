@@ -115,9 +115,16 @@ fn lock_armed(armed: &SharedArmed) -> MutexGuard<'_, Armed> {
 
 /// Record what worker `generation` is doing, and tell the frontend when
 /// that changes whether Ottid is listening for a wake word.
+///
+/// The event is emitted under the lock, so events leave in the order the
+/// reports were applied. Emitted after the lock, a superseded worker's
+/// `true` could overtake its successor's `false` and leave the overlay
+/// showing an open microphone. `emit` only queues the event for the
+/// webviews, and no Rust listener takes this event, so nothing it does
+/// waits on this lock.
 fn report_armed(app: &AppHandle, armed: &SharedArmed, generation: u64, listening: bool) {
-    let changed = lock_armed(armed).report(generation, listening);
-    if let Some(armed) = changed {
+    let mut state = lock_armed(armed);
+    if let Some(armed) = state.report(generation, listening) {
         let _ = app.emit("wake:armed", WakeArmedEvent { armed });
     }
 }
@@ -383,10 +390,29 @@ fn run_worker(
     armed: SharedArmed,
     generation: u64,
 ) {
+    // However it ends (every slot off, no microphone, the microphone gone,
+    // superseded by a newer worker, or a panic), this worker no longer
+    // listens. A guard says so, because a panic unwinds past any code after
+    // `listen`.
+    let _stopped = StoppedListening {
+        app: &app,
+        armed: &armed,
+        generation,
+    };
     listen(&app, &gates, &running, &armed, generation);
-    // However it ended (every slot off, no microphone, the microphone gone,
-    // or superseded by a newer worker), this worker no longer listens.
-    report_armed(&app, &armed, generation, false);
+}
+
+/// Reports worker `generation` as no longer listening when dropped.
+struct StoppedListening<'a> {
+    app: &'a AppHandle,
+    armed: &'a SharedArmed,
+    generation: u64,
+}
+
+impl Drop for StoppedListening<'_> {
+    fn drop(&mut self) {
+        report_armed(self.app, self.armed, self.generation, false);
+    }
 }
 
 /// Load the enabled slots and listen until `running` drops.

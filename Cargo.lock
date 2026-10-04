@@ -3416,6 +3416,7 @@ dependencies = [
  "enigo",
  "futures",
  "glob",
+ "icu_properties",
  "keyring",
  "notify-rust",
  "nvml-wrapper",

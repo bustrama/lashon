@@ -112,7 +112,8 @@
 	});
 
 	// ---- Pointer on the stage ----
-	let press: { id: number; x: number; y: number; dragging: boolean } | null = null;
+	// `drag` resolves to the token of the drag the press started, or null if none did.
+	let press: { id: number; x: number; y: number; drag: Promise<number | null> | null } | null = null;
 	let swallowClick = false;
 
 	function onPointerDown(event: PointerEvent): void {
@@ -120,26 +121,34 @@
 		// Capture on the hit element, so the drag keeps its events wherever
 		// the cursor goes while the window follows it.
 		(event.target as Element).setPointerCapture(event.pointerId);
-		press = { id: event.pointerId, x: event.screenX, y: event.screenY, dragging: false };
+		press = { id: event.pointerId, x: event.screenX, y: event.screenY, drag: null };
 	}
 
 	function onPointerMove(event: PointerEvent): void {
-		if (!press || press.dragging || event.pointerId !== press.id) return;
+		if (!press || press.drag || event.pointerId !== press.id) return;
 		const moved = Math.hypot(event.screenX - press.x, event.screenY - press.y);
 		if (moved < DRAG_THRESHOLD) return;
-		press.dragging = true;
-		void invoke('overlay_drag_start').catch(() => {
-			if (press) press.dragging = false;
+		const current = press;
+		const drag: Promise<number | null> = invoke<number>('overlay_drag_start').catch(() => {
+			// No drag started (no cursor or no layout yet): the next move tries again.
+			if (current.drag === drag) current.drag = null;
+			return null;
 		});
+		current.drag = drag;
 	}
 
 	function onPointerEnd(event: PointerEvent): void {
 		if (!press || event.pointerId !== press.id) return;
-		const dragged = press.dragging;
+		const drag = press.drag;
 		press = null;
-		if (dragged) {
+		if (drag) {
 			swallowClick = true;
-			void invoke('overlay_drag_end').catch(() => {});
+			// End the drag this press started, once it has started: the shell may
+			// handle the two commands in either order, and an end that overtook
+			// its start would leave the window following the cursor.
+			void drag
+				.then((token) => (token === null ? undefined : invoke('overlay_drag_end', { token })))
+				.catch(() => {});
 		}
 	}
 

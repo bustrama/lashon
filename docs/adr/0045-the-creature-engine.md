@@ -29,10 +29,11 @@ The frontend had no unit-test framework.
    - `Creature.svelte`: the component. It takes the contract's props, plus an
      optional validated creature (the bundled one by default) and an `onStats`
      callback.
-   - `engine/`: pure modules with no DOM (springs, geometry, the gesture
-     library, state → pose, the lamp, the simulation and the per-frame
-     description) and the renderers on top of them (`gl.ts`, `canvas2d.ts`,
-     `engine.ts` for the frame loop).
+   - `engine/`: pure modules with no DOM (geometry, the gesture library,
+     state → pose, the lamp, the simulation and the per-frame description)
+     and the renderers on top of them (`gl.ts`, `canvas2d.ts`, `engine.ts`
+     for the frame loop). The simulation moves on the damped springs in
+     `lib/motion/spring.ts`, the same ones the overlay's island eases with.
    - `data.ts`: the TypeScript mirror of the creature file.
    - `types.ts` and `state.ts`: ADR-0044's contract and state mapping, kept
      identical to that branch.
@@ -55,10 +56,17 @@ The frontend had no unit-test framework.
    how the fields fit together:
    - the palm is wider than the arm;
    - the lamp's centre is in the inner 40% of the body and never under an eye,
-     even a startled one, and its glow reaches at least the body's half-height;
+     even a startled one looking toward it, and its glow reaches at least the
+     body's half-height. The engine clamps how far it scales and shifts an
+     eye to the limits the validator checks, and the schema publishes them
+     (`x-ottid-eye-motion` on `Eyes`);
    - the eyes sit inside the body;
    - `write` is used only in dictation, the one state with the notepad;
-   - names are plain text, with no control or bidi-override characters.
+   - the id, which is also the folder name, is not a device name Windows
+     reserves (`con`, `nul`, `com1`…);
+   - names are plain text: no control characters, line breaks or characters
+     Unicode makes invisible (Default_Ignorable_Code_Point, such as zero-width
+     spaces, bidi overrides and tag characters), except the two direction marks.
 
    It reports every problem at once, in Hebrew and English. It lives in Rust
    because the schema's source, the MCP server, the CLI and hot reload all live

@@ -57,6 +57,8 @@ pub struct RegionSet {
     regions: Vec<Region>,
     scale: f64,
     version: u64,
+    /// The stamp of the last report applied.
+    stamp: Option<Stamp>,
 }
 
 impl Default for RegionSet {
@@ -65,11 +67,52 @@ impl Default for RegionSet {
             regions: Vec::new(),
             scale: 1.0,
             version: 0,
+            stamp: None,
         }
     }
 }
 
+/// Where a report sits in the order the frontend sent them.
+///
+/// Reports arrive through async commands, which the shell may handle out of
+/// order. An older report applied after a newer one would leave stale
+/// rectangles in force until the next change. `seq` counts the reports one
+/// page sends; `source` names the page, because a reloaded page counts from
+/// the start again.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Stamp {
+    pub source: u32,
+    pub seq: u64,
+}
+
+impl Stamp {
+    /// Whether a report stamped `self` was sent after one stamped `last`:
+    /// a later report of the same page, or any report of another page.
+    pub fn follows(&self, last: &Stamp) -> bool {
+        self.source != last.source || self.seq > last.seq
+    }
+}
+
 impl RegionSet {
+    /// Replace the report with one the frontend stamped, unless a report it
+    /// sent later has already been applied. Returns whether anything changed.
+    ///
+    /// A late report is dropped without an error: what replaced it is
+    /// already in force. A rejected report leaves the order as it was.
+    pub fn replace_in_order(
+        &mut self,
+        regions: Vec<Region>,
+        scale: f64,
+        stamp: Stamp,
+    ) -> Result<bool, RegionError> {
+        if self.stamp.is_some_and(|last| !stamp.follows(&last)) {
+            return Ok(false);
+        }
+        let changed = self.replace(regions, scale)?;
+        self.stamp = Some(stamp);
+        Ok(changed)
+    }
+
     /// Replace the report. Returns whether anything changed.
     ///
     /// The whole report is validated first; a bad one is rejected and the
@@ -273,6 +316,70 @@ mod tests {
 
         assert_eq!(set.version(), v);
         assert_eq!(set.hit(Point::new(5.0, 5.0), 1.0, 0.0), Some("creature"));
+    }
+
+    fn stamp(source: u32, seq: u64) -> Stamp {
+        Stamp { source, seq }
+    }
+
+    #[test]
+    fn a_late_report_cannot_replace_a_newer_one() {
+        let mut set = RegionSet::default();
+        let newer = vec![region("island", 0.0, 0.0, 10.0, 10.0)];
+        let older = vec![region("creature", 50.0, 50.0, 10.0, 10.0)];
+        assert!(set.replace_in_order(newer, 1.0, stamp(7, 2)).unwrap());
+        // Sent first, handled second: dropped.
+        assert!(!set
+            .replace_in_order(older.clone(), 1.0, stamp(7, 1))
+            .unwrap());
+        assert_eq!(set.hit(Point::new(5.0, 5.0), 1.0, 0.0), Some("island"));
+        // A repeat of the last report's stamp is not newer either.
+        assert!(!set.replace_in_order(older, 1.0, stamp(7, 2)).unwrap());
+        assert_eq!(set.hit(Point::new(55.0, 55.0), 1.0, 0.0), None);
+    }
+
+    #[test]
+    fn a_reloaded_page_counts_from_the_start_again() {
+        let mut set = RegionSet::default();
+        set.replace_in_order(
+            vec![region("creature", 0.0, 0.0, 10.0, 10.0)],
+            1.0,
+            stamp(1, 500),
+        )
+        .unwrap();
+        let fresh = vec![region("island", 0.0, 0.0, 10.0, 10.0)];
+        assert!(set.replace_in_order(fresh, 1.0, stamp(2, 1)).unwrap());
+        assert_eq!(set.hit(Point::new(5.0, 5.0), 1.0, 0.0), Some("island"));
+    }
+
+    #[test]
+    fn an_unchanged_report_still_moves_the_order_on() {
+        let mut set = RegionSet::default();
+        let report = vec![region("creature", 0.0, 0.0, 10.0, 10.0)];
+        set.replace_in_order(report.clone(), 1.0, stamp(3, 1))
+            .unwrap();
+        assert!(!set.replace_in_order(report, 1.0, stamp(3, 3)).unwrap());
+        // Older than the unchanged report, so older than what is in force.
+        assert!(!set.replace_in_order(Vec::new(), 1.0, stamp(3, 2)).unwrap());
+        assert!(!set.is_empty());
+    }
+
+    #[test]
+    fn a_rejected_report_leaves_the_order_alone() {
+        let mut set = RegionSet::default();
+        set.replace_in_order(
+            vec![region("creature", 0.0, 0.0, 10.0, 10.0)],
+            1.0,
+            stamp(4, 1),
+        )
+        .unwrap();
+        assert_eq!(
+            set.replace_in_order(Vec::new(), 0.0, stamp(4, 3)),
+            Err(RegionError::BadScale(0.0))
+        );
+        // Report 2 was sent after the last one applied, so it applies.
+        assert!(set.replace_in_order(Vec::new(), 1.0, stamp(4, 2)).unwrap());
+        assert!(set.is_empty());
     }
 
     #[test]
