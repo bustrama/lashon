@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Train your own wake word for Lashon</title>
+<title>Train your own wake word for Ottid</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="description" content="Train a custom 'Hey Lashon' (or any phrase) wake-word classifier for Lashon using a free Google Colab notebook. ~30–60 minutes." />
+<meta name="description" content="Train a custom wake-word classifier for Ottid ('Hey Ottid', your own name, any phrase) using a free Google Colab notebook. ~30–60 minutes." />
 <meta name="theme-color" content="#22272f" />
 <link rel="stylesheet" href="../styles.css" />
 <link rel="icon" type="image/svg+xml" href="../ottid-mark.svg" />
@@ -114,6 +114,8 @@ body {
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+/* Long folder paths wrap instead of pushing the page sideways on phones. */
+.article td code { overflow-wrap: anywhere; }
 
 /* The primary CTA button — its own peach-on-dark style. Higher specificity
    than `.article a:not(.cta)` so the link color doesn't override it. */
@@ -161,6 +163,10 @@ body {
 .foot a { color: var(--muted); border: none; }
 .foot a:hover { color: var(--accent); }
 
+@media (prefers-reduced-motion: reduce) {
+  .article a.cta:hover { transform: none; }
+}
+
 @media (max-width: 720px) {
   .article { padding: 40px 20px 64px; }
   .article h1 { font-size: 26px; }
@@ -173,24 +179,34 @@ body {
 <article class="article">
 
   <nav class="article-nav" aria-label="Site navigation">
-    <a href="../">← Lashon home</a>
+    <a href="../">← Ottid home</a>
   </nav>
 
-  <h1>Train your own wake word for Lashon</h1>
+  <h1>Train your own wake word for Ottid</h1>
   <p class="lede">
-    Want Lashon to listen for a custom phrase — "Hey Lashon", your own name,
+    Want Ottid to listen for a custom phrase — "Hey Ottid", your own name,
     anything? Train a small classifier in Google Colab. About 30–60 minutes,
     free, all in your browser. The result runs locally on your machine.
   </p>
 
   <div class="callout">
     <p>
-      <strong>Don't want to train one?</strong> Lashon's Settings Hub
+      <strong>The built-in wake phrase is still "Hey Lashon".</strong>
+      Ottid used to be called Lashon. A wake-word model is trained on a spoken
+      phrase, so renaming the app doesn't change what it listens for. A
+      "Hey Ottid" model is being trained now and will ship in an update.
+      Until then, say "Hey Lashon" — or train your own phrase below.
+    </p>
+  </div>
+
+  <div class="callout">
+    <p>
+      <strong>Don't want to train one?</strong> Ottid's Settings Hub
       → <strong>Wake word</strong> → <strong>More wake words</strong> offers
       one-click installs of "Hey Jarvis", "Alexa", "Hey Mycroft", and
       "Hey Rhasspy". They're released under
       <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC-BY-NC-4.0</a>
-      (non-commercial use only) and Lashon shows the licence before installing.
+      (non-commercial use only) and Ottid shows the licence before installing.
       Models you train yourself have no such restriction.
     </p>
   </div>
@@ -222,7 +238,8 @@ body {
 
     <li>
       <strong>Set your phrase.</strong> Near the top of the notebook,
-      change <code>target_word = "hey lashon"</code> to whatever you want.
+      the default is still <code>target_word = "hey lashon"</code>. Change it
+      to <code>"hey ottid"</code>, your own name, or whatever you want.
       Hebrew works too. Pick something distinctive and 2–3 syllables —
       single common words like "hello" or "yes" will fire constantly.
     </li>
@@ -238,24 +255,30 @@ body {
     <li>
       <strong>Download the <code>.onnx</code> file.</strong> When training
       finishes the notebook produces a file named after your phrase, e.g.
-      <code>hey_lashon.onnx</code>. In Colab's left <em>Files</em> panel,
+      <code>hey_ottid.onnx</code>. In Colab's left <em>Files</em> panel,
       right-click and choose <em>Download</em>.
     </li>
 
     <li>
-      <strong>Drop it into Lashon's wake-words folder:</strong>
+      <strong>Drop it into Ottid's wake-words folder:</strong>
       <table>
         <thead><tr><th>OS</th><th>Path</th></tr></thead>
         <tbody>
-          <tr><td>Windows</td><td><code>%LOCALAPPDATA%\dev.lashon.desktop\models\wakewords\</code></td></tr>
-          <tr><td>macOS</td><td><code>~/Library/Application Support/dev.lashon.desktop/models/wakewords/</code></td></tr>
-          <tr><td>Linux</td><td><code>~/.local/share/dev.lashon.desktop/models/wakewords/</code></td></tr>
+          <tr><td>Windows</td><td><code>%LOCALAPPDATA%\app.ottid.desktop\models\wakewords\</code></td></tr>
+          <tr><td>macOS</td><td><code>~/Library/Application Support/app.ottid.desktop/models/wakewords/</code></td></tr>
+          <tr><td>Linux</td><td><code>~/.local/share/app.ottid.desktop/models/wakewords/</code></td></tr>
         </tbody>
       </table>
+      <p>
+        Still on a Lashon 1.x build? Use <code>dev.lashon.desktop</code> in
+        place of <code>app.ottid.desktop</code>. Ottid moves that folder over
+        the first time it starts.
+      </p>
     </li>
 
     <li>
-      <strong>Pick it in the Hub.</strong> Double-click the tongue →
+      <strong>Pick it in the Hub.</strong> Double-click Ottid, the small mark
+      floating on your screen →
       <em>Settings</em> → <em>Wake word</em> → toggle <strong>Enable</strong>
       on, then select your phrase from the picker. The wake worker
       live-reloads in under a second. Say your phrase — dictation opens.
@@ -279,7 +302,7 @@ body {
 
   <footer class="foot">
     <p>
-      <a href="../">← Lashon · לשון</a>  ·  <a href="https://github.com/bustrama/lashon">Source on GitHub</a>
+      <a href="../">← Ottid · <span lang="he" dir="rtl">אוטיד</span></a>  ·  <a href="https://github.com/bustrama/ottid">Source on GitHub</a>
     </p>
   </footer>
 
