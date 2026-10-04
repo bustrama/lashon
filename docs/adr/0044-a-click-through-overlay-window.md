@@ -65,9 +65,12 @@ character, artwork, icons, sounds and media, so we ported mechanics only.
    takes no clicks before the poll's next look), and without a layout or a
    global cursor. The frontend only reports **regions**: every element marked
    `data-interactive="<name>"`, measured in physical pixels relative to the
-   window, with the scale they were measured at. The poll rescales them if the
-   window has since moved to a display with another scale, adds an 8 px margin,
-   and keeps the mouse while a drag is held. Everything else passes through.
+   window, with the scale they were measured at. Each report carries the
+   page's id and a count, and the poll drops one older than the last it
+   applied, since async commands can be handled out of order. The poll
+   rescales them if the window has since moved to a display with another
+   scale, adds an 8 px margin, and keeps the mouse while a drag is held.
+   Everything else passes through.
 4. **Three placements, saved.** Taskbar, float and ceiling
    (`overlay.placement`), plus the stage centre in physical pixels
    (`overlay.anchor`). The creature stands in a 220 × 120 CSS px stage; the

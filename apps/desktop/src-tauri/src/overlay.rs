@@ -23,7 +23,7 @@ use std::time::Duration;
 use ottid_core::overlay::{
     self, decide, default_anchor, gaze_toward, legacy_anchor, pick_monitor, pointer, snap,
     switch_anchor, ClickThrough, Drags, Frame, Gaze, Layout, Monitor, Placement, Point, Rect,
-    Region, RegionSet, Sample, GAZE_FALLOFF,
+    Region, RegionSet, Sample, Stamp, GAZE_FALLOFF,
 };
 use serde::{Deserialize, Serialize};
 use tauri::menu::CheckMenuItem;
@@ -148,17 +148,20 @@ pub async fn overlay_layout(
 
 /// The frontend's interactive rectangles: physical pixels relative to the
 /// window, measured at `scale`. The cursor poll hit-tests against them from
-/// the next tick on.
+/// the next tick on. `source` and `seq` stamp the report, so one handled
+/// after a report the page sent later is dropped.
 #[tauri::command]
 pub async fn overlay_set_regions(
     state: tauri::State<'_, OverlayState>,
     regions: Vec<Region>,
     scale: f64,
+    source: u32,
+    seq: u64,
 ) -> Result<(), String> {
     state
         .lock()
         .regions
-        .replace(regions, scale)
+        .replace_in_order(regions, scale, Stamp { source, seq })
         .map(|_| ())
         .map_err(|err| err.to_string())
 }

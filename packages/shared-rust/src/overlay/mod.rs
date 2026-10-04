@@ -26,4 +26,4 @@ pub use placement::{
     default_anchor, layout, legacy_anchor, pick_monitor, snap, switch_anchor, Frame, IslandSide,
     Layout, Monitor, Placement,
 };
-pub use regions::{Region, RegionError, RegionSet};
+pub use regions::{Region, RegionError, RegionSet, Stamp};
