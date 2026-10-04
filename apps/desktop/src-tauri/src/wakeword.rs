@@ -115,9 +115,16 @@ fn lock_armed(armed: &SharedArmed) -> MutexGuard<'_, Armed> {
 
 /// Record what worker `generation` is doing, and tell the frontend when
 /// that changes whether Ottid is listening for a wake word.
+///
+/// The event is emitted under the lock, so events leave in the order the
+/// reports were applied. Emitted after the lock, a superseded worker's
+/// `true` could overtake its successor's `false` and leave the overlay
+/// showing an open microphone. `emit` only queues the event for the
+/// webviews, and no Rust listener takes this event, so nothing it does
+/// waits on this lock.
 fn report_armed(app: &AppHandle, armed: &SharedArmed, generation: u64, listening: bool) {
-    let changed = lock_armed(armed).report(generation, listening);
-    if let Some(armed) = changed {
+    let mut state = lock_armed(armed);
+    if let Some(armed) = state.report(generation, listening) {
         let _ = app.emit("wake:armed", WakeArmedEvent { armed });
     }
 }
