@@ -28,7 +28,7 @@ use ottid_core::approval::{
     Cancel, Decision, Hold, HoldCheck, HoldRelease, Id, Queue, Refusal, Request, Shown,
     ALLOW_ACCELERATOR, ALLOW_KEYS, DENY_ACCELERATOR, DENY_KEYS,
 };
-use ottid_core::overlay::Foreground;
+use ottid_core::overlay::{keyboard, Foreground};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
@@ -284,8 +284,12 @@ fn spawn_timeout(app: AppHandle, id: Id) {
 // ---- Hotkeys ----
 
 fn register_keys(app: &AppHandle) -> Keys {
+    // A hold allows only when the OS says the chord is down. Where it can't
+    // say, the hotkey could never allow, so it isn't offered.
+    let can_hold = keyboard::allow_chord_down().is_some();
     Keys {
-        allow: register_key(app, ALLOW_ACCELERATOR, Decision::Allow).then_some(ALLOW_KEYS),
+        allow: (can_hold && register_key(app, ALLOW_ACCELERATOR, Decision::Allow))
+            .then_some(ALLOW_KEYS),
         deny: register_key(app, DENY_ACCELERATOR, Decision::Deny).then_some(DENY_KEYS),
     }
 }
@@ -339,10 +343,15 @@ fn unregister_keys(app: &AppHandle, keys: &Keys) {
 /// - Allow pressed before the card armed is refused, and the card is told,
 ///   so it can scroll on through the text and say why.
 ///
-/// The plugin calls this on the main thread, in key order, with its own
-/// shortcut map locked. The press and the release are noted here, so a
-/// quick tap can't be seen in the wrong order. Answering unregisters
-/// hotkeys, so the answers go to the async runtime.
+/// The plugin calls this synchronously on whichever thread global-hotkey
+/// sends the event from, with its own shortcut map locked. On Windows a
+/// press comes from the main thread's window procedure, and only after it
+/// is handled does global-hotkey start a thread that polls the main key
+/// (Y or N alone) and sends the release when it comes up. So a press is
+/// always noted before its release, but the release says nothing about
+/// Ctrl or Shift, and may never come. That's why only the hold's timer
+/// allows, after asking the OS whether the whole chord is still down.
+/// Answering unregisters hotkeys, so the answers go to the async runtime.
 fn on_key(app: &AppHandle, decision: Decision, pressed: bool) {
     let state = app.state::<Approvals>();
     let now = Instant::now();
@@ -368,8 +377,7 @@ fn on_key(app: &AppHandle, decision: Decision, pressed: bool) {
                 _ => {}
             }
         }
-        (Decision::Allow, false) => match lock(&state.hold).release(now) {
-            HoldRelease::Allow(id) => spawn_answer(app, id, Decision::Allow),
+        (Decision::Allow, false) => match lock(&state.hold).release() {
             HoldRelease::Short(id) => nudge(app, id, "short"),
             HoldRelease::Nothing => {}
         },
@@ -391,16 +399,24 @@ fn spawn_answer(app: &AppHandle, id: Id, decision: Decision) {
     });
 }
 
-/// Allow once `press` has been held for `approval::HOLD`, unless it is let
-/// go or pressed again first.
+/// Allow once `press` has been held for `approval::HOLD` with the whole
+/// chord down, unless any of its keys is let go or it is pressed again
+/// first. The keys are read from the OS at every look, and anything but
+/// "all down" ends the hold without allowing.
 fn spawn_hold(app: AppHandle, press: u64) {
     tauri::async_runtime::spawn(async move {
         loop {
-            let check = lock(&app.state::<Approvals>().hold).check(press, Instant::now());
+            let chord_down = keyboard::allow_chord_down();
+            let check =
+                lock(&app.state::<Approvals>().hold).check(press, Instant::now(), chord_down);
             match check {
                 HoldCheck::Wait(left) => tokio::time::sleep(left).await,
                 HoldCheck::Allow(id) => {
                     spawn_answer(&app, id, Decision::Allow);
+                    return;
+                }
+                HoldCheck::Short(id) => {
+                    nudge(&app, id, "short");
                     return;
                 }
                 HoldCheck::Gone => return,

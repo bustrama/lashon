@@ -143,9 +143,18 @@ keyboard path is the hotkeys, which the broker gates the same way.
   never allows: the chord has to stay down for `approval::HOLD` (1 s). While
   it is held, the Allow button fills; under reduced motion it is outlined
   instead. Let go too soon, and the card shows and says "hold it for a
-  second". The press and the release are noted in key order on the main
-  thread (`ottid_core::approval::Hold`), so a quick tap can't be read as a
-  hold. Deny takes a tap: a wrong Deny runs nothing.
+  second". Deny takes a tap: a wrong Deny runs nothing.
+- **Only the whole chord, held, allows.** The hotkey's events can't tell
+  that on their own. On Windows, global-hotkey sends the press from the main
+  thread and then starts a thread that polls the main key alone and sends
+  the release when it comes up. Letting go of Ctrl or Shift goes unseen, and
+  a release that never came would turn a tap into a hold. So only the hold's
+  timer allows (`ottid_core::approval::Hold`): every 50 ms it asks the OS
+  whether Ctrl, Shift and Y are all still down
+  (`ottid_core::overlay::keyboard`, `GetAsyncKeyState`), and anything else
+  ends the hold without allowing. A release before the timer allows is
+  short, however long it lasted. Where the OS can't be asked, the Allow
+  hotkey isn't registered or offered.
 - **Only while needed.** The shell registers them only while a request is
   pending and unregisters them after.
 - **Any layout.** They are physical keys (`Code::KeyY` and `Code::KeyN`, which
