@@ -247,6 +247,11 @@ pub fn init(app: &AppHandle) {
     }
     sync_menu(app, placement);
     if let Some(window) = app.get_webview_window(WINDOW) {
+        // Until the poll first looks at the cursor, the large transparent
+        // window would take every click on what lies under it: let them
+        // through from the start.
+        let ignore = state.lock().clicks.update(false);
+        set_click_through(&state, &window, ignore);
         // The window is created hidden so it never flashes at a default
         // position. `focus: false` makes this first show non-activating.
         let _ = window.show();
@@ -384,12 +389,20 @@ fn poll(app: AppHandle) {
             let now = window.is_visible().unwrap_or(false);
             if now != visible {
                 // Hiding and showing can reset the window's styles: decide
-                // the flag afresh, and start over with nothing hovered.
-                let was_hovering = {
+                // the flag afresh, and start over with nothing hovered. A
+                // hidden window lets clicks through, so that when it is shown
+                // again it takes none until the poll has looked.
+                let (was_hovering, ignore) = {
                     let mut inner = state.lock();
                     inner.clicks.invalidate();
-                    inner.hover.take().is_some()
+                    let ignore = if now {
+                        None
+                    } else {
+                        inner.clicks.update(false)
+                    };
+                    (inner.hover.take().is_some(), ignore)
                 };
+                set_click_through(&state, &window, ignore);
                 if was_hovering {
                     let _ = app.emit_to(WINDOW, "overlay:hover", HoverPayload { region: None });
                 }
@@ -409,16 +422,12 @@ fn poll(app: AppHandle) {
             // cursor is must not block the desktop under it. Ottid stays
             // visible and its hotkeys work; only the mouse passes through.
             let ignore = state.lock().clicks.update(false);
-            if let Some(ignore) = ignore {
-                if window.set_ignore_cursor_events(ignore).is_err() {
-                    state.lock().clicks.failed();
-                }
-            }
+            set_click_through(&state, &window, ignore);
             continue;
         };
         let button = pointer::primary_button_down();
 
-        let (released, plan, ignore, hover, gaze) = {
+        let (released, plan, ignore, hover, gaze) = 'decide: {
             let mut inner = state.lock();
             let mut plan = None;
             let released = inner.drags.observe_button(button);
@@ -429,7 +438,9 @@ fn poll(app: AppHandle) {
                 }
             }
             let Some(layout) = inner.layout.clone() else {
-                continue;
+                // No layout to hit-test against (no displays read yet): the
+                // window must not block the desktop under it.
+                break 'decide (released, plan, inner.clicks.update(false), None, None);
             };
             let sample = Sample {
                 cursor,
@@ -461,17 +472,24 @@ fn poll(app: AppHandle) {
         if let Some(plan) = plan {
             carry_out(&app, plan);
         }
-        if let Some(ignore) = ignore {
-            if window.set_ignore_cursor_events(ignore).is_err() {
-                state.lock().clicks.failed();
-            }
-        }
+        set_click_through(&state, &window, ignore);
         if let Some(region) = hover {
             let _ = app.emit_to(WINDOW, "overlay:hover", HoverPayload { region });
         }
         if let Some(gaze) = gaze {
             let _ = app.emit_to(WINDOW, "overlay:gaze", gaze);
         }
+    }
+}
+
+/// Tell the OS what `ClickThrough::update` decided, if anything. A failed
+/// call leaves the flag unknown, so the next tick sets it again.
+fn set_click_through(state: &OverlayState, window: &tauri::WebviewWindow, ignore: Option<bool>) {
+    let Some(ignore) = ignore else {
+        return;
+    };
+    if window.set_ignore_cursor_events(ignore).is_err() {
+        state.lock().clicks.failed();
     }
 }
 

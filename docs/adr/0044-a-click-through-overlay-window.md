@@ -60,7 +60,10 @@ character, artwork, icons, sounds and media, so we ported mechanics only.
    awareness), hit-tests it, and sets `set_ignore_cursor_events` in the same
    tick: every 16 ms, every 8 ms while dragging, every 200 ms while hidden. It
    remembers the flag it set and sets it again after a failure, a move, or a
-   hide and show. The frontend only reports **regions**: every element marked
+   hide and show. Where the poll has nothing to decide from, the window lets
+   clicks through: before its first show and while it is hidden (so a show
+   takes no clicks before the poll's next look), and without a layout or a
+   global cursor. The frontend only reports **regions**: every element marked
    `data-interactive="<name>"`, measured in physical pixels relative to the
    window, with the scale they were measured at. The poll rescales them if the
    window has since moved to a display with another scale, adds an 8 px margin,
