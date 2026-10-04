@@ -114,4 +114,41 @@ describe('the engine under reduced motion', () => {
 		engine.destroy();
 		expect(frames.size).toBe(0);
 	});
+
+	it('logs a run of failing frames once, and a new run again', () => {
+		const engine = setup();
+		failing = true;
+		engine.setInput({ ...input, state: 'dictation' });
+		for (let i = 0; i < 60; i++) runFrames();
+		expect(console.error).toHaveBeenCalledOnce();
+
+		failing = false;
+		runFrames();
+		failing = true;
+		engine.setInput({ ...input, state: 'error' });
+		runFrames();
+		expect(console.error).toHaveBeenCalledTimes(2);
+		engine.destroy();
+	});
+});
+
+describe('the engine in motion', () => {
+	it('keeps drawing through failing frames, and logs the run once', () => {
+		const engine = setup();
+		engine.setInput({ ...input, state: 'dictation', reduced: false });
+		failing = true;
+		for (let i = 0; i < 60; i++) {
+			expect(frames.size).toBe(1);
+			expect(runFrames).not.toThrow();
+		}
+		expect(console.error).toHaveBeenCalledOnce();
+
+		failing = false;
+		const before = draws;
+		runFrames();
+		expect(draws).toBe(before + 1);
+		expect(frames.size).toBe(1);
+		engine.destroy();
+		expect(frames.size).toBe(0);
+	});
 });
