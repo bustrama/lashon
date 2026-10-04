@@ -46,6 +46,11 @@ touches (see [`roadmap.md`](roadmap.md) for milestone scope).
   Ubuntu+CPU-only, macOS+M1} runners asserts the correct tier is chosen.
 - Memory-leak: a 1-hour continuous push-to-talk loop; RSS drift under 50 MB
   passes.
+- Frontend unit tests: **Vitest** (`npm test` in `apps/desktop`, run in CI
+  after the type-check) covers pure TypeScript: the creature's springs, its
+  state → pose mapping, the lamp's guarantees and the creature-file mirror of
+  the Rust schema ([ADR-0045](adr/0045-the-creature-engine.md)). Tests sit
+  next to the code as `*.test.ts` and run in Node, with no DOM.
 
 ## Performance budgets (enforced in CI)
 
