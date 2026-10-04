@@ -229,11 +229,18 @@ capability `global-shortcut:allow-unregister-all` is replaced by
   not to change the foreground window, even while Ottid's own process owned
   the foreground, when an activation would have been allowed.
 - **Focus stays with the user's app.** The risks left are the overlay's
-  right-click menu, which hands the foreground back when it closes
-  (`Foreground::give_back`), and a button keeping focus, which the card
-  prevents. As a backstop, a click answer hands the foreground back the same
-  way, to the window that was in front when the card came on screen, if the
-  overlay ever ends up in front.
+  right-click menu and a button keeping focus, which the card prevents.
+  - **The menu.** It brings the overlay to the front.
+    `ottid_core::overlay::Handback` holds the give-back until the item picked
+    is known, then hands the front back to the user's app.
+  - **The menu's exceptions.** Settings, Tutorial and the logs folder open a
+    window that takes the front. The give-back is settled after Settings and
+    Tutorial run, so it still happens if their window couldn't take the
+    front. After the logs folder, it happens only if the folder couldn't be
+    opened.
+  - **A backstop.** A click answer hands the foreground back with
+    `Foreground::give_back`, to the window that was in front when the card
+    came on screen, should the overlay ever end up in front.
 - **The free edition has no broker.** Command mode is compiled out
   ([ADR-0034](0034-command-mode-editioning.md)), and the card never shows.
 - **A debug build can show a sample card** with `approval_preview` (`long` and
