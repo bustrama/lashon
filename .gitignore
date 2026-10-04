@@ -51,6 +51,11 @@ apps/desktop/src-tauri/binaries/ottid-stt/*
 apps/desktop/src-tauri/binaries/llama-server/*
 !apps/desktop/src-tauri/binaries/llama-server/.gitkeep
 !apps/desktop/src-tauri/binaries/llama-server/README.md
+# The Claude Code hook client (docs/adr/0049), built from ottid-core and
+# staged by a full-edition release build. .gitkeep keeps the resource glob
+# resolving on a clean checkout.
+apps/desktop/src-tauri/binaries/ottid-hook/*
+!apps/desktop/src-tauri/binaries/ottid-hook/.gitkeep
 # A standalone run of the frozen sidecar (e.g. a packaging smoke-test) caches
 # the downloaded STT model under src-tauri/models/; the installed app uses the
 # user data dir instead. Never commit those weights.

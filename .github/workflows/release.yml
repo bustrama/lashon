@@ -321,6 +321,23 @@ jobs:
           echo "Staged sidecar — listing:"
           ls -la "$TARGET/"
 
+      # ── Claude Code hook client (docs/adr/0049) ──────────────────────────────
+      #
+      # The command-mode edition ships `ottid-hook`, which Claude Code runs as
+      # its PermissionRequest hook once the user installs it from the Hub.
+      # The free edition has no bridge, so it stages nothing here. Staged
+      # before the signing step, which signs everything under binaries/.
+      - name: Build and stage the hook client (command-mode edition)
+        if: ${{ !contains(matrix.cargo_args, '--no-default-features') }}
+        run: |
+          cargo build --release --locked -p ottid-core --bin ottid-hook
+          TARGET=apps/desktop/src-tauri/binaries/ottid-hook
+          case "${{ runner.os }}" in
+            Windows) cp target/release/ottid-hook.exe "$TARGET/" ;;
+            *) cp target/release/ottid-hook "$TARGET/" ;;
+          esac
+          ls -la "$TARGET/"
+
       # ── Frontend ─────────────────────────────────────────────────────────────
 
       - name: Install frontend dependencies

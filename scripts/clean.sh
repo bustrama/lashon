@@ -160,6 +160,7 @@ if [[ "$level" == "medium" || "$level" == "aggressive" ]]; then
     # Tauri-side bundled binaries — preserve .gitkeep (and README.md for llama).
     for bin_dir in \
         "apps/desktop/src-tauri/binaries/ottid-stt:.gitkeep" \
+        "apps/desktop/src-tauri/binaries/ottid-hook:.gitkeep" \
         "apps/desktop/src-tauri/binaries/llama-server:.gitkeep,README.md"; do
         path="${bin_dir%%:*}"
         keep="${bin_dir##*:}"
