@@ -73,8 +73,14 @@ const MARK = /\p{M}/u;
 const HEBREW = /\p{Script=Hebrew}/u;
 const LETTER = /\p{L}/u;
 // The separators of a command line: ASCII whitespace, punctuation and
-// symbols. None of them has a direction of its own.
-const SEPARATOR = /[\t\n !-/:-@[-`{-~]/;
+// symbols, and the non-ASCII characters PowerShell parses as syntax: its
+// dashes (U+2013–U+2015) and its single and double quotes (U+2018–U+201E),
+// per the PowerShell language spec. A scan of every BMP code point through
+// PowerShell's parser found no others but spaces, which `segments` already
+// shows as badges. Inside a Hebrew word's isolate, a smart quote would be
+// drawn on the far side of the word, so a dangerous command could look
+// quoted. None of these has a direction of its own or mirrors.
+const SEPARATOR = /[\t\n !-/:-@[-`{-~–-―‘-„]/;
 const NOT_ASCII = /[^\x00-\x7F]/;
 
 /** `U+202E` style. */

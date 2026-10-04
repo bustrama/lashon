@@ -100,8 +100,14 @@ its own, so a frontend bug or a hotkey cannot get round them.
   reorder a command line around its Hebrew words: `Copy-Item "דוח" "ארכיון"`
   drew its two arguments swapped, a Hebrew path drew its folders backwards,
   and a `>` between Hebrew words drew as `<`. So each word with a non-ASCII
-  character is its own isolate, where Hebrew reads right to left, and only
-  ASCII is left between the isolates. ASCII never turns a line around.
+  character is its own isolate, where Hebrew reads right to left. Between
+  the isolates there is only ASCII and the non-ASCII characters PowerShell
+  parses as syntax: its dashes (U+2013–U+2015) and smart quotes
+  (U+2018–U+201E). A scan of every BMP code point through PowerShell's parser
+  found no others but spaces, which are already badges. Inside a Hebrew
+  word's isolate, a smart quote would be drawn on the far side of the word,
+  and a command after it could look quoted. None of these turns a line
+  around.
 
 ### Allow arms
 

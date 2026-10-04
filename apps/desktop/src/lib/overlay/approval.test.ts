@@ -206,19 +206,43 @@ describe('runs', () => {
 		expect(runs('')).toEqual([]);
 	});
 
-	it('loses nothing, and leaves only ASCII outside the isolates', () => {
+	it("keeps PowerShell's smart quotes out of a Hebrew word", () => {
+		// Inside the word's isolate, the closing quote would be drawn on the
+		// far side of שלום, and the Remove-Item would look quoted.
+		expect(runs('Write-Output “שלום”; Remove-Item -Recurse C:\\x; “עולם”')).toEqual([
+			{ kind: 'text', text: 'Write-Output “' },
+			{ kind: 'isolate', text: 'שלום' },
+			{ kind: 'text', text: '”; Remove-Item -Recurse C:\\x; “' },
+			{ kind: 'isolate', text: 'עולם' },
+			{ kind: 'text', text: '”' }
+		]);
+		expect(isolates('echo ‘דוח’ ‚ארכיון‛ „קובץ”')).toEqual(['דוח', 'ארכיון', 'קובץ']);
+	});
+
+	it("keeps PowerShell's dashes out of a Hebrew word", () => {
+		// PowerShell reads U+2013–U+2015 as `-`: these are parameters.
+		expect(isolates('Get-Item –שם —נתיב ―סוג')).toEqual(['שם', 'נתיב', 'סוג']);
+		expect(runs('ls –דוח')).toEqual([
+			{ kind: 'text', text: 'ls –' },
+			{ kind: 'isolate', text: 'דוח' }
+		]);
+	});
+
+	it('loses nothing, and leaves only ASCII or PowerShell syntax outside the isolates', () => {
 		const samples = [
 			'Copy-Item "דוח" "ארכיון"',
 			'Move-Item -Path ~\\מסמכים\\*.pdf -Destination "ארכיון 2024"',
 			'echo «שלום» — עולם\n\tנוסף',
 			'{"path": "דוח", "mode": "כתיבה"}',
-			'ls مرحبا > سجل'
+			'ls مرحبا > سجل',
+			'Write-Output “שלום”; Remove-Item -Recurse C:\\x; “עולם”',
+			'echo ‘דוח’ ‚ארכיון‛ „קובץ” –שם —נתיב ―סוג'
 		];
 		for (const text of samples) {
 			const out = runs(text);
 			expect(out.map((r) => (r.kind === 'hidden' ? '' : r.text)).join('')).toBe(text);
 			for (const r of out) {
-				if (r.kind === 'text') expect(r.text).toMatch(/^[\x00-\x7F]*$/);
+				if (r.kind === 'text') expect(r.text).toMatch(/^[\x00-\x7F\u2013-\u2015\u2018-\u201E]*$/);
 			}
 		}
 	});
