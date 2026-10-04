@@ -437,6 +437,7 @@
 	},
 	"approval": {
 		"eyebrow": "אוטיד צריך את האישור שלך",
+		"eyebrowAgent": "{agent} צריך את האישור שלך",
 		"question": {
 			"command": "להריץ את הפקודה הזו?",
 			"tool": "להפעיל את {tool}?"
@@ -449,6 +450,7 @@
 		"deny": "דחייה",
 		"scrollToEnd": "גללו עד סוף הפקודה כדי לאשר",
 		"expires": "תידחה אוטומטית בעוד {seconds} שנ׳",
+		"expiresAgent": "תחזור לטרמינל בעוד {seconds} שנ׳",
 		"waiting": "עוד {count} בתור",
 		"hiddenChar": "תו נסתר",
 		"hiddenCharTitle": "תו שלא נראה על המסך: {code}",
@@ -457,7 +459,8 @@
 			"details": "הפרטים",
 			"allowKey": "לאישור, החזיקו {keys} שנייה.",
 			"denyKey": "לדחייה: {keys}.",
-			"timeout": "בלי תשובה, הבקשה תידחה בעוד {seconds} שניות."
+			"timeout": "בלי תשובה, הבקשה תידחה בעוד {seconds} שניות.",
+			"timeoutAgent": "בלי תשובה, הבקשה תחזור לטרמינל בעוד {seconds} שניות."
 		},
 		"nudge": {
 			"more": "מוצג עוד מהפקודה. אפשר לאשר אחרי שכולה הוצגה.",

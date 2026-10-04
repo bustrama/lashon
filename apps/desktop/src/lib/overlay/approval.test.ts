@@ -5,9 +5,12 @@ import {
 	ARM_DELAY_MS,
 	ArmClock,
 	announcement,
+	askingAgent,
 	atEnd,
 	codePoint,
+	eyebrow,
 	fill,
+	lapseKey,
 	nextPage,
 	pieces,
 	question,
@@ -363,6 +366,54 @@ describe('announcement', () => {
 		expect(text).toContain('file_delete');
 		expect(text).toContain('קובץ.txt');
 		expect(text).toContain(tr('approval.source.recipe'));
+	});
+});
+
+describe('an agent’s request', () => {
+	const claude = (over: Partial<ApprovalCard> = {}) =>
+		card({
+			source: 'agent',
+			agent: 'Claude Code',
+			tool: 'Bash',
+			command: 'git push --force origin feat/מסלול',
+			cwd: 'C:\\Users\\דנה\\ottid',
+			details: '{\n  "description": "Push the rebased branch"\n}',
+			...over
+		});
+
+	it('names the agent asking', () => {
+		const tr = translate('he');
+		expect(askingAgent(claude())).toBe('Claude Code');
+		expect(eyebrow(claude(), tr)).toBe('Claude Code צריך את האישור שלך');
+		// Ottid's own requests keep Ottid's eyebrow, whatever they carry.
+		expect(askingAgent(card({ agent: 'Claude Code' }))).toBeNull();
+		expect(eyebrow(card(), tr)).toBe(tr('approval.eyebrow'));
+		// An agent request without a name falls back to Ottid's.
+		expect(eyebrow(claude({ agent: undefined }), tr)).toBe(tr('approval.eyebrow'));
+	});
+
+	it('says it goes back to the terminal, never that it is denied', () => {
+		const tr = translate('he');
+		expect(lapseKey(claude(), 'expires')).toBe('approval.expiresAgent');
+		expect(lapseKey(card(), 'expires')).toBe('approval.expires');
+		const text = announcement(claude(), tr);
+		expect(text).toContain('Claude Code צריך את האישור שלך');
+		expect(text).toContain('תחזור לטרמינל');
+		expect(text).not.toContain('תידחה');
+		// The whole request is read, with the agent's description.
+		expect(text).toContain('git push --force origin feat/מסלול');
+		expect(text).toContain('C:\\Users\\דנה\\ottid');
+		expect(text).toContain('Push the rebased branch');
+		expect(text).not.toMatch(/approval\.\w/);
+	});
+
+	it('reads in English too', () => {
+		const tr = translate('en');
+		const text = announcement(claude(), tr);
+		expect(text).toContain('Claude Code needs your approval');
+		expect(text).toContain('goes back to the terminal');
+		expect(text).not.toMatch(/approval\.\w/);
+		translate('he');
 	});
 });
 
