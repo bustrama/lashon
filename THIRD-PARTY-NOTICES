@@ -1,0 +1,62 @@
+Ottid — third-party source notices
+===================================
+
+This file lists third-party source code that Ottid's own source files are
+derived from, with the notices their licenses require. Third-party material
+that is vendored or bundled as-is (fonts, model weights, runtimes) is listed in
+NOTICE. Every file named below carries a header comment pointing back here.
+
+--------------------------------------------------------------------------------
+Coucou
+--------------------------------------------------------------------------------
+Origin:  https://github.com/Louis-CFM/coucou
+License: MIT (reproduced below)
+
+Ottid's overlay window adapts the windowing mechanics of Coucou's Windows
+build: the cursor poll that toggles click-through over the drawn regions, the
+display-change check, the cursor and button reads, the damped spring and the
+cubic-bezier easing, the hover rules that keep a card open, and the
+cursor-following gaze mapping. Each was rewritten for Ottid; no Coucou names,
+characters, artwork, icons, sounds, animations or other assets were taken.
+
+Derived files (Ottid path  <-  Coucou path):
+
+  packages/shared-rust/src/overlay/hit_test.rs
+      <-  windows/src-tauri/src/island.rs          (click-through decision)
+  packages/shared-rust/src/overlay/regions.rs
+      <-  windows/src-tauri/src/island.rs          (hit rectangles, generalised)
+  packages/shared-rust/src/overlay/pointer.rs
+      <-  windows/src-tauri/src/platform/windows.rs (cursor_physical,
+                                                     left_button_down)
+  packages/shared-rust/src/overlay/gaze.rs
+      <-  windows/src/island/island.ts             (eyes follow the cursor)
+  apps/desktop/src-tauri/src/overlay.rs
+      <-  windows/src-tauri/src/island.rs          (cursor poll, click-through
+                                                     toggle, display check)
+  apps/desktop/src/lib/motion/spring.ts
+      <-  windows/src/core/anim.ts                 (Spring, cubicBezier)
+  apps/desktop/src/lib/overlay/island.ts
+      <-  windows/src/island/fsm.ts                (IslandStateMachine hover
+                                                     rules)
+
+  MIT License
+
+  Copyright (c) 2026 Louis Raillé
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.

@@ -143,7 +143,14 @@
 			"language": "Interface language",
 			"languageHint": "Choose the language Ottid's interface is shown in. The change applies to every window immediately.",
 			"langHe": "עברית",
-			"langEn": "English"
+			"langEn": "English",
+			"placement": "Placement",
+			"placementHint": "Where Ottid stands: on the taskbar, floating on the desktop, or hanging from the top of the screen. You can also drag it to an edge.",
+			"placements": {
+				"taskbar": "Taskbar",
+				"float": "Float",
+				"ceiling": "Ceiling"
+			}
 		},
 		"hardware": {
 			"title": "Hardware",
