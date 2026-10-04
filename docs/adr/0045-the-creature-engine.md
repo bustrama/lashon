@@ -29,10 +29,11 @@ The frontend had no unit-test framework.
    - `Creature.svelte`: the component. It takes the contract's props, plus an
      optional validated creature (the bundled one by default) and an `onStats`
      callback.
-   - `engine/`: pure modules with no DOM (springs, geometry, the gesture
-     library, state → pose, the lamp, the simulation and the per-frame
-     description) and the renderers on top of them (`gl.ts`, `canvas2d.ts`,
-     `engine.ts` for the frame loop).
+   - `engine/`: pure modules with no DOM (geometry, the gesture library,
+     state → pose, the lamp, the simulation and the per-frame description)
+     and the renderers on top of them (`gl.ts`, `canvas2d.ts`, `engine.ts`
+     for the frame loop). The simulation moves on the damped springs in
+     `lib/motion/spring.ts`, the same ones the overlay's island eases with.
    - `data.ts`: the TypeScript mirror of the creature file.
    - `types.ts` and `state.ts`: ADR-0044's contract and state mapping, kept
      identical to that branch.

@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { isSettled, snapSpring, spring, stepSpring, SUBSTEP_HZ } from './spring';
+import {
+	CLOSE_EASING,
+	cubicBezier,
+	isSettled,
+	snapSpring,
+	spring,
+	springEasing,
+	stepSpring,
+	SUBSTEP_HZ
+} from './spring';
 
 describe('spring', () => {
 	it('takes ω from the response time', () => {
@@ -94,5 +103,54 @@ describe('spring', () => {
 		s.v = 9;
 		snapSpring(s);
 		expect(s).toMatchObject({ x: 4, v: 0, t: 4 });
+	});
+});
+
+describe('springEasing', () => {
+	it('runs from 0 to 1 along the spring it simulates', () => {
+		const { easing, duration } = springEasing(0.5, 0.72);
+		expect(easing(0)).toBe(0);
+		expect(easing(1)).toBe(1);
+		// Sampled at 120 Hz until the spring settles.
+		const frames = Math.round((duration / 1000) * 120);
+		const s = spring(0, 0.5, 0.72);
+		s.t = 1;
+		for (let i = 1; i < frames; i++) {
+			stepSpring(s, 1 / 120);
+			expect(easing(i / frames), `frame ${i}`).toBeCloseTo(s.x, 9);
+			expect(isSettled(s), `frame ${i}`).toBe(false);
+		}
+		// The last frame is where it settles, and the curve lands on 1 exactly.
+		stepSpring(s, 1 / 120);
+		expect(isSettled(s)).toBe(true);
+	});
+
+	it('overshoots like the spring, and ends when it settles', () => {
+		const loose = springEasing(0.5, 0.5);
+		const firm = springEasing(0.5, 1);
+		const peak = (e: (t: number) => number) => Math.max(...Array.from({ length: 401 }, (_, i) => e(i / 400)));
+		expect(peak(loose.easing)).toBeGreaterThan(1.1);
+		expect(peak(firm.easing)).toBeLessThanOrEqual(1);
+		// A stiffer spring settles sooner.
+		expect(springEasing(0.25, 0.72).duration).toBeLessThan(springEasing(0.5, 0.72).duration);
+	});
+});
+
+describe('cubicBezier', () => {
+	it('is the identity for the linear curve', () => {
+		const linear = cubicBezier(1 / 3, 1 / 3, 2 / 3, 2 / 3);
+		for (let i = 0; i <= 20; i++) expect(linear(i / 20)).toBeCloseTo(i / 20, 4);
+	});
+
+	it('closes the island without overshoot', () => {
+		let previous = 0;
+		for (let i = 0; i <= 100; i++) {
+			const y = CLOSE_EASING(i / 100);
+			expect(y).toBeGreaterThanOrEqual(previous);
+			expect(y).toBeLessThanOrEqual(1);
+			previous = y;
+		}
+		expect(CLOSE_EASING(0)).toBe(0);
+		expect(CLOSE_EASING(1)).toBe(1);
 	});
 });
