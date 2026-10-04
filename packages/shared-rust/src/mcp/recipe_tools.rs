@@ -39,13 +39,22 @@ pub fn bundled_recipes_dir() -> PathBuf {
 /// - Linux:   `$XDG_DATA_HOME/ottid/recipes/` (or `~/.local/share/...`)
 ///
 /// Recipes written before the rename live in `<data_local_dir>/lashon/`;
-/// the first resolve moves them here (docs/adr/0042).
+/// the first resolve moves them here (docs/adr/0042), when the carry-over
+/// is on (docs/adr/0046).
 pub fn user_recipes_dir() -> PathBuf {
     if let Some(path) = std::env::var_os(USER_RECIPES_ENV) {
         return PathBuf::from(path);
     }
-    let base = user_data_local_dir();
+    recipes_dir_under(&user_data_local_dir(), crate::legacy::carry_over_enabled())
+}
+
+/// `<base>/ottid/recipes`, after moving the pre-rename recipes into it
+/// when `carry_over` is on.
+fn recipes_dir_under(base: &Path, carry_over: bool) -> PathBuf {
     let dir = base.join("ottid").join("recipes");
+    if !carry_over {
+        return dir;
+    }
     let legacy = base.join(crate::legacy::LEGACY_DIR_NAME);
     match crate::legacy::adopt_dir(&legacy.join("recipes"), &dir) {
         Ok(crate::legacy::Adopted::Nothing) => {}
@@ -156,4 +165,43 @@ pub fn find_recipe_path(id: &str) -> Option<PathBuf> {
         return Some(bundled);
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const RECIPE: &str = "id: send-message\nintents: [\"שלח הודעה\"]\n";
+
+    fn seed_legacy_recipe(base: &Path) -> PathBuf {
+        let yaml = base.join("lashon/recipes/send_message/recipe.yaml");
+        fs::create_dir_all(yaml.parent().unwrap()).unwrap();
+        fs::write(&yaml, RECIPE).unwrap();
+        yaml
+    }
+
+    #[test]
+    fn pre_rename_recipes_stay_put_without_the_carry_over() {
+        let base = tempfile::tempdir().unwrap();
+        let old = seed_legacy_recipe(base.path());
+
+        let dir = recipes_dir_under(base.path(), false);
+        assert_eq!(dir, base.path().join("ottid/recipes"));
+        assert_eq!(fs::read_to_string(&old).unwrap(), RECIPE);
+        assert!(!dir.exists());
+    }
+
+    #[test]
+    fn pre_rename_recipes_move_with_the_carry_over() {
+        let base = tempfile::tempdir().unwrap();
+        seed_legacy_recipe(base.path());
+
+        let dir = recipes_dir_under(base.path(), true);
+        assert_eq!(
+            fs::read_to_string(dir.join("send_message/recipe.yaml")).unwrap(),
+            RECIPE
+        );
+        // The emptied `lashon/` parent is tidied away too.
+        assert!(!base.path().join("lashon").exists());
+    }
 }
