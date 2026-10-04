@@ -90,7 +90,7 @@ legal clearance:
 | `LASHON_STT_TOKEN` / `LASHON_STT_PORT`, `x-lashon-auth`, proto package `lashon.stt.v1` | `OTTID_STT_TOKEN` / `OTTID_STT_PORT`, `x-ottid-auth`, `ottid.stt.v1` |
 | Keychain service `lashon` | `ottid` (old keys are adopted on first read) |
 | `<data-local>/lashon/recipes` | `<data-local>/ottid/recipes` (moved on first use) |
-| MCP tool names `lashon.*` | `ottid.*` |
+| MCP server name `lashon-mcp` (`serverInfo.name`, the label hosts show) | `ottid-mcp`. The tool names (`list_recipes`, …) are unchanged: they were never prefixed ([ADR-0028](0028-lashon-as-mcp-server.md)). |
 | `lashon-recipe.schema.json`, `lashon.system.*.md` | `ottid-recipe.schema.json`, `ottid.system.*.md` |
 | `bustrama/lashon`, `bustrama.github.io/lashon` | `bustrama/ottid`, `bustrama.github.io/ottid` |
 
