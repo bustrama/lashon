@@ -9,7 +9,9 @@ import {
 	codePoint,
 	fill,
 	nextPage,
+	pieces,
 	question,
+	runs,
 	segments,
 	spoken,
 	type ApprovalCard,
@@ -97,6 +99,80 @@ describe('segments', () => {
 
 	it('returns nothing for empty text', () => {
 		expect(segments('')).toEqual([]);
+	});
+});
+
+describe('runs', () => {
+	const isolates = (text: string) =>
+		runs(text)
+			.filter((r) => r.kind === 'isolate')
+			.map((r) => (r.kind === 'isolate' ? r.text : ''));
+
+	it('isolates each Hebrew argument, in the order they run', () => {
+		// Ordinary bidi draws this as Copy-Item "ארכיון" "דוח": the
+		// arguments swap places.
+		expect(runs('Copy-Item "דוח" "ארכיון"')).toEqual([
+			{ kind: 'text', text: 'Copy-Item "' },
+			{ kind: 'isolate', text: 'דוח' },
+			{ kind: 'text', text: '" "' },
+			{ kind: 'isolate', text: 'ארכיון' },
+			{ kind: 'text', text: '"' }
+		]);
+	});
+
+	it('keeps an operator between Hebrew words out of the isolates', () => {
+		// Inside a right-to-left run, ">" would be drawn mirrored as "<".
+		expect(runs('echo שלום > פלט.txt')).toEqual([
+			{ kind: 'text', text: 'echo ' },
+			{ kind: 'isolate', text: 'שלום' },
+			{ kind: 'text', text: ' > ' },
+			{ kind: 'isolate', text: 'פלט' },
+			{ kind: 'text', text: '.txt' }
+		]);
+		expect(isolates('דוח|ארכיון>>יומן')).toEqual(['דוח', 'ארכיון', 'יומן']);
+	});
+
+	it('keeps the folders of a Hebrew path in order', () => {
+		expect(isolates('C:\\Users\\בן\\מסמכים\\דוח.txt')).toEqual(['בן', 'מסמכים', 'דוח']);
+	});
+
+	it('keeps a word whole, with its niqqud and any other script in it', () => {
+		expect(runs('שָׁלוֹם')).toEqual([{ kind: 'isolate', text: 'שָׁלוֹם' }]);
+		expect(runs('fileדוח2024')).toEqual([{ kind: 'isolate', text: 'fileדוח2024' }]);
+	});
+
+	it('leaves ASCII as it is', () => {
+		const text = 'Get-ChildItem -Path "$HOME" | Select-Object -First 5';
+		expect(runs(text)).toEqual([{ kind: 'text', text }]);
+		expect(runs('')).toEqual([]);
+	});
+
+	it('loses nothing, and leaves only ASCII outside the isolates', () => {
+		const samples = [
+			'Copy-Item "דוח" "ארכיון"',
+			'Move-Item -Path ~\\מסמכים\\*.pdf -Destination "ארכיון 2024"',
+			'echo «שלום» — עולם\n\tנוסף',
+			'{"path": "דוח", "mode": "כתיבה"}',
+			'ls مرحبا > سجل'
+		];
+		for (const text of samples) {
+			const out = runs(text);
+			expect(out.map((r) => (r.kind === 'hidden' ? '' : r.text)).join('')).toBe(text);
+			for (const r of out) {
+				if (r.kind === 'text') expect(r.text).toMatch(/^[\x00-\x7F]*$/);
+			}
+		}
+	});
+});
+
+describe('pieces', () => {
+	it('isolates the words around a hidden character', () => {
+		expect(pieces('דוח\u202Eארכיון x')).toEqual([
+			{ kind: 'isolate', text: 'דוח' },
+			{ kind: 'hidden', code: 'U+202E' },
+			{ kind: 'isolate', text: 'ארכיון' },
+			{ kind: 'text', text: ' x' }
+		]);
 	});
 });
 

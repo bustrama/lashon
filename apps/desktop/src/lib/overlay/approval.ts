@@ -39,6 +39,15 @@ export interface ApprovalNudge {
 /** A run of ordinary text, or one character shown by its code point. */
 export type Segment = { kind: 'text'; text: string } | { kind: 'hidden'; code: string };
 
+/**
+ * What the card draws: plain text, a word in its own bidi isolate, or one
+ * character shown by its code point.
+ */
+export type Piece =
+	| { kind: 'text'; text: string }
+	| { kind: 'isolate'; text: string }
+	| { kind: 'hidden'; code: string };
+
 // Characters that draw nothing, draw as something else, or reorder the text
 // around them: controls, format characters (bidi overrides and isolates,
 // zero-width characters, tags), lone surrogates, line and paragraph
@@ -47,6 +56,10 @@ export type Segment = { kind: 'text'; text: string } | { kind: 'hidden'; code: s
 const HIDDEN = /[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}\p{Zs}\p{Variation_Selector}]/u;
 // The only ones a command line shows as themselves.
 const SHOWN_AS_IS = new Set(['\t', '\n', ' ']);
+// The separators of a command line: ASCII whitespace, punctuation and
+// symbols. None of them has a direction of its own.
+const SEPARATOR = /[\t\n !-/:-@[-`{-~]/;
+const NOT_ASCII = /[^\x00-\x7F]/;
 
 /** `U+202E` style. */
 export function codePoint(ch: string): string {
@@ -69,6 +82,49 @@ export function segments(text: string): Segment[] {
 	}
 	if (run) out.push({ kind: 'text', text: run });
 	return out;
+}
+
+/**
+ * Split drawable text so that it reads in the order it runs, left to right.
+ *
+ * Bidi would reorder a command line around its right-to-left words: two
+ * quoted Hebrew arguments swap places, the folders of a Hebrew path come out
+ * backwards, and a `>` between Hebrew words turns into `<`. So each word
+ * with a non-ASCII character in it gets its own isolate, where Hebrew reads
+ * right to left, and the separators between words stay in the line's
+ * left-to-right order. Outside the isolates there is only ASCII, which
+ * never turns a line around.
+ */
+export function runs(text: string): Piece[] {
+	const out: Piece[] = [];
+	let plain = '';
+	let word = '';
+	const endWord = () => {
+		if (NOT_ASCII.test(word)) {
+			if (plain) out.push({ kind: 'text', text: plain });
+			plain = '';
+			out.push({ kind: 'isolate', text: word });
+		} else {
+			plain += word;
+		}
+		word = '';
+	};
+	for (const ch of text) {
+		if (SEPARATOR.test(ch)) {
+			endWord();
+			plain += ch;
+		} else {
+			word += ch;
+		}
+	}
+	endWord();
+	if (plain) out.push({ kind: 'text', text: plain });
+	return out;
+}
+
+/** Everything the card draws for `text`, in order. */
+export function pieces(text: string): Piece[] {
+	return segments(text).flatMap((s) => (s.kind === 'hidden' ? [s] : runs(s.text)));
 }
 
 /** Replace `{name}` placeholders. Unknown ones stay as they are. */

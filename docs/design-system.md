@@ -110,6 +110,10 @@ later an agent, the island shows the approval card
   command and its folder; for any other tool, every argument. The text is
   monospace, left to right in its own bidi isolate, and scrolls inside the
   card when it is long. The bottom edge fades while there is more to read.
+- **In the order it runs.** Each Hebrew word is its own isolate, so Hebrew
+  reads right to left inside the word while the arguments, path folders and
+  operators stay in left-to-right order. Plain bidi would swap two Hebrew
+  arguments and mirror a `>` between them.
 - **Hidden characters show by code point.** A bidi override, a zero-width
   character or a look-alike space is drawn as a small `--saffron` badge such
   as `U+202E`, never obeyed.

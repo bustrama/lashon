@@ -25,7 +25,7 @@
 		atEnd,
 		fill,
 		nextPage,
-		segments,
+		pieces,
 		type ApprovalCard,
 		type ApprovalDecision,
 		type ApprovalNudge,
@@ -190,7 +190,9 @@
 	});
 </script>
 
-{#snippet text(value: string)}{#each segments(value) as segment, i (i)}{#if segment.kind === 'text'}{segment.text}{:else}<span class="hidden-char" title={fill($t('approval.hiddenCharTitle'), { code: segment.code })}>{segment.code}</span>{/if}{/each}{/snippet}
+<!-- Each non-ASCII word is its own isolate, so the line reads in the order
+     it runs (`runs` in approval.ts). -->
+{#snippet text(value: string)}{#each pieces(value) as piece, i (i)}{#if piece.kind === 'text'}{piece.text}{:else if piece.kind === 'isolate'}<bdi>{piece.text}</bdi>{:else}<span class="hidden-char" title={fill($t('approval.hiddenCharTitle'), { code: piece.code })}>{piece.code}</span>{/if}{/each}{/snippet}
 
 <div class="approval" role="group" aria-labelledby="approval-question-{card.id}">
 	<div class="head">
