@@ -44,9 +44,24 @@ without explicit consent.
 
 ## Install
 
-No installer is published yet — for now Ottid is built from source (see
-below); a signed Windows installer is on the way. Watch the
-[Releases page](https://github.com/bustrama/ottid/releases) for the first build.
+Download the installer from the
+[latest release](https://github.com/bustrama/ottid/releases/latest): the file
+ending in `_x64-setup.exe`. If you'd rather not install, the release also has
+a portable `.zip`. Releases up to v1.1 carry Ottid's old name, Lashon
+(`Lashon_1.1.0_x64-setup.exe`).
+
+- **Windows only, for v1.x.** There are no macOS or Linux builds yet.
+- **Code signing.** Releases up to v1.1 aren't code-signed, so Windows
+  SmartScreen stops them with "Windows protected your PC". Click **More
+  info**, then **Run anyway**. Later releases are signed
+  ([ADR-0043](docs/adr/0043-sign-windows-releases-with-azure-artifact-signing.md)).
+  You can always read the source, or build it yourself (below).
+- **The free dictation edition.** The published build does dictation only.
+  Command mode and recipes are left out of it; a build from source includes
+  them.
+- **Upgrading from Lashon?** The first release under the Ottid name installs
+  over it: its installer removes the old app and keeps your settings, history
+  and downloaded models.
 
 On **first run** Ottid downloads the ~1.6 GB Hebrew speech model; on an NVIDIA
 GPU it also fetches the CUDA runtime for faster transcription. After that it
@@ -80,8 +95,8 @@ Ottid is built in three phases:
    coding agents.
 3. **Voice response** — Hebrew-perfect text-to-speech for confirmations and chat.
 
-Dictation and command mode are built and working; the current focus is
-packaging and a signed installer for the first release.
+Dictation and command mode are built and working, and the dictation edition
+ships as a Windows installer. The current focus is code-signing it.
 
 The full roadmap — scope, milestones, and per-phase workstreams — lives in
 [`docs/roadmap.md`](docs/roadmap.md). Active work is tracked as stories in
