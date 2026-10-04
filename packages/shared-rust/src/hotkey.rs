@@ -22,6 +22,10 @@ pub enum HotkeyError {
     /// An OS-reserved chord the operating system intercepts before any app, so
     /// binding it would simply never fire.
     Reserved,
+    /// A chord that answers the approval card (`crate::approval`). Ottid
+    /// registers it while a card is pending, so a binding there would be
+    /// taken away exactly then.
+    Approval,
 }
 
 impl HotkeyError {
@@ -34,6 +38,7 @@ impl HotkeyError {
             HotkeyError::NoKey => "no-key",
             HotkeyError::Malformed => "malformed",
             HotkeyError::Reserved => "reserved",
+            HotkeyError::Approval => "approval",
         }
     }
 }
@@ -66,17 +71,55 @@ fn canonical_signature(modifiers: &[&str], key: &str) -> String {
         .collect();
     canon.sort_unstable();
     canon.dedup();
+    format!("{}+{}", canon.join("+"), canonical_key(key))
+}
+
+/// A lowercased key name, with the spellings that name the same physical key
+/// folded together: `Del` is `Delete`, `KeyY` is `Y` and `Digit5` is `5`.
+fn canonical_key(key: &str) -> String {
     let key = key.to_ascii_lowercase();
-    let key = if key == "del" { "delete" } else { key.as_str() };
-    format!("{}+{}", canon.join("+"), key)
+    if key == "del" {
+        return "delete".to_string();
+    }
+    for prefix in ["key", "digit"] {
+        if let Some(rest) = key.strip_prefix(prefix) {
+            if rest.len() == 1 {
+                return rest.to_string();
+            }
+        }
+    }
+    key
+}
+
+/// The signature of a whole accelerator string, split the way
+/// `validate_accelerator` splits it.
+fn signature_of(accelerator: &str) -> Option<String> {
+    let tokens: Vec<&str> = accelerator
+        .split('+')
+        .map(str::trim)
+        .filter(|token| !token.is_empty())
+        .collect();
+    let (key, modifiers) = tokens.split_last()?;
+    Some(canonical_signature(modifiers, key))
+}
+
+/// Whether `signature` is one of the approval card's chords.
+fn is_approval_chord(signature: &str) -> bool {
+    [
+        crate::approval::ALLOW_ACCELERATOR,
+        crate::approval::DENY_ACCELERATOR,
+    ]
+    .iter()
+    .any(|chord| signature_of(chord).as_deref() == Some(signature))
 }
 
 /// Validate a Tauri global-shortcut accelerator string.
 ///
 /// A chord is acceptable when it has at least one modifier, exactly one
-/// ordinary key, and is not OS-reserved. The function does not check that the
-/// key name is one Tauri can register — a genuinely unknown key fails loudly
-/// at `register()` time; this is the policy gate, not the parser.
+/// ordinary key, is not OS-reserved, and is not one of the approval card's
+/// chords. The function does not check that the key name is one Tauri can
+/// register — a genuinely unknown key fails loudly at `register()` time; this
+/// is the policy gate, not the parser.
 pub fn validate_accelerator(accelerator: &str) -> Result<(), HotkeyError> {
     let tokens: Vec<&str> = accelerator
         .split('+')
@@ -97,8 +140,12 @@ pub fn validate_accelerator(accelerator: &str) -> Result<(), HotkeyError> {
     if !modifiers.iter().all(|m| canonical_modifier(m).is_some()) {
         return Err(HotkeyError::Malformed);
     }
-    if RESERVED.contains(&canonical_signature(modifiers, key).as_str()) {
+    let signature = canonical_signature(modifiers, key);
+    if RESERVED.contains(&signature.as_str()) {
         return Err(HotkeyError::Reserved);
+    }
+    if is_approval_chord(&signature) {
+        return Err(HotkeyError::Approval);
     }
     Ok(())
 }
@@ -168,11 +215,52 @@ mod tests {
     }
 
     #[test]
+    fn the_approval_chords_are_valid_accelerators_of_their_own() {
+        // Their shape passes every other rule; only the reservation stops them.
+        for chord in [
+            crate::approval::ALLOW_ACCELERATOR,
+            crate::approval::DENY_ACCELERATOR,
+        ] {
+            assert_eq!(validate_accelerator(chord), Err(HotkeyError::Approval));
+        }
+    }
+
+    #[test]
+    fn rejects_the_approval_chords_in_any_spelling() {
+        assert_eq!(
+            validate_accelerator("Ctrl+Shift+Y"),
+            Err(HotkeyError::Approval)
+        );
+        assert_eq!(
+            validate_accelerator("shift+control+keyn"),
+            Err(HotkeyError::Approval)
+        );
+        assert_eq!(
+            validate_accelerator("CommandOrControl+Shift+N"),
+            Err(HotkeyError::Approval)
+        );
+        // Neighbours stay free.
+        assert!(validate_accelerator("Control+Shift+D").is_ok());
+        assert!(validate_accelerator("Control+Y").is_ok());
+        assert!(validate_accelerator("Control+Alt+Shift+Y").is_ok());
+    }
+
+    #[test]
+    fn folds_key_spellings_of_the_same_physical_key() {
+        assert_eq!(canonical_key("KeyY"), "y");
+        assert_eq!(canonical_key("Digit5"), "5");
+        assert_eq!(canonical_key("Del"), "delete");
+        assert_eq!(canonical_key("Keypad"), "keypad");
+        assert_eq!(canonical_key("Space"), "space");
+    }
+
+    #[test]
     fn error_codes_are_stable() {
         assert_eq!(HotkeyError::Empty.code(), "empty");
         assert_eq!(HotkeyError::NoModifier.code(), "no-modifier");
         assert_eq!(HotkeyError::NoKey.code(), "no-key");
         assert_eq!(HotkeyError::Malformed.code(), "malformed");
         assert_eq!(HotkeyError::Reserved.code(), "reserved");
+        assert_eq!(HotkeyError::Approval.code(), "approval");
     }
 }

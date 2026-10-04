@@ -176,7 +176,8 @@
 				"no-modifier": "A shortcut must include a modifier key — Ctrl, Alt or Shift.",
 				"no-key": "A shortcut must include one key besides the modifiers.",
 				"malformed": "That combination isn't valid. Try another.",
-				"reserved": "That combination is reserved by the operating system. Choose another."
+				"reserved": "That combination is reserved by the operating system. Choose another.",
+				"approval": "That combination is reserved for Ottid's approval card. Choose another."
 			}
 		},
 		"wakeword": {
