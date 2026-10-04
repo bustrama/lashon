@@ -12,7 +12,9 @@ lamp.
 
 The product was called Lashon until v1.1
 ([ADR-0042](adr/0042-rename-the-product-to-ottid.md)). The overlay is the
-`main` window, drawn today by `Tongue.svelte`; older docs call it "the tongue".
+`main` window ([ADR-0044](adr/0044-a-click-through-overlay-window.md)); until the
+WebGL creature lands it draws a stand-in, the mark with a lamp halo. Older docs
+call it "the tongue".
 The creature itself is
 [ADR-0040](adr/0040-the-overlay-becomes-a-living-creature.md), and user-made
 creatures are [ADR-0041](adr/0041-user-authored-creatures-are-data.md).
@@ -94,9 +96,9 @@ The approval card shows the **full** command and arms its buttons only after a
 ### Form
 
 - **Body.** One dark, gooey shape: a wide ellipse about **29 × 20 units**. In the
-  prototypes 1 unit is 1.5 CSS px; Phase B sets the scale in the app. Its outline wobbles slowly through angular harmonics
-  2, 3 and 5. The wobble grows with the voice level and with a "jiggle" spring
-  after a poke.
+  prototypes and in the app, 1 unit is 1.5 CSS px. Its outline wobbles slowly
+  through angular harmonics 2, 3 and 5. The wobble grows with the voice level
+  and with a "jiggle" spring after a poke.
 - **Hands.** Exactly two, made of dough. Each is a thin arm (capsule radius 2.6)
   ending in a round palm (radius 4.6), fused into the body with smooth fillets
   (`smin` 4.5 for the arm, 2.5 for the palm). The shoulders sit at the sides.
@@ -147,6 +149,14 @@ The user chooses one of three:
 | **Taskbar** | Sits on the taskbar's top edge. The bottom is flattened by a smooth intersection with the floor line. | Hands rest on the floor beside the body. Hops land on the floor. |
 | **Float** | Free on the desktop | Gentle bob (about 2.6 units at 1.8 rad/s). Hands paddle slowly. |
 | **Ceiling** | Hangs from the screen's top edge by both hands. The edge is a smooth union with the ceiling, evaluated in screen space so it stays put while the body swings. | Pendulum swing. **One hand always holds on**, and the other does the state's gesture. |
+
+The user picks the placement from the tray menu, from the Hub (General) or by
+dragging Ottid. A drop within 40 px of the taskbar or the top edge snaps to
+that edge; anywhere else, Ottid floats. The placement and the position are
+saved. The creature stands in a **stage** of 220 × 120 CSS px (about 147 × 80
+units): its bottom edge is the floor for the taskbar placement and its top
+edge is the ceiling for the ceiling placement. Cards open above the stage, or
+below it when Ottid hangs from the ceiling or there is no room above.
 
 ### The silhouette rule
 
@@ -203,8 +213,10 @@ without the smile.
   swing, wobble, writing and rain. **The lamp still shows the state.**
 - ARIA-live regions announce every state change. The creature is decoration on
   top of that, never the only signal.
-- Ottid never takes keyboard focus from the user's app. Phase B sets up
-  non-activating focus and click-through on transparent pixels.
+- Ottid never takes keyboard focus from the user's app. The overlay window is
+  non-activating, and the mouse passes through it everywhere except the
+  creature and its cards ([ADR-0044](adr/0044-a-click-through-overlay-window.md)).
+  Its keyboard paths are the global hotkeys, the tray menu and the Hub.
 
 ## States
 
