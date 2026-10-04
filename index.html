@@ -8,6 +8,7 @@
 <meta name="theme-color" content="#22272f" />
 <link rel="stylesheet" href="styles.css" />
 <link rel="icon" type="image/svg+xml" href="ottid-mark.svg" />
+<script src="ottid.js" defer></script>
 </head>
 <body>
 
@@ -73,6 +74,80 @@
   </section>
 
   <aside class="showcase">
+    <figure class="meet">
+      <div class="stage">
+        <svg class="ottid" viewBox="0 0 320 180" role="img" aria-labelledby="ottid-title">
+          <title id="ottid-title">אוטיד, שלולית קטנה בצבע פחם עם שתי ידיים ועיני גחלת, יושב על שורת המשימות ומנופף לשלום</title>
+          <defs>
+            <radialGradient id="ottid-lamp" gradientUnits="userSpaceOnUse" cx="0" cy="5.5" r="25">
+              <stop offset="0" stop-color="#f7c8a3" stop-opacity=".18"/>
+              <stop offset=".6" stop-color="#f7c8a3" stop-opacity=".063"/>
+              <stop offset="1" stop-color="#f7c8a3" stop-opacity="0"/>
+            </radialGradient>
+            <filter id="ottid-goo" filterUnits="userSpaceOnUse" x="-70" y="-60" width="140" height="90" color-interpolation-filters="sRGB">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="1.6" result="soft"/>
+              <feColorMatrix in="soft" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 16 -7.5" result="body"/>
+              <feMorphology in="body" operator="erode" radius=".55" result="inner"/>
+              <feComposite in="body" in2="inner" operator="out" result="edge"/>
+              <feFlood flood-color="#f7c8a3" flood-opacity=".3"/>
+              <feComposite in2="edge" operator="in" result="rim"/>
+              <feGaussianBlur in="body" stdDeviation="2.5" result="spread"/>
+              <feFlood class="o-halo" flood-color="#f7c8a3" flood-opacity=".16"/>
+              <feComposite in2="spread" operator="in" result="halo"/>
+              <feMerge><feMergeNode in="halo"/><feMergeNode in="body"/><feMergeNode in="rim"/></feMerge>
+            </filter>
+            <filter id="ottid-ember" filterUnits="userSpaceOnUse" x="-24" y="-16" width="48" height="32" color-interpolation-filters="sRGB">
+              <feGaussianBlur in="SourceAlpha" stdDeviation="1.4" result="spread"/>
+              <feFlood flood-color="#f7c8a3" flood-opacity=".85"/>
+              <feComposite in2="spread" operator="in" result="glow"/>
+              <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+            <clipPath id="ottid-floor"><rect x="-80" y="-80" width="160" height="91"/></clipPath>
+            <clipPath id="ottid-lid-l"><path class="o-lid" data-side="-1" d="M-20 -3.8H4V30H-20Z"/></clipPath>
+            <clipPath id="ottid-lid-r"><path class="o-lid" data-side="1" d="M-4 -3.8H20V30H-4Z"/></clipPath>
+            <clipPath id="ottid-smile-l"><path class="o-smile" data-side="-1" clip-rule="evenodd" d="M-20 -40H4V40H-20ZM-1.07 6.41A6.93 6.5 0 1 0 -14.93 6.41A6.93 6.5 0 1 0 -1.07 6.41Z"/></clipPath>
+            <clipPath id="ottid-smile-r"><path class="o-smile" data-side="1" clip-rule="evenodd" d="M-4 -40H20V40H-4ZM14.93 6.41A6.93 6.5 0 1 0 1.07 6.41A6.93 6.5 0 1 0 14.93 6.41Z"/></clipPath>
+          </defs>
+          <g class="o-taskbar" aria-hidden="true">
+            <rect x="0" y="156" width="320" height="24" fill="#000" fill-opacity=".22"/>
+            <rect x="0" y="156" width="320" height="1" fill="#fff" fill-opacity=".07"/>
+            <g fill="#fff" fill-opacity=".12">
+              <rect x="110" y="163" width="10" height="10" rx="2"/>
+              <rect x="130" y="163" width="10" height="10" rx="2"/>
+              <rect x="150" y="163" width="10" height="10" rx="2"/>
+              <rect x="170" y="163" width="10" height="10" rx="2"/>
+              <rect x="190" y="163" width="10" height="10" rx="2"/>
+              <rect x="210" y="163" width="10" height="10" rx="2"/>
+            </g>
+          </g>
+          <g transform="translate(160 156) scale(2.2) translate(0 -11)">
+            <g class="o-move">
+              <g filter="url(#ottid-goo)">
+                <g clip-path="url(#ottid-floor)" fill="#14181c" stroke="#14181c">
+                  <path class="o-body" stroke="none" d="M-29 0A29 20.2 0 1 0 29 0A29 20.2 0 1 0 -29 0Z"/>
+                  <line class="o-arm" data-side="-1" x1="-24" y1="1" x2="-34.73" y2="8.34" stroke-width="5.2" stroke-linecap="round"/>
+                  <circle class="o-palm" data-side="-1" cx="-34.73" cy="8.34" r="4.6" stroke="none"/>
+                  <line class="o-arm" data-side="1" x1="24" y1="1" x2="35.63" y2="-15.27" stroke-width="5.2" stroke-linecap="round"/>
+                  <circle class="o-palm" data-side="1" cx="35.63" cy="-15.27" r="4.6" stroke="none"/>
+                  <circle cx="0" cy="5.5" r="25" fill="url(#ottid-lamp)" stroke="none"/>
+                </g>
+              </g>
+              <g class="o-eyes" transform="translate(0 -1.3)" fill="#f7c8a3" filter="url(#ottid-ember)">
+                <g clip-path="url(#ottid-lid-l)"><g clip-path="url(#ottid-smile-l)"><ellipse class="o-eye" data-side="-1" cx="-8" cy="0" rx="3.3" ry="5"/></g></g>
+                <g clip-path="url(#ottid-lid-r)"><g clip-path="url(#ottid-smile-r)"><ellipse class="o-eye" data-side="1" cx="8" cy="0" rx="3.3" ry="5"/></g></g>
+              </g>
+            </g>
+          </g>
+        </svg>
+        <button class="pet" type="button" hidden aria-label="ללטף את אוטיד"></button>
+      </div>
+      <figcaption>
+        <b>הכירו את אוטיד</b><span class="soon">בקרוב באפליקציה</span><br />
+        אוטיד הוא שלולית קטנה בצבע פחם, עם שתי ידיים ועיני גחלת. בתוך הגוף שלו
+        יש מנורה שמראה מה הוא עושה — וכשהוא מקשיב, היא תמיד דולקת.
+      </figcaption>
+    </figure>
+
     <ul class="highlights">
       <li>
         <span class="h-icon"><svg aria-hidden="true"><use href="#i-mic"/></svg></span>
