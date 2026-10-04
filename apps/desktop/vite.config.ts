@@ -16,6 +16,10 @@ export default defineConfig({
 	server: {
 		port: 1735,
 		strictPort: true,
+		// The bundled creatures live at the repo root, shared with ottid-core.
+		fs: {
+			allow: ['../../creatures']
+		},
 		watch: {
 			ignored: ['**/src-tauri/**']
 		}
