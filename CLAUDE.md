@@ -39,8 +39,11 @@ Shipped: M0-M9, plus unsigned pre-releases v0.1.0-v0.6.0 and the open-core
 **v1.0.0** — the free, dictation-only, Windows, unsigned edition (in-app
 auto-update + cross-OS installers landed in v0.6.0). The next release is
 **v1.1.0** (Windows): single-instance enforcement and persistent diagnostic
-logging that harden the shipped build. Code-signing is still the next major
-step. The full milestone-by-milestone dev narrative is kept off-repo.
+logging that harden the shipped build. Code signing is wired into the release
+workflow with Azure Artifact Signing
+([ADR-0043](docs/adr/0043-sign-windows-releases-with-azure-artifact-signing.md));
+it goes live once the owner's identity validation completes. The full
+milestone-by-milestone dev narrative is kept off-repo.
 
 ## Repository layout
 

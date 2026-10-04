@@ -119,7 +119,7 @@ The standing engineering risks that shape Ottid's design and review priorities.
 | CUDA/cuDNN version drift breaks ctranslate2 | Med | High | Bundle exact DLLs; document required versions; auto-detect + prompt |
 | Hebrew RTL paste glitches in specific apps | Med | Med | Per-app injection-profile overrides; explicit RTL marks (U+202B/U+202C) fallback |
 | Clipboard race with managers (Ditto, ClipboardFusion) | Med | Med | Detect, warn, offer a "skip restore" flag |
-| Windows SmartScreen blocks an unsigned exe | High if unsigned | High | Code-signing certificate; sign all binaries including sidecars |
+| Windows SmartScreen blocks an unsigned exe | High if unsigned | High | Code-signing certificate; sign all binaries including sidecars (ADR-0043) |
 | Model downloads blocked on some networks | Med | Med | Custom mirror-URL setting; manual import path; `HF_ENDPOINT` env var |
 | LLM cleanup hallucinates content | Med | High | Conservative prompt; max-tokens 1.5× input; n-gram Jaccard guard ≥ 0.5; user toggle |
 | Wake-word false activations | Med | Med | 2-frame threshold; sensitivity slider; battery-aware throttle |

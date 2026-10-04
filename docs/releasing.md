@@ -51,13 +51,17 @@ runtime-downloaded CUDA cannot leak into the artifact.
 
 ## 3. Verify the artifacts
 
-Install to a scratch directory and check it:
+Install it per-user and check it:
 
 ```sh
-Ottid-X.Y.Z-windows-x64-setup.exe /S /D=C:\ottid-check
+Ottid-X.Y.Z-windows-x64-setup.exe /S /CurrentUser
 ```
 
-- `C:\ottid-check\ottid.exe` and `binaries\ottid-stt\ottid-stt.exe` exist.
+The installer uses `installMode: "both"`, so NSIS ignores `/D=`. A per-user
+install goes to `%LOCALAPPDATA%\Programs\Ottid`, unless an earlier install is
+found, in which case it reuses that folder.
+
+- `ottid.exe` and `binaries\ottid-stt\ottid-stt.exe` exist there.
 - `binaries\ottid-stt\_internal\nvidia` does **not** exist — CUDA is fetched at
   runtime, never bundled.
 - Launch it: the tongue appears, shows the dim "preparing" pulse while it
@@ -87,40 +91,61 @@ gh release create vX.Y.Z \
   "target/release/Ottid-X.Y.Z-windows-x64-portable.zip"
 ```
 
-The release notes should tell users: download and run, the SmartScreen
-"Run anyway" step while the build is unsigned, and that the first run downloads
-the model (and the CUDA runtime on NVIDIA machines).
+The release notes should tell users: download and run, that a new release can
+still meet a SmartScreen notice for its first days while its reputation builds,
+and that the first run downloads the model (and the CUDA runtime on NVIDIA
+machines).
 
-## Auto-update signing (tauri-plugin-updater)
+A locally built installer is unsigned. Signed builds come only from the release
+workflow (see **Signing** below).
 
-The release workflow signs the installer and
-`latest.json` manifest with a minisign keypair so in-app auto-update can
-verify authenticity. The public key is committed in `tauri.conf.json`
-(`plugins.updater.pubkey`). The private key lives **only** in the developer's
-`~/.tauri/ottid.key` and in GitHub Actions secrets — never committed.
+## Signing
 
-Before pushing the **first signed release tag**, run once:
+A release tag (`v*`) runs `.github/workflows/release.yml`, which signs twice,
+independently ([ADR-0043](adr/0043-sign-windows-releases-with-azure-artifact-signing.md)):
 
-```sh
-# Store the private key (generated with `npm run tauri signer generate`):
-gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/ottid.key
+- **Authenticode, with Azure Artifact Signing.** It signs every PE image in the
+  build: the app exe, the installer and uninstaller, the NSIS plugins, and every
+  unsigned exe/dll/pyd of the frozen sidecar (and of `llama-server` in the full
+  edition). The workflow logs in to Azure over GitHub OIDC, so there is no
+  signing secret. The tooling is `scripts/sign-windows.ps1`, which Tauri calls
+  through `apps/desktop/src-tauri/tauri.signing.conf.json`.
+- **The updater's minisign signature.** It covers the finished installer and
+  `latest.json`, so in-app auto-update can verify them
+  ([ADR-0017](adr/0017-auto-update-via-tauri-plugin-updater.md)). The public key
+  is committed in `tauri.conf.json` (`plugins.updater.pubkey`). The private key
+  is never committed.
 
-# Set the password (empty string if the key has no password):
-gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD
-```
+Both live in the GitHub environment **`release`**. Its deployment rules admit
+tags `v*` and `main`.
 
-See [ADR-0017](adr/0017-auto-update-via-tauri-plugin-updater.md) for key
-rotation instructions and security notes.
+| Kind | Name |
+|---|---|
+| secret | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` |
+| variable | `ARTIFACT_SIGNING_ENDPOINT`, `ARTIFACT_SIGNING_ACCOUNT`, `ARTIFACT_SIGNING_PROFILE` |
+| secret | `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` |
 
-## Code signing
+ADR-0043 lists the one-time Azure setup behind these values.
 
-`v0.1.x`–`v0.5.x` ship **unsigned** — Windows SmartScreen warns on first run
-(ADR-0006). Once a code-signing certificate is in hand (Certum Open Source or
-Azure Trusted Signing), wire it into `tauri.conf.json` under `bundle.windows`
-and drop `--prerelease` for the first signed, stable release. Note: the
-minisign key (above) is **independent** of the Windows EV certificate — both
-are needed for a fully hardened release, but either can be set up without the
-other.
+**A run fails before the build starts when any of them is missing.** The one
+exception is an explicitly unsigned pre-release:
+
+- a tag containing `-unsigned` (e.g. `v1.2.0-unsigned.1`), or
+- a manual run with **allow_unsigned** ticked.
+
+Such a build skips both signatures and is released as a GitHub pre-release,
+which keeps it out of `/releases/latest`, the updater's feed. Its release notes
+say it is unsigned.
+
+**Every run ends in a draft release:**
+
+1. A signed run verifies itself first. It silently installs the installer and
+   checks that every PE image installed, including the uninstaller, carries a
+   valid signature.
+2. Install the draft's installer for real (fresh, and over the previous
+   release), check the publisher in the UAC prompt, and run the smoke test in
+   §3.
+3. Only then publish the draft. **Never publish a draft whose run is red.**
 
 ## Notes
 

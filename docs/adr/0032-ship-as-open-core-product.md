@@ -5,6 +5,9 @@
 Accepted — 2026-06-11. Supersedes
 [ADR-0023](0023-defer-code-signing-for-now.md): code signing moves from
 "indefinitely deferred" to a critical-path requirement for the paid binary.
+The signing route below (SignPath Foundation) is replaced by
+[ADR-0043](0043-sign-windows-releases-with-azure-artifact-signing.md) (Azure
+Artifact Signing).
 
 ## Context
 

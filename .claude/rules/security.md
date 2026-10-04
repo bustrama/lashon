@@ -24,9 +24,14 @@ invariants — never trade them for convenience.
   always badged.
 - Never bundle CC-BY-NC or CPML models in the installer — those are opt-in
   downloads with a non-commercial badge.
-- Never ship a release installer without code signing. (The unsigned `v0.1.0`
-  preview was an explicit, recorded exception —
-  [ADR-0006](../../docs/adr/0006-release-packaging-and-signing.md).)
+- Never ship a release installer without code signing. `release.yml` enforces
+  it: a release run fails unless both the Authenticode and the updater
+  signature are configured, and an unsigned build is possible only as an
+  explicitly marked pre-release
+  ([ADR-0043](../../docs/adr/0043-sign-windows-releases-with-azure-artifact-signing.md)).
+  v0.1.0, v1.0.0 and v1.1.0 shipped unsigned as recorded exceptions
+  ([ADR-0006](../../docs/adr/0006-release-packaging-and-signing.md),
+  [ADR-0039](../../docs/adr/0039-ship-v1-unsigned-windows-only.md)).
 - No telemetry by default.
 
 ## Licensing
