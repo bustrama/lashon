@@ -53,8 +53,9 @@ anyhow = "=1.0.102"
 # Async runtime primitives — `tokio::sync::oneshot` and `tokio::time::timeout`
 # for the M8 Command-mode confirmation flow. The full Tokio runtime is
 # already brought in by `tauri::async_runtime`; this just pins the surface
-# we touch directly.
-tokio = { version = "=1.52.3", features = ["sync", "time", "rt"] }
+# we touch directly. `rt-multi-thread` is for `block_in_place` in the recipe
+# approval gate (ADR-0048); Tauri's runtime already turns it on.
+tokio = { version = "=1.52.3", features = ["sync", "time", "rt", "rt-multi-thread"] }
 tracing = "=0.1.44"
 tracing-subscriber = { version = "=0.3.23", features = ["env-filter"] }
 # Rolling on-disk diagnostic log (issue #13) — the file a user can send us when

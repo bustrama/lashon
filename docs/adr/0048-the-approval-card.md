@@ -45,7 +45,9 @@ Every request for the user's yes or no goes through one broker:
 - **The shell's `approval` module** adds what needs Tauri: the reply channels,
   events, commands, the timeout task, the hotkeys and the window.
 - **Asking.** Command mode awaits `approval::ask`. The recipe runtime's
-  synchronous gate blocks on `approval::ask_blocking`.
+  synchronous gate blocks on `approval::ask_blocking`. It asks from inside
+  an async run on a Tauri tokio worker, so it blocks in `block_in_place`,
+  which hands the worker's other tasks to another worker meanwhile.
 - **Answering.** Only the overlay's card arms and answers a request. The Hub
   and the tutorial load the same frontend, so `approval_armed` and
   `approval_answer` refuse a call from any other webview (`not-the-card`).

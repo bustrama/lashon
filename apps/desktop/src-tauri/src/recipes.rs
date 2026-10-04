@@ -238,7 +238,14 @@ impl CardConfirm {
 impl ConfirmHandler for CardConfirm {
     fn confirm(&self, prompt: &str) -> ConfirmDecision {
         let request = Request::for_recipe_step(prompt);
-        match crate::approval::ask_blocking(&self.app, request, &self.cancelled) {
+        // The runtime asks from inside its async run, on one of Tauri's
+        // tokio workers, and the user may take up to 30 s to answer. Tell
+        // tokio this worker blocks, so it hands the worker's other tasks
+        // (the approval timer and hotkey answers among them) to another.
+        let decision = tokio::task::block_in_place(|| {
+            crate::approval::ask_blocking(&self.app, request, &self.cancelled)
+        });
+        match decision {
             Decision::Allow => ConfirmDecision::Allow,
             Decision::Deny => ConfirmDecision::Deny,
         }
