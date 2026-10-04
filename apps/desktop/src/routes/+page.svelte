@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { register, unregisterAll } from '@tauri-apps/plugin-global-shortcut';
+	import { register, unregister } from '@tauri-apps/plugin-global-shortcut';
 	import { invoke } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
 	import { t } from '$lib/i18n';
@@ -174,40 +174,62 @@
 		);
 	}
 
+	// The chords this page registered, so it can take back exactly those: the
+	// plugin's `unregisterAll` would also drop the approval card's hotkeys,
+	// which the Rust shell registers while a card is pending.
+	const registered = new Set<string>();
+	function add(chord: string, handler: (event: { state: string }) => void): Promise<void> {
+		return register(chord, handler).then(() => void registered.add(chord));
+	}
+
 	function registerShortcuts(): void {
-		void register(DEBUG_SHORTCUT, (event) => {
+		void add(DEBUG_SHORTCUT, (event) => {
 			if (event.state === 'Pressed') {
 				debugVisible = !debugVisible;
 			}
-		});
+		}).catch(() => {});
 		// `validate_hotkey` is only a policy gate — a chord can still fail to
 		// register (most often an OS-level conflict with another app). If it
 		// does, fall back to the default so dictation is never left without a
 		// working hotkey.
-		void register(dictationShortcut, onDictationEdge).catch((err) => {
+		void add(dictationShortcut, onDictationEdge).catch((err) => {
 			console.warn(`dictation hotkey "${dictationShortcut}" could not be registered:`, err);
 			if (dictationShortcut !== DEFAULTS['hotkeys.dictation']) {
 				dictationShortcut = DEFAULTS['hotkeys.dictation'];
-				void register(dictationShortcut, onDictationEdge).catch(() => {});
+				void add(dictationShortcut, onDictationEdge).catch(() => {});
 			}
 		});
 		// Command mode is full-edition only — the free dictation build has no
 		// command backend, so don't register the chord (it would shadow Ctrl+`
 		// globally and error on press). See docs/adr/0034.
-		if (FULL_EDITION) void register(commandShortcut, onCommandEdge).catch((err) => {
+		if (FULL_EDITION) void add(commandShortcut, onCommandEdge).catch((err) => {
 			console.warn(`command hotkey "${commandShortcut}" could not be registered:`, err);
 			if (commandShortcut !== DEFAULTS['hotkeys.command']) {
 				commandShortcut = DEFAULTS['hotkeys.command'];
-				void register(commandShortcut, onCommandEdge).catch(() => {});
+				void add(commandShortcut, onCommandEdge).catch(() => {});
 			}
 		});
 	}
 
-	// Clear every registration, then register the current chords fresh — used
-	// on mount and whenever the dictation hotkey is rebound. Re-registering
-	// over a live shortcut fails, so the slate is always cleared first.
+	// Take back this page's chords, then register the current ones fresh —
+	// used on mount and whenever a hotkey is rebound. Re-registering over a
+	// live shortcut fails, so the old ones go first. A dev remount starts with
+	// an empty `registered` while the old chords stay live, so the current
+	// and default chords are taken back too; one that isn't registered just
+	// fails on its own.
 	function refreshShortcuts(): void {
-		void unregisterAll().finally(registerShortcuts);
+		const chords = new Set([
+			...registered,
+			DEBUG_SHORTCUT,
+			dictationShortcut,
+			commandShortcut,
+			DEFAULTS['hotkeys.dictation'],
+			DEFAULTS['hotkeys.command']
+		]);
+		registered.clear();
+		void Promise.allSettled([...chords].map((chord) => unregister(chord))).then(
+			registerShortcuts
+		);
 	}
 
 	function onCommandResult(payload: {
