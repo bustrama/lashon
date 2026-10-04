@@ -443,7 +443,7 @@
 				</div>
 			{:else if current === 'tongue'}
 				<div class="tut-centered-stack">
-					<div class="mono tut-eyebrow">STEP · 04 / 07 · THE TONGUE</div>
+					<div class="mono tut-eyebrow">STEP · 04 / 07 · OTTID</div>
 					<h1 class="he-display tut-title-text centered">{$t(`tutorial.steps.${current}.title`)}</h1>
 					<p class="he-sans tut-lede centered">{$t(`tutorial.steps.${current}.lead`)}</p>
 					<div class="tongue-teaching" dir="rtl">
@@ -550,7 +550,7 @@
 							<div class="practice-halo" aria-hidden="true"></div>
 							<Mark size={96} color={liveState === 'capturing' ? 'var(--saffron)' : 'var(--peach)'} />
 						</div>
-						<div class="mono practice-mirror-hint">LIVE TONGUE · MIRROR</div>
+						<div class="mono practice-mirror-hint">LIVE OTTID · MIRROR</div>
 					</div>
 					{#if transcript}
 						<div class="practice-done">
