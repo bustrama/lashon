@@ -9,6 +9,9 @@
 	//   fully open, for ARM_DELAY_MS. Until then a click on Allow, or the
 	//   Allow hotkey, says what is missing; the hotkey also scrolls on
 	//   through a long request. Deny works at once.
+	// - From the keyboard, Allow takes holding its hotkey for HOLD_MS, so a
+	//   tap meant for another app never allows. The button fills while it
+	//   is held; let go too soon, and the card says to hold it.
 	// - The broker denies the request when its time runs out.
 	//
 	// The overlay never has keyboard focus (docs/adr/0044): the keyboard path
@@ -22,6 +25,7 @@
 	import {
 		ARM_DELAY_MS,
 		ArmClock,
+		HOLD_MS,
 		atEnd,
 		fill,
 		nextPage,
@@ -61,13 +65,18 @@
 	let visible = $state(true);
 	let charging = $state(false);
 	let armed = $state(false);
+	/** The Allow hotkey is held down. */
+	let holding = $state(false);
 	/** Briefly highlight why Allow isn't taken yet. */
 	let hint = $state(false);
+	/** Briefly shown in place of the countdown. */
+	let keyHint = $state<string | null>(null);
 	let secondsLeft = $state(0);
 
 	const clock = new ArmClock();
 	let armTimer: ReturnType<typeof setTimeout> | undefined;
 	let hintTimer: ReturnType<typeof setTimeout> | undefined;
+	let keyHintTimer: ReturnType<typeof setTimeout> | undefined;
 	let lastNudge = 0;
 
 	const toolQuestion = $derived($t('approval.question.tool').split('{tool}'));
@@ -133,11 +142,26 @@
 		}
 	}
 
+	// Say, and show, how the keyboard allows.
+	function sayHold(): void {
+		if (!card.keys.allow) return;
+		const text = fill($t('approval.announce.allowKey'), { keys: card.keys.allow.join('+') });
+		hint = true;
+		clearTimeout(hintTimer);
+		hintTimer = setTimeout(() => (hint = false), 1600);
+		keyHint = text;
+		clearTimeout(keyHintTimer);
+		keyHintTimer = setTimeout(() => (keyHint = null), 2400);
+		onSay(text);
+	}
+
 	$effect(() => {
 		const n = nudge;
 		if (!n || n.id !== card.id || n.n === lastNudge) return;
 		lastNudge = n.n;
-		untrack(() => explain(true));
+		holding = n.kind === 'hold';
+		if (n.kind === 'early') untrack(() => explain(true));
+		else if (n.kind === 'short') untrack(sayHold);
 	});
 
 	// Only a pointer answers. Enter or Space on a button, or an accessibility
@@ -145,9 +169,7 @@
 	// keyboard path is the hotkeys, which the broker gates the same way.
 	function allow(event: MouseEvent): void {
 		if (event.detail === 0) {
-			if (card.keys.allow) {
-				onSay(fill($t('approval.announce.allowKey'), { keys: card.keys.allow.join('+') }));
-			}
+			sayHold();
 		} else if (armed) {
 			onAnswer(card.id, 'allow');
 		} else {
@@ -200,6 +222,7 @@
 			clearInterval(countdown);
 			clearTimeout(armTimer);
 			clearTimeout(hintTimer);
+			clearTimeout(keyHintTimer);
 			sizes.disconnect();
 			document.removeEventListener('visibilitychange', onVisibility);
 		};
@@ -257,6 +280,7 @@
 			class="allow"
 			class:armed
 			class:charging
+			class:holding
 			class:flash={hint && !overflowing}
 			aria-disabled={!armed}
 			tabindex="-1"
@@ -264,6 +288,7 @@
 			onclick={allow}
 		>
 			<span class="charge" style="--arm-ms: {ARM_DELAY_MS}ms" aria-hidden="true"></span>
+			<span class="hold" style="--hold-ms: {HOLD_MS}ms" aria-hidden="true"></span>
 			<span class="label">{$t('approval.allow')}</span>
 			{#if card.keys.allow}<kbd class="keys">{card.keys.allow.join('+')}</kbd>{/if}
 		</button>
@@ -281,7 +306,11 @@
 
 	<!-- A ticking value is information, not decoration: reduced motion keeps
 	     it. The live region announced the time limit once. -->
-	<p class="expires" aria-hidden="true">{fill($t('approval.expires'), { seconds: secondsLeft })}</p>
+	{#if keyHint}
+		<p class="expires key-hint" aria-hidden="true">{keyHint}</p>
+	{:else}
+		<p class="expires" aria-hidden="true">{fill($t('approval.expires'), { seconds: secondsLeft })}</p>
+	{/if}
 </div>
 
 <style>
@@ -484,7 +513,7 @@
 
 	/* Allow runs something that can't be taken back: rose, and dim until it
 	   arms. The charge fills it from the inline start while the arm delay
-	   runs. */
+	   runs; once armed, holding the hotkey fills it again, darker. */
 	.allow {
 		border: 1px solid color-mix(in srgb, var(--state-error) 60%, transparent);
 		background: color-mix(in srgb, var(--state-error) 16%, transparent);
@@ -498,7 +527,7 @@
 		transform: scaleX(0);
 		transform-origin: var(--charge-from, right);
 	}
-	:global([dir='ltr']) .allow .charge {
+	:global([dir='ltr']) .allow {
 		--charge-from: left;
 	}
 	.allow.charging .charge {
@@ -513,6 +542,17 @@
 	}
 	.allow.armed .charge {
 		display: none;
+	}
+	.allow .hold {
+		position: absolute;
+		inset: 0;
+		background: color-mix(in srgb, var(--ink) 30%, transparent);
+		transform: scaleX(0);
+		transform-origin: var(--charge-from, right);
+	}
+	.allow.holding .hold {
+		transform: scaleX(1);
+		transition: transform var(--hold-ms) linear;
 	}
 	.allow.armed:hover {
 		filter: brightness(1.08);
@@ -540,11 +580,20 @@
 		text-align: center;
 		font-variant-numeric: tabular-nums;
 	}
+	.key-hint {
+		color: var(--tint);
+	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.allow.charging .charge {
+		.allow.charging .charge,
+		.allow.holding .hold {
 			transition: none;
 			transform: scaleX(0);
+		}
+		/* No fill to watch: mark the held button instead. */
+		.allow.holding {
+			outline: 2px solid var(--tint);
+			outline-offset: 2px;
 		}
 		.scroll-hint {
 			transition: none;

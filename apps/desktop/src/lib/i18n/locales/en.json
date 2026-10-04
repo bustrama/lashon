@@ -455,7 +455,7 @@
 		"announce": {
 			"command": "The command",
 			"details": "The details",
-			"allowKey": "To allow: {keys}.",
+			"allowKey": "To allow, hold {keys} for a second.",
 			"denyKey": "To deny: {keys}.",
 			"timeout": "With no answer, the request is denied in {seconds} seconds."
 		},

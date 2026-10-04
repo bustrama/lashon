@@ -455,7 +455,7 @@
 		"announce": {
 			"command": "הפקודה",
 			"details": "הפרטים",
-			"allowKey": "לאישור: {keys}.",
+			"allowKey": "לאישור, החזיקו {keys} שנייה.",
 			"denyKey": "לדחייה: {keys}.",
 			"timeout": "בלי תשובה, הבקשה תידחה בעוד {seconds} שניות."
 		},

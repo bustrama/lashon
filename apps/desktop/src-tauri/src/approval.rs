@@ -17,15 +17,16 @@
 //! Locks: `queue` is held only for quick queue operations. `side` orders the
 //! slow changes that follow the queue (hotkeys, the window), which round-trip
 //! to the main thread, so nothing on the main thread may wait on it: the
-//! commands here are async, and the hotkey and menu handlers hand their work
-//! to the async runtime. `side` is always taken before `queue`, never after.
+//! commands here are async, and the hotkey and menu handlers hand their
+//! answers to the async runtime. `side` is always taken before `queue`,
+//! never after. `hold` is taken alone, after `queue` is let go.
 
 use std::sync::{mpsc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use ottid_core::approval::{
-    Cancel, Decision, Id, Queue, Refusal, Request, Shown, ALLOW_ACCELERATOR, ALLOW_KEYS,
-    DENY_ACCELERATOR, DENY_KEYS,
+    Cancel, Decision, Hold, HoldCheck, HoldRelease, Id, Queue, Refusal, Request, Shown,
+    ALLOW_ACCELERATOR, ALLOW_KEYS, DENY_ACCELERATOR, DENY_KEYS,
 };
 use ottid_core::overlay::Foreground;
 use serde::Serialize;
@@ -39,7 +40,7 @@ const LOG: &str = "ottid::approval";
 
 /// The card to show, or `null` when nothing is pending.
 const EVENT_CHANGED: &str = "approval:changed";
-/// Allow was pressed before the card was armed.
+/// The Allow hotkey did something the card shows.
 const EVENT_NUDGE: &str = "approval:nudge";
 
 /// How long a blocking asker waits before giving up on its own. The broker
@@ -88,6 +89,9 @@ pub struct Card {
 #[derive(Debug, Clone, Serialize)]
 struct Nudge {
     id: Id,
+    /// `early`: pressed before the card armed. `hold`: held down, counting
+    /// to `approval::HOLD`. `short`: let go too soon.
+    kind: &'static str,
 }
 
 #[derive(Default)]
@@ -107,6 +111,8 @@ struct Side {
 pub struct Approvals {
     queue: Mutex<Queue<Reply>>,
     side: Mutex<Side>,
+    /// The Allow hotkey held down.
+    hold: Mutex<Hold>,
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -295,13 +301,7 @@ fn register_key(app: &AppHandle, accelerator: &'static str, decision: Decision) 
     let registered = app
         .global_shortcut()
         .on_shortcut(shortcut, move |app, _shortcut, event| {
-            if event.state() == ShortcutState::Pressed {
-                // The plugin calls this on the main thread with its own
-                // shortcut map locked, and answering unregisters hotkeys:
-                // do it on the async runtime.
-                let app = app.clone();
-                tauri::async_runtime::spawn(async move { on_key(&app, decision) });
-            }
+            on_key(app, decision, event.state() == ShortcutState::Pressed);
         });
     match registered {
         Ok(()) => true,
@@ -330,16 +330,83 @@ fn unregister_keys(app: &AppHandle, keys: &Keys) {
     }
 }
 
-/// A hotkey answers the request on screen. Allow before the card is armed
-/// is refused, and the card is told, so it can scroll on through the text
-/// and say why.
-fn on_key(app: &AppHandle, decision: Decision) {
-    let Some(id) = lock(&app.state::<Approvals>().queue).shown_id() else {
-        return;
-    };
-    if let Err(Refusal::NotArmed) = answer(app, id, decision, "hotkey") {
-        let _ = app.emit_to(overlay::WINDOW, EVENT_NUDGE, Nudge { id });
+/// A hotkey went down or up, for the request on screen.
+///
+/// - Deny answers when pressed.
+/// - Allow answers once held for `approval::HOLD`; a tap never allows.
+///   While it is held the card fills its Allow button, and if it is let go
+///   too soon the card says to hold it.
+/// - Allow pressed before the card armed is refused, and the card is told,
+///   so it can scroll on through the text and say why.
+///
+/// The plugin calls this on the main thread, in key order, with its own
+/// shortcut map locked. The press and the release are noted here, so a
+/// quick tap can't be seen in the wrong order. Answering unregisters
+/// hotkeys, so the answers go to the async runtime.
+fn on_key(app: &AppHandle, decision: Decision, pressed: bool) {
+    let state = app.state::<Approvals>();
+    let now = Instant::now();
+    match (decision, pressed) {
+        (Decision::Deny, true) => {
+            if let Some(id) = lock(&state.queue).shown_id() {
+                spawn_answer(app, id, Decision::Deny);
+            }
+        }
+        (Decision::Deny, false) => {}
+        (Decision::Allow, true) => {
+            let ready = {
+                let queue = lock(&state.queue);
+                queue.shown_id().map(|id| (id, queue.can_allow(id, now)))
+            };
+            match ready {
+                Some((id, Ok(()))) => {
+                    let press = lock(&state.hold).press(id, now);
+                    nudge(app, id, "hold");
+                    spawn_hold(app.clone(), press);
+                }
+                Some((id, Err(Refusal::NotArmed))) => nudge(app, id, "early"),
+                _ => {}
+            }
+        }
+        (Decision::Allow, false) => match lock(&state.hold).release(now) {
+            HoldRelease::Allow(id) => spawn_answer(app, id, Decision::Allow),
+            HoldRelease::Short(id) => nudge(app, id, "short"),
+            HoldRelease::Nothing => {}
+        },
     }
+}
+
+fn nudge(app: &AppHandle, id: Id, kind: &'static str) {
+    let _ = app.emit_to(overlay::WINDOW, EVENT_NUDGE, Nudge { id, kind });
+}
+
+/// Answer from a hotkey, off the main thread. The broker checks the rules
+/// again: an Allow it refuses as not armed is shown as an early press.
+fn spawn_answer(app: &AppHandle, id: Id, decision: Decision) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(Refusal::NotArmed) = answer(&app, id, decision, "hotkey") {
+            nudge(&app, id, "early");
+        }
+    });
+}
+
+/// Allow once `press` has been held for `approval::HOLD`, unless it is let
+/// go or pressed again first.
+fn spawn_hold(app: AppHandle, press: u64) {
+    tauri::async_runtime::spawn(async move {
+        loop {
+            let check = lock(&app.state::<Approvals>().hold).check(press, Instant::now());
+            match check {
+                HoldCheck::Wait(left) => tokio::time::sleep(left).await,
+                HoldCheck::Allow(id) => {
+                    spawn_answer(&app, id, Decision::Allow);
+                    return;
+                }
+                HoldCheck::Gone => return,
+            }
+        }
+    });
 }
 
 // ---- The window ----

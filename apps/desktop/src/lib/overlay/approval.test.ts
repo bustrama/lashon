@@ -245,6 +245,8 @@ describe('announcement', () => {
 		expect(text).toContain('Ctrl+Shift+N');
 		expect(text).toContain('30');
 		expect(text).toContain(tr('approval.eyebrow'));
+		// Allow from the keyboard takes a hold, and the reader says so.
+		expect(text).toContain('לאישור, החזיקו Ctrl+Shift+Y שנייה.');
 		// Every key resolved: no raw catalog paths left in the text.
 		expect(text).not.toMatch(/approval\.\w/);
 	});

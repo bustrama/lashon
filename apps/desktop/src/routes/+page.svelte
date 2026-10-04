@@ -383,9 +383,10 @@
 				if (!approvalHeard) approval = card;
 			})
 			.catch(() => {});
-		const nudgeUnlisten = listen<{ id: number }>('approval:nudge', (event) => {
-			const n = approvalNudge?.id === event.payload.id ? approvalNudge.n + 1 : 1;
-			approvalNudge = { id: event.payload.id, n };
+		const nudgeUnlisten = listen<Omit<ApprovalNudge, 'n'>>('approval:nudge', (event) => {
+			const { id, kind } = event.payload;
+			const n = approvalNudge?.id === id ? approvalNudge.n + 1 : 1;
+			approvalNudge = { id, n, kind };
 		});
 		// M8.1 — live progress feedback. `command:state` flips the
 		// indicator on/off; `command:tool` rolls the per-tool flash.

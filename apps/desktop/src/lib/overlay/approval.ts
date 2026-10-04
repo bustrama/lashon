@@ -5,6 +5,8 @@
 
 /** Mirrors `ottid_core::approval::ARM_DELAY`. */
 export const ARM_DELAY_MS = 700;
+/** Mirrors `ottid_core::approval::HOLD`: how long the Allow hotkey is held. */
+export const HOLD_MS = 1000;
 
 export type ApprovalSource = 'command' | 'recipe';
 export type ApprovalDecision = 'allow' | 'deny';
@@ -29,11 +31,16 @@ export interface ApprovalCard {
 	keys: { allow: string[] | null; deny: string[] | null };
 }
 
-/** Allow was pressed before the card armed (`approval:nudge`). */
+/** What the Allow hotkey did (`approval:nudge`). */
 export interface ApprovalNudge {
 	id: number;
 	/** Counts the nudges, so the same one twice is still a change. */
 	n: number;
+	/**
+	 * `early`: pressed before the card armed. `hold`: held down, counting
+	 * to HOLD_MS. `short`: let go too soon.
+	 */
+	kind: 'early' | 'hold' | 'short';
 }
 
 /** A run of ordinary text, or one character shown by its code point. */

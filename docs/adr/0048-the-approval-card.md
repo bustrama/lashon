@@ -130,7 +130,16 @@ keyboard path is the hotkeys, which the broker gates the same way.
 
 ### Keyboard: two hotkeys while a request is pending
 
-- **The chords.** `Ctrl+Shift+Y` allows and `Ctrl+Shift+N` denies.
+- **The chords.** Holding `Ctrl+Shift+Y` for a second allows, and
+  `Ctrl+Shift+N` denies.
+- **Allow takes a hold.** Other apps bind `Ctrl+Shift+Y` (VS Code's debug
+  console, Firefox's downloads), and a habit presses it as a tap. So a tap
+  never allows: the chord has to stay down for `approval::HOLD` (1 s). While
+  it is held, the Allow button fills; under reduced motion it is outlined
+  instead. Let go too soon, and the card shows and says "hold it for a
+  second". The press and the release are noted in key order on the main
+  thread (`ottid_core::approval::Hold`), so a quick tap can't be read as a
+  hold. Deny takes a tap: a wrong Deny runs nothing.
 - **Only while needed.** The shell registers them only while a request is
   pending and unregisters them after.
 - **Any layout.** They are physical keys (`Code::KeyY` and `Code::KeyN`, which
@@ -138,10 +147,11 @@ keyboard path is the hotkeys, which the broker gates the same way.
   layout or any other. `MOD_NOREPEAT` keeps a held key from repeating.
 - **Reserved.** Hotkey validation rejects both chords, in any spelling, as
   Ottid bindings.
-- **Allow pressed before the card arms** isn't taken. The broker sends
-  `approval:nudge`, and the card scrolls a page further through a long request
-  and says so. For a keyboard user, this is the only way through a long
-  command. Once everything has been seen, the card says to wait a moment.
+- **Allow pressed before the card arms** isn't taken, and no hold starts.
+  The broker sends `approval:nudge`, and the card scrolls a page further
+  through a long request and says so. For a keyboard user, this is the only
+  way through a long command. Once everything has been seen, the card says
+  to wait a moment.
 - **A chord another app already holds** is left out of the card and out of the
   announcement.
 
@@ -186,6 +196,10 @@ capability `global-shortcut:allow-unregister-all` is replaced by
 - **Enter and Esc as global hotkeys.** They would capture Enter and Esc in
   every app for up to 30 s, and Enter is the key a typing user is most likely
   to press without looking. That is an accidental approval.
+- **A rarer chord for Allow, such as `Ctrl+Alt+Shift+Y`.** It makes a clash
+  less likely, but one press would still allow, and `Ctrl+Alt` is `AltGr` on
+  many layouts. A hold rules out the tap of a habit, whatever app it was
+  meant for.
 - **A separate, focusable approval window.** It takes focus too, with the same
   risk.
 - **Fix the recipe listener and keep two flows.** Two flows had already
@@ -202,8 +216,9 @@ capability `global-shortcut:allow-unregister-all` is replaced by
   one of them was denied.
 - **The chords are taken while a request is pending.** For up to 30 s per
   request, `Ctrl+Shift+Y` and `Ctrl+Shift+N` reach Ottid instead of the app in
-  front. That app's own binding for them, such as Chrome's private window,
-  waits until the card is answered. Neither chord can be bound as an Ottid
+  front. That app's own binding for them, such as Chrome's private window or
+  VS Code's debug console, waits until the card is answered. Pressing one
+  out of habit only denies, or shows how to allow. Neither chord can be bound as an Ottid
   hotkey.
 - **A queued request waits longer.** It may wait behind others before its
   30 s start. The blocking recipe asker has a 600 s backstop, so its thread is

@@ -121,13 +121,16 @@ later an agent, the island shows the approval card
 - **The look.** Dark glass with an `--aqua` border and glow, matching the
   creature's lamp. Allow is rose (`--state-error`): it runs something that
   can't be taken back. It stays dim until it arms, and fills from the inline
-  start while the arm delay runs. Deny is a quiet outline. Each button shows
-  its hotkey.
+  start while the arm delay runs. Once armed, holding its hotkey fills it
+  again, darker. Deny is a quiet outline. Each button shows its hotkey.
 - **Allow arms** 700 ms after the whole text has been on screen: the card has
   finished opening and the end has been seen. A click before that says what
   is missing and doesn't count. Deny works at once.
 - **Pointer only.** The buttons never take focus, so Enter or Space can't
   press them. The keyboard answers with the hotkeys.
+- **Allow from the keyboard takes a hold** of a second, so a tap meant for
+  another app never approves. A tap swaps the countdown line for "hold it
+  for a second", in `--aqua`.
 - **Time limit.** A line under the buttons counts down the 30 s, after which
   the request is denied.
 - **Several requests.** One card shows at a time, with "N waiting" in its
@@ -275,10 +278,10 @@ bundled one is [`creatures/ottid/creature.json`](../creatures/ottid/creature.jso
   non-activating, and the mouse passes through it everywhere except the
   creature and its cards ([ADR-0044](adr/0044-a-click-through-overlay-window.md)).
   Its keyboard paths are the global hotkeys, the tray menu and the Hub.
-- While an approval card is pending, **Ctrl+Shift+Y** allows and
-  **Ctrl+Shift+N** denies. They are physical keys, so they work under any
-  layout, and they are registered only while a card is pending. Pressing
-  Ctrl+Shift+Y before Allow arms scrolls on through a long request. An
+- While an approval card is pending, holding **Ctrl+Shift+Y** for a second
+  allows and **Ctrl+Shift+N** denies. They are physical keys, so they work
+  under any layout, and they are registered only while a card is pending.
+  Pressing Ctrl+Shift+Y before Allow arms scrolls on through a long request. An
   assertive live region reads the whole request, the hotkeys and the time
   limit once, when the card appears.
 

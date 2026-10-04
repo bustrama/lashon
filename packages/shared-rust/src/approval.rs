@@ -32,10 +32,15 @@ pub const ARM_DELAY: Duration = Duration::from_millis(700);
 /// How long a request stays on screen before it is denied unanswered.
 pub const TIMEOUT: Duration = Duration::from_secs(30);
 
-/// The global chord that allows the request on screen, registered only while
-/// one is pending. The key is a physical key code (`KeyY`, the virtual key
-/// `VK_Y` on Windows), not a character, so the chord works under any
-/// keyboard layout, Hebrew included.
+/// How long the Allow hotkey has to be held down to allow. Other apps bind
+/// the same chord (VS Code's debug console, Firefox's downloads), and a
+/// habit presses it as a tap: a tap never allows.
+pub const HOLD: Duration = Duration::from_secs(1);
+
+/// The global chord that allows the request on screen when held for
+/// [`HOLD`], registered only while one is pending. The key is a physical key
+/// code (`KeyY`, the virtual key `VK_Y` on Windows), not a character, so the
+/// chord works under any keyboard layout, Hebrew included.
 pub const ALLOW_ACCELERATOR: &str = "Control+Shift+KeyY";
 
 /// The global chord that denies the request on screen. See
@@ -376,6 +381,90 @@ impl<T> Queue<T> {
             }
         }
         Some(entry)
+    }
+}
+
+/// The Allow hotkey held down for a request, until it has been held for
+/// [`HOLD`]. Each press is numbered, so the timer of an earlier press can't
+/// finish a later one.
+#[derive(Debug, Default)]
+pub struct Hold {
+    presses: u64,
+    held: Option<Held>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Held {
+    press: u64,
+    id: Id,
+    since: Instant,
+}
+
+/// Where a hold stands when its timer looks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HoldCheck {
+    /// Held for [`HOLD`]: allow this request.
+    Allow(Id),
+    /// Still held: look again after this long.
+    Wait(Duration),
+    /// Released, or replaced by a later press.
+    Gone,
+}
+
+/// What letting go of the Allow hotkey means.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HoldRelease {
+    /// It was held for [`HOLD`] before the timer looked: allow.
+    Allow(Id),
+    /// Let go too soon: tell the user to hold it.
+    Short(Id),
+    /// Nothing was held, or the hold was already done.
+    Nothing,
+}
+
+impl Hold {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The Allow hotkey went down for request `id`. Returns the press, for
+    /// [`check`](Self::check).
+    pub fn press(&mut self, id: Id, now: Instant) -> u64 {
+        self.presses += 1;
+        self.held = Some(Held {
+            press: self.presses,
+            id,
+            since: now,
+        });
+        self.presses
+    }
+
+    /// The timer of `press` looks at `now`. An answer it returns is given
+    /// once.
+    pub fn check(&mut self, press: u64, now: Instant) -> HoldCheck {
+        match self.held {
+            Some(held) if held.press == press => {
+                let held_for = now.saturating_duration_since(held.since);
+                if held_for >= HOLD {
+                    self.held = None;
+                    HoldCheck::Allow(held.id)
+                } else {
+                    HoldCheck::Wait(HOLD - held_for)
+                }
+            }
+            _ => HoldCheck::Gone,
+        }
+    }
+
+    /// The Allow hotkey came up at `now`.
+    pub fn release(&mut self, now: Instant) -> HoldRelease {
+        match self.held.take() {
+            Some(held) if now.saturating_duration_since(held.since) >= HOLD => {
+                HoldRelease::Allow(held.id)
+            }
+            Some(held) => HoldRelease::Short(held.id),
+            None => HoldRelease::Nothing,
+        }
     }
 }
 
@@ -731,6 +820,62 @@ mod tests {
             Decision::Deny
         );
         assert!(serde_json::from_value::<Decision>(json!("yes")).is_err());
+    }
+
+    #[test]
+    fn a_hold_allows_once_held_for_the_full_time() {
+        let t0 = Instant::now();
+        let mut hold = Hold::new();
+        let press = hold.press(4, t0);
+        assert_eq!(hold.check(press, t0 + 300 * MS), HoldCheck::Wait(700 * MS));
+        assert_eq!(hold.check(press, t0 + HOLD), HoldCheck::Allow(4));
+        // Given once: the timer looking again, or the key coming up, finds
+        // nothing more.
+        assert_eq!(hold.check(press, t0 + HOLD + MS), HoldCheck::Gone);
+        assert_eq!(hold.release(t0 + HOLD + 2 * MS), HoldRelease::Nothing);
+    }
+
+    #[test]
+    fn a_tap_never_allows() {
+        let t0 = Instant::now();
+        let mut hold = Hold::new();
+        let press = hold.press(4, t0);
+        assert_eq!(hold.release(t0 + 120 * MS), HoldRelease::Short(4));
+        assert_eq!(hold.check(press, t0 + HOLD), HoldCheck::Gone);
+        // Let go a hair before the full time.
+        hold.press(4, t0);
+        assert_eq!(hold.release(t0 + HOLD - MS), HoldRelease::Short(4));
+    }
+
+    #[test]
+    fn letting_go_after_the_full_time_allows_even_before_the_timer_looks() {
+        let t0 = Instant::now();
+        let mut hold = Hold::new();
+        let press = hold.press(9, t0);
+        assert_eq!(hold.release(t0 + HOLD + 5 * MS), HoldRelease::Allow(9));
+        assert_eq!(hold.check(press, t0 + HOLD + 6 * MS), HoldCheck::Gone);
+    }
+
+    #[test]
+    fn a_new_press_replaces_the_old_one() {
+        let t0 = Instant::now();
+        let mut hold = Hold::new();
+        let first = hold.press(1, t0);
+        assert_eq!(hold.release(t0 + 100 * MS), HoldRelease::Short(1));
+        let second = hold.press(1, t0 + 200 * MS);
+        // The first press's timer must not finish the second hold early.
+        assert_eq!(hold.check(first, t0 + HOLD), HoldCheck::Gone);
+        assert_eq!(hold.check(second, t0 + HOLD), HoldCheck::Wait(200 * MS));
+        assert_eq!(
+            hold.check(second, t0 + 200 * MS + HOLD),
+            HoldCheck::Allow(1)
+        );
+    }
+
+    #[test]
+    fn letting_go_with_nothing_held_does_nothing() {
+        let mut hold = Hold::new();
+        assert_eq!(hold.release(Instant::now()), HoldRelease::Nothing);
     }
 
     #[test]
