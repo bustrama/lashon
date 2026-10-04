@@ -6,6 +6,7 @@
 import { load, type Store } from '@tauri-apps/plugin-store';
 import type { Lang } from '$lib/i18n';
 import type { Tier } from '$lib/hardware';
+import type { Placement } from '$lib/creature/types';
 
 export interface Settings {
 	'ui.language': Lang;
@@ -15,6 +16,14 @@ export interface Settings {
 	// clash with Ctrl+Space (the dictation hotkey).
 	'hotkeys.command': string;
 	'tutorial.completed': boolean;
+	// Where Ottid stands (docs/adr/0044). Written by the Rust shell when the
+	// user drops Ottid or picks a placement; the Hub changes it through the
+	// `overlay_set_placement` command, never by writing the key itself.
+	'overlay.placement': Placement;
+	// The centre of Ottid's stage, in physical screen pixels. Rust-owned.
+	'overlay.anchor': { x: number; y: number } | null;
+	// Legacy: the old overlay window's top-left. Read once by the Rust shell
+	// to place Ottid where the user had it; never written any more.
 	'tongue.position': { x: number; y: number } | null;
 	// The hardware tier picks the default STT/LLM/TTS models. Detected during
 	// onboarding and overridable there and in the Hub; `null` until onboarding
@@ -73,6 +82,8 @@ export const DEFAULTS: Settings = {
 	// ; on Israeli Hebrew layout). The user can rebind it from the Hub.
 	'hotkeys.command': 'CommandOrControl+Backquote',
 	'tutorial.completed': false,
+	'overlay.placement': 'taskbar',
+	'overlay.anchor': null,
 	'tongue.position': null,
 	'hardware.tier': null,
 	'wakeword.dictation.enabled': false,

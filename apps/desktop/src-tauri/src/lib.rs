@@ -4,7 +4,7 @@
 //! lives in the `ottid-core` crate (`packages/shared-rust`); see
 //! `docs/adr/0003-core-logic-in-a-tauri-independent-crate.md`.
 //!
-//! It owns the tongue window, the tray, and the global hotkeys, and delegates
+//! It owns the overlay window, the tray, and the global hotkeys, and delegates
 //! capture, transcription, and text injection to the ottid-core crate.
 
 #[cfg(feature = "command-mode")]
@@ -12,29 +12,22 @@ mod command_mode;
 mod dictation;
 #[cfg(feature = "command-mode")]
 mod llm;
+mod overlay;
 #[cfg(feature = "command-mode")]
 mod recipes;
 mod wakeword;
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use tauri::menu::{Menu, MenuItem};
+use ottid_core::overlay::Placement;
+use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::TrayIconBuilder;
-use tauri::{Emitter, Listener, Manager, PhysicalPosition};
+use tauri::{Emitter, Listener, Manager};
 use tauri_plugin_store::StoreExt;
 
 #[cfg(feature = "command-mode")]
 use ottid_core::llama_server::LlamaServerState;
 use ottid_core::sidecar::{self, HealthReport, SidecarState};
-
-/// Drag-loop state shared by `start_window_drag` / `stop_window_drag`.
-/// A single atomic flag is enough — only one drag at a time per app
-/// (the tongue is the only draggable window).
-#[derive(Default)]
-pub struct DragState {
-    active: Arc<AtomicBool>,
-}
 
 /// Suspend gates shared by the dictation and wake-word workers.
 ///
@@ -136,79 +129,6 @@ fn show_tongue_menu(window: tauri::Window, menu: tauri::State<'_, Menu<tauri::Wr
     if let Err(err) = menu.popup(window) {
         tracing::warn!("could not show the tongue context menu: {err:#}");
     }
-}
-
-/// Start a server-side window drag for the tongue.
-///
-/// `offset_x` / `offset_y` are the cursor's position relative to the window's
-/// top-left at drag start (physical px). Rust then spins a background task
-/// that polls the cursor every ~8 ms and re-positions the window so the
-/// cursor stays at the same relative offset — i.e. the window follows
-/// the cursor 1:1. Calling `stop_window_drag` (or losing the JS hand on
-/// mouseup) flips the active flag and the loop exits next tick.
-///
-/// Why: the JS-side equivalent (mousemove → setPosition per frame) is
-/// rate-limited by IPC latency; even coalesced down to one in-flight
-/// call at a time, the window visibly lags behind the cursor. Running
-/// the loop in Rust eliminates the per-frame IPC entirely — set_position
-/// is a direct Tauri/Wry call (no IPC roundtrip), so the drag runs at
-/// 120 Hz with no perceptible lag.
-#[tauri::command]
-async fn start_window_drag(
-    window: tauri::WebviewWindow,
-    drag: tauri::State<'_, DragState>,
-    offset_x: f64,
-    offset_y: f64,
-) -> Result<(), String> {
-    // If a previous drag is still running (race), tell it to stop. The new
-    // drag picks up cleanly from the current cursor.
-    drag.active.store(false, Ordering::SeqCst);
-    // Tiny yield so any in-flight tick observes the stop.
-    tokio::task::yield_now().await;
-    drag.active.store(true, Ordering::SeqCst);
-    let active = drag.active.clone();
-    let win = window.clone();
-    tauri::async_runtime::spawn(async move {
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(8));
-        // The first tick fires immediately — without `Burst` mode the
-        // delay-then-tick behaviour skips the initial cursor sample.
-        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-        while active.load(Ordering::SeqCst) {
-            interval.tick().await;
-            let cursor = match win.cursor_position() {
-                Ok(p) => p,
-                Err(_) => break,
-            };
-            let new_x = (cursor.x - offset_x).round() as i32;
-            let new_y = (cursor.y - offset_y).round() as i32;
-            if win
-                .set_position(PhysicalPosition::new(new_x, new_y))
-                .is_err()
-            {
-                break;
-            }
-        }
-    });
-    Ok(())
-}
-
-/// Stop the server-side window drag — sets the flag the loop polls.
-#[tauri::command]
-fn stop_window_drag(drag: tauri::State<'_, DragState>) {
-    drag.active.store(false, Ordering::SeqCst);
-}
-
-/// Diagnostic — re-emit a frontend message to the Rust `tracing` stream so it
-/// appears in the same terminal as the dictation / command-mode `INFO` logs.
-/// Used by the M8.3 tongue ResizeObserver while we triangulate the cropping
-/// bug; it's the cheapest way to surface frontend state when devtools aren't
-/// open (and on this borderless WebView2 window, F12 is unreliable).
-///
-/// Safe to leave wired up — frontend code only calls it from the autoResize
-/// action, which is dormant outside Command mode.
-#[tauri::command]
-fn log_tongue_diag(message: String) {
-    tracing::info!(target: "ottid::tongue_diag", "tongue: {}", message);
 }
 
 /// Check GitHub Releases for a newer version of Ottid.
@@ -336,7 +256,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(SidecarState::default())
-        .manage(DragState::default());
+        .manage(overlay::OverlayState::default());
 
     // Command-mode-only managed state — compiled out of the free build (ADR-0034).
     #[cfg(feature = "command-mode")]
@@ -361,9 +281,11 @@ pub fn run() {
             restart_app,
             check_for_updates,
             show_tongue_menu,
-            log_tongue_diag,
-            start_window_drag,
-            stop_window_drag,
+            overlay::overlay_layout,
+            overlay::overlay_set_regions,
+            overlay::overlay_drag_start,
+            overlay::overlay_drag_end,
+            overlay::overlay_set_placement,
             dictation::dictation_hotkey_pressed,
             dictation::dictation_hotkey_released,
             // --- command-mode-only commands; compiled out of the free build (ADR-0034) ---
@@ -471,12 +393,13 @@ pub fn run() {
                 }
             });
 
-            // One bilingual menu, shared by the tray and the tongue's
+            // One bilingual menu, shared by the tray and the overlay's
             // right-click context menu (see `show_tongue_menu`). The labels
             // are built once and are not re-localized when the language
-            // changes — show the tongue, open the Settings Hub, replay the
-            // tutorial, or quit.
-            let menu = build_app_menu(app.handle())?;
+            // changes — show or hide Ottid, pick its placement, open the
+            // Settings Hub, replay the tutorial, or quit.
+            let (menu, placement_menu) = build_app_menu(app.handle())?;
+            app.manage(placement_menu);
             // The tray uses the background-free mark so it sits cleanly on the
             // taskbar; the window and installer keep the framed icon.
             TrayIconBuilder::with_id("ottid-tray")
@@ -487,6 +410,10 @@ pub fn run() {
                 .build(app)?;
             // Keep the menu alive and reachable for the right-click context menu.
             app.manage(menu);
+
+            // Place the overlay where the user left it, show it, and start
+            // the cursor poll that drives click-through and dragging.
+            overlay::init(app.handle());
 
             // First run reveals the interactive tutorial (issue #9) over the
             // tongue — both windows are on screen, so the practice step's
@@ -588,23 +515,69 @@ fn show_hub(app: &tauri::AppHandle) {
     let _ = window.set_focus();
 }
 
-/// Build Ottid's bilingual menu — shared by the tray and the tongue's
+/// Build Ottid's bilingual menu — shared by the tray and the overlay's
 /// right-click context menu. Labels are `Hebrew · English`; the menu is built
-/// once and is not re-localized when the in-app language changes.
-fn build_app_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
+/// once and is not re-localized when the in-app language changes. Also
+/// returns the placement items, whose checks follow the placement.
+fn build_app_menu(
+    app: &tauri::AppHandle,
+) -> tauri::Result<(Menu<tauri::Wry>, overlay::PlacementMenu)> {
     let show = MenuItem::with_id(app, "show", "הצג את אוטיד · Show Ottid", true, None::<&str>)?;
+    let hide = MenuItem::with_id(
+        app,
+        "hide",
+        "הסתר את אוטיד · Hide Ottid",
+        true,
+        None::<&str>,
+    )?;
+    let mut placements = Vec::new();
+    for placement in Placement::ALL {
+        let label = match placement {
+            Placement::Taskbar => "על שורת המשימות · Taskbar",
+            Placement::Float => "צף · Float",
+            Placement::Ceiling => "מהתקרה · Ceiling",
+        };
+        let id = format!("{}{}", overlay::MENU_PREFIX, placement.code());
+        let item = CheckMenuItem::with_id(app, id, label, true, false, None::<&str>)?;
+        placements.push((placement, item));
+    }
+    let placement_items: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = placements
+        .iter()
+        .map(|(_, item)| item as &dyn tauri::menu::IsMenuItem<tauri::Wry>)
+        .collect();
+    let placement = Submenu::with_items(app, "מיקום · Placement", true, &placement_items)?;
+    let separator = PredefinedMenuItem::separator(app)?;
     let tutorial = MenuItem::with_id(app, "tutorial", "מדריך · Tutorial", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "הגדרות · Settings", true, None::<&str>)?;
     let logs = MenuItem::with_id(app, "logs", "יומני אבחון · Open logs folder", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "יציאה · Quit", true, None::<&str>)?;
-    Menu::with_items(app, &[&show, &tutorial, &settings, &logs, &quit])
+    let menu = Menu::with_items(
+        app,
+        &[
+            &show, &hide, &placement, &separator, &tutorial, &settings, &logs, &quit,
+        ],
+    )?;
+    Ok((menu, overlay::PlacementMenu(placements)))
 }
 
-/// Dispatch a menu selection — shared by the tray menu and the tongue's
+/// Dispatch a menu selection — shared by the tray menu and the overlay's
 /// right-click context menu, which carry the same item ids.
 fn handle_menu_event(app: &tauri::AppHandle, id: &str) {
+    if let Some(code) = id.strip_prefix(overlay::MENU_PREFIX) {
+        if let Some(placement) = Placement::from_code(code) {
+            // Off the main thread: it saves the settings file.
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move { overlay::set_placement(&app, placement) });
+        }
+        return;
+    }
     match id {
         "show" => focus_main_window(app),
+        "hide" => {
+            if let Some(window) = app.get_webview_window(overlay::WINDOW) {
+                let _ = window.hide();
+            }
+        }
         "tutorial" => show_tutorial(app, true),
         "settings" => show_hub(app),
         "logs" => open_logs_folder(app),
@@ -613,16 +586,15 @@ fn handle_menu_event(app: &tauri::AppHandle, id: &str) {
     }
 }
 
-/// Raise the primary (tongue) window: reveal it if hidden, un-minimize, and
-/// focus. Shared by the tray / context-menu "Show Ottid" action and the
-/// single-instance handoff (issue #12), which raises the running window when a
-/// second launch is rejected — hence `show()` + `unminimize()` before focus,
-/// since the tray-resident tongue may be hidden or minimized at that point.
+/// Reveal the overlay window if hidden or minimized. Shared by the tray /
+/// context-menu "Show Ottid" action and the single-instance handoff (issue
+/// #12), which reveals the running window when a second launch is rejected.
+/// The overlay never takes focus (it is non-activating), so this does not
+/// focus it.
 fn focus_main_window(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(window) = app.get_webview_window(overlay::WINDOW) {
         let _ = window.show();
         let _ = window.unminimize();
-        let _ = window.set_focus();
     }
 }
 
