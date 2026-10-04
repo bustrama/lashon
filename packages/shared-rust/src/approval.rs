@@ -1,5 +1,5 @@
 //! The approval queue behind Ottid's approval card
-//! ([ADR-0047](../../../docs/adr/0047-the-approval-card.md)).
+//! ([ADR-0048](../../../docs/adr/0048-the-approval-card.md)).
 //!
 //! Anything that needs the user's yes or no before it acts asks through one
 //! queue: a command-mode tool, a recipe's shell step, and later an agent. The
