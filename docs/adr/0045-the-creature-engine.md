@@ -64,9 +64,12 @@ The frontend had no unit-test framework.
    - `write` is used only in dictation, the one state with the notepad;
    - the id, which is also the folder name, is not a device name Windows
      reserves (`con`, `nul`, `com1`…);
-   - names are plain text: no control characters, line breaks or characters
-     Unicode makes invisible (Default_Ignorable_Code_Point, such as zero-width
-     spaces, bidi overrides and tag characters), except the two direction marks.
+   - names are plain text: no control or format characters (Cc, Cf), line
+     breaks, characters Unicode makes invisible (Default_Ignorable_Code_Point,
+     such as zero-width spaces, bidi overrides and tag characters) or the
+     blank braille pattern. The two direction marks are allowed, and so are
+     emoji as a picker types them: a variation selector after an emoji, and a
+     zero-width joiner between two.
 
    It reports every problem at once, in Hebrew and English. It lives in Rust
    because the schema's source, the MCP server, the CLI and hot reload all live

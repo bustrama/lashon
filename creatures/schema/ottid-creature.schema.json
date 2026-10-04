@@ -49,7 +49,7 @@
     },
     "CreatureName": {
       "additionalProperties": false,
-      "description": "A display name in each UI language. Plain text: no control characters,\nline breaks or invisible characters (Unicode's default-ignorable ones,\nsuch as zero-width spaces, bidi overrides and tag characters). The\nleft-to-right and right-to-left marks are allowed.",
+      "description": "A display name in each UI language. Plain text: no control or format\ncharacters, line breaks or invisible characters (Unicode's\ndefault-ignorable ones, such as zero-width spaces, bidi overrides and tag\ncharacters, and the blank braille pattern). The left-to-right and\nright-to-left marks are allowed, and so are emoji with their variation\nselectors and zero-width joiners.",
       "properties": {
         "en": {
           "maxLength": 32,
