@@ -351,10 +351,10 @@
       "$ref": "#/$defs/Hands"
     },
     "id": {
-      "description": "Stable kebab-case id, `[a-z][a-z0-9-]*`. Also the directory name under\n`creatures/`.",
+      "description": "Stable kebab-case id, `[a-z][a-z0-9-]*`. Also the directory name under\n`creatures/`, so never a device name Windows reserves: `con`, `prn`,\n`aux`, `nul`, `com0`–`com9` or `lpt0`–`lpt9`.",
       "maxLength": 40,
       "minLength": 1,
-      "pattern": "^[a-z][a-z0-9-]*$",
+      "pattern": "^(?!(?:con|prn|aux|nul|com[0-9]|lpt[0-9])$)[a-z][a-z0-9-]*$",
       "type": "string"
     },
     "lamp": {

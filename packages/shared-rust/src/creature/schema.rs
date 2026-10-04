@@ -87,8 +87,12 @@ pub struct Creature {
     #[schemars(range(min = SCHEMA_VERSION, max = SCHEMA_VERSION))]
     pub schema: u32,
     /// Stable kebab-case id, `[a-z][a-z0-9-]*`. Also the directory name under
-    /// `creatures/`.
-    #[schemars(regex(pattern = r"^[a-z][a-z0-9-]*$"), length(min = 1, max = 40))]
+    /// `creatures/`, so never a device name Windows reserves: `con`, `prn`,
+    /// `aux`, `nul`, `com0`–`com9` or `lpt0`–`lpt9`.
+    #[schemars(
+        regex(pattern = r"^(?!(?:con|prn|aux|nul|com[0-9]|lpt[0-9])$)[a-z][a-z0-9-]*$"),
+        length(min = 1, max = 40)
+    )]
     pub id: String,
     /// The name the user gave the creature, per UI language.
     pub name: CreatureName,

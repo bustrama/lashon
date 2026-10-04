@@ -8,7 +8,8 @@
 //!
 //! - the file size cap and the schema version
 //! - every number inside its [`Bounds`]
-//! - a kebab-case id, and display names that are plain text
+//! - a kebab-case id that can name a folder on every OS, and display names
+//!   that are plain text
 //! - a palm wider than its arm
 //! - the lamp inside the body, at least as large as the body is tall, and
 //!   never under an eye, wherever the engine moves it
@@ -64,6 +65,11 @@ pub enum CreatureIssue {
     InvalidId {
         id: String,
     },
+    /// The id is a device name Windows reserves, and the id is also the
+    /// creature's folder name.
+    ReservedId {
+        id: String,
+    },
     InvalidName {
         lang: &'static str,
         problem: NameProblem,
@@ -99,6 +105,10 @@ impl CreatureIssue {
             InvalidId { id } => format!(
                 "id {id:?} must be 1–{} characters of a–z, 0–9 and '-', starting with a letter",
                 ID_CHARS.max
+            ),
+            ReservedId { id } => format!(
+                "id {id:?} is a device name Windows reserves (con, prn, aux, nul, com0–com9, \
+                 lpt0–lpt9), and the id is also the creature's folder name; pick another"
             ),
             InvalidName { lang, problem } => match problem {
                 NameProblem::Empty => format!("name.{lang} is empty"),
@@ -149,6 +159,10 @@ impl CreatureIssue {
             InvalidId { id } => format!(
                 "המזהה {id:?} צריך להכיל 1–{} תווים מתוך a–z, ‏0–9 ו-'-', ולהתחיל באות",
                 ID_CHARS.max
+            ),
+            ReservedId { id } => format!(
+                "המזהה {id:?} הוא שם התקן ש-Windows שומרת לעצמה (con, prn, aux, nul, com0–com9, \
+                 lpt0–lpt9), והמזהה הוא גם שם התיקייה של היצור. בחרו מזהה אחר"
             ),
             InvalidName { lang, problem } => match problem {
                 NameProblem::Empty => format!("השם name.{lang} ריק"),
@@ -240,6 +254,8 @@ fn check(c: &Creature) -> Vec<CreatureIssue> {
     }
     if !is_valid_id(&c.id) {
         issues.push(CreatureIssue::InvalidId { id: c.id.clone() });
+    } else if is_reserved_on_windows(&c.id) {
+        issues.push(CreatureIssue::ReservedId { id: c.id.clone() });
     }
     for (lang, name) in [("he", &c.name.he), ("en", &c.name.en)] {
         if let Some(problem) = name_problem(name) {
@@ -321,6 +337,15 @@ fn is_valid_id(id: &str) -> bool {
     ID_CHARS.contains(len)
         && chars.next().is_some_and(|c| c.is_ascii_lowercase())
         && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+/// A device name Windows reserves: no file or folder can take it, in any
+/// case or with any extension. A valid id is lowercase letters, digits and
+/// hyphens, so only the bare names can occur. Windows also reserves `COM`
+/// and `LPT` with a superscript digit, which an id can't hold.
+fn is_reserved_on_windows(id: &str) -> bool {
+    matches!(id, "con" | "prn" | "aux" | "nul")
+        || matches!(id.as_bytes(), [b'c', b'o', b'm', d] | [b'l', b'p', b't', d] if d.is_ascii_digit())
 }
 
 fn name_problem(name: &str) -> Option<NameProblem> {
@@ -488,6 +513,32 @@ mod tests {
         let mut v = default_value();
         v["id"] = serde_json::json!("my-creature-2");
         assert!(validate_value(&v).is_ok());
+    }
+
+    #[test]
+    fn rejects_ids_windows_reserves_for_devices() {
+        let digits = ('0'..='9').flat_map(|d| [format!("com{d}"), format!("lpt{d}")]);
+        let reserved: Vec<String> = ["con", "prn", "aux", "nul"]
+            .map(String::from)
+            .into_iter()
+            .chain(digits)
+            .collect();
+        assert_eq!(reserved.len(), 24);
+        for id in &reserved {
+            let mut v = default_value();
+            v["id"] = serde_json::json!(id);
+            assert_eq!(
+                issues_of(&v),
+                vec![CreatureIssue::ReservedId { id: id.clone() }],
+                "id {id:?}"
+            );
+        }
+        // Only the bare names are reserved.
+        for id in ["console", "com", "com10", "lpt-1", "nul-2"] {
+            let mut v = default_value();
+            v["id"] = serde_json::json!(id);
+            assert!(validate_value(&v).is_ok(), "id {id:?}");
+        }
     }
 
     #[test]
@@ -671,6 +722,7 @@ mod tests {
             },
             CreatureIssue::UnsupportedSchema { found: 9 },
             CreatureIssue::InvalidId { id: "X".into() },
+            CreatureIssue::ReservedId { id: "con".into() },
             CreatureIssue::InvalidName {
                 lang: "he",
                 problem: NameProblem::TooLong,
