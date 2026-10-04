@@ -116,8 +116,13 @@ character, artwork, icons, sounds and media, so we ported mechanics only.
 - **Wayland** has no global cursor, so there the window is click-through and
   display-only; the hotkeys and the tray menu still work. macOS and Linux
   compile and read the cursor through Tauri; only Windows is tested.
-- After **Hide** then **Show**, the window is shown with `SW_SHOW`, which may
-  activate it once.
+- Showing the window never activates it, after **Hide** then **Show** too.
+  `focus: false` sets tao's don't-focus marker, and tao 0.35.2 clears the
+  marker only on a copy of the window's flags, so every show is
+  `SW_SHOWNOACTIVATE`. This leans on tao: if an update makes the marker
+  one-shot, as its code seems to intend, later shows become `SW_SHOW`, which
+  can activate the window despite `WS_EX_NOACTIVATE`. Check it when tao is
+  bumped.
 - The taskbar placement stands on the bottom of the work area. With the
   taskbar on a side or at the top, Ottid stands on the bottom edge of the
   screen instead.
