@@ -302,9 +302,9 @@ pub fn run() {
         .manage(command_mode::ActiveDispatch::default());
 
     builder
-        // Menu selections from the tongue's right-click context menu arrive
-        // here; the tray menu keeps its own handler (both call the same
-        // `handle_menu_event`).
+        // Every menu selection arrives here once: the tray's and the
+        // tongue's right-click context menu's. (A tray's own `on_menu_event`
+        // would be one more app-wide handler, not a tray-only one.)
         .on_menu_event(|app, event| handle_menu_event(app, event.id.as_ref()))
         .invoke_handler(tauri::generate_handler![
             ottid_healthcheck,
@@ -444,7 +444,6 @@ pub fn run() {
                 .icon(tauri::include_image!("icons/tray.png"))
                 .tooltip("Ottid · אוטיד")
                 .menu(&menu)
-                .on_menu_event(|app, event| handle_menu_event(app, event.id.as_ref()))
                 .build(app)?;
             // Keep the menu alive and reachable for the right-click context menu.
             app.manage(menu);

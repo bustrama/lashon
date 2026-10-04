@@ -177,8 +177,8 @@ mod tests {
 
     #[test]
     fn a_handback_settles_once() {
-        // The menu event can reach the handler twice, and the fallback for
-        // a menu closed without a pick always runs after it.
+        // The fallback for a menu closed without a pick runs after the
+        // handler for an item picked, and must then find nothing to do.
         let handback = Handback::default();
         handback.arm(Foreground(APP), OVERLAY);
         handback.settle(false);
