@@ -390,10 +390,29 @@ fn run_worker(
     armed: SharedArmed,
     generation: u64,
 ) {
+    // However it ends (every slot off, no microphone, the microphone gone,
+    // superseded by a newer worker, or a panic), this worker no longer
+    // listens. A guard says so, because a panic unwinds past any code after
+    // `listen`.
+    let _stopped = StoppedListening {
+        app: &app,
+        armed: &armed,
+        generation,
+    };
     listen(&app, &gates, &running, &armed, generation);
-    // However it ended (every slot off, no microphone, the microphone gone,
-    // or superseded by a newer worker), this worker no longer listens.
-    report_armed(&app, &armed, generation, false);
+}
+
+/// Reports worker `generation` as no longer listening when dropped.
+struct StoppedListening<'a> {
+    app: &'a AppHandle,
+    armed: &'a SharedArmed,
+    generation: u64,
+}
+
+impl Drop for StoppedListening<'_> {
+    fn drop(&mut self) {
+        report_armed(self.app, self.armed, self.generation, false);
+    }
 }
 
 /// Load the enabled slots and listen until `running` drops.
