@@ -1,0 +1,385 @@
+{
+  "$defs": {
+    "Body": {
+      "additionalProperties": false,
+      "description": "The body: an ellipse whose outline wobbles through angular harmonics 2, 3\nand 5.",
+      "properties": {
+        "colour": {
+          "$ref": "#/$defs/BodyColour"
+        },
+        "radius_x": {
+          "description": "Half-width of the ellipse.",
+          "format": "double",
+          "maximum": 33.0,
+          "minimum": 24.0,
+          "type": "number"
+        },
+        "radius_y": {
+          "description": "Half-height of the ellipse.",
+          "format": "double",
+          "maximum": 23.0,
+          "minimum": 16.0,
+          "type": "number"
+        },
+        "wobble": {
+          "description": "The resting wobble of the outline, as a fraction of the body's size.\nThe voice level and pokes add to it.",
+          "format": "double",
+          "maximum": 0.04,
+          "minimum": 0.0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "radius_x",
+        "radius_y",
+        "wobble",
+        "colour"
+      ],
+      "type": "object"
+    },
+    "BodyColour": {
+      "description": "Body colours: names of design tokens, never colour values.",
+      "oneOf": [
+        {
+          "const": "charcoal",
+          "description": "`--creature-charcoal`.",
+          "type": "string"
+        }
+      ]
+    },
+    "CreatureName": {
+      "additionalProperties": false,
+      "description": "A display name in each UI language. Plain text: no control characters\nand no bidi embedding, override or isolate characters.",
+      "properties": {
+        "en": {
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
+        },
+        "he": {
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "he",
+        "en"
+      ],
+      "type": "object"
+    },
+    "EyeColour": {
+      "description": "Eye colours: names of design tokens, never colour values. State colours\nare not offered, so the eyes never read as a state.",
+      "oneOf": [
+        {
+          "const": "peach",
+          "description": "`--peach`.",
+          "type": "string"
+        }
+      ]
+    },
+    "EyeStyle": {
+      "description": "How the eyes are drawn.",
+      "oneOf": [
+        {
+          "const": "ember",
+          "description": "Glowing ovals with lids and no pupil.",
+          "type": "string"
+        }
+      ]
+    },
+    "Eyes": {
+      "additionalProperties": false,
+      "description": "Two eyes, mirrored about the midline. Positions are from the body's\ncentre, y down.",
+      "properties": {
+        "colour": {
+          "$ref": "#/$defs/EyeColour"
+        },
+        "radius_x": {
+          "format": "double",
+          "maximum": 4.5,
+          "minimum": 2.0,
+          "type": "number"
+        },
+        "radius_y": {
+          "format": "double",
+          "maximum": 6.5,
+          "minimum": 2.5,
+          "type": "number"
+        },
+        "style": {
+          "$ref": "#/$defs/EyeStyle"
+        },
+        "x": {
+          "description": "Each eye's distance from the midline.",
+          "format": "double",
+          "maximum": 12.0,
+          "minimum": 4.0,
+          "type": "number"
+        },
+        "y": {
+          "format": "double",
+          "maximum": 3.0,
+          "minimum": -8.0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "style",
+        "colour",
+        "radius_x",
+        "radius_y",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "Gesture": {
+      "description": "The engine's gesture library. Each gesture sets the hands, the lids, the\ngaze and the body's squash; the engine supplies time, voice level and\nplacement. Gestures happen on the outline (the silhouette rule).",
+      "oneOf": [
+        {
+          "const": "rest",
+          "description": "Hands rest; nothing else.",
+          "type": "string"
+        },
+        {
+          "const": "greet",
+          "description": "Rests, and now and then waves hello with a smile.",
+          "type": "string"
+        },
+        {
+          "const": "stretch",
+          "description": "Both hands overhead, then rest.",
+          "type": "string"
+        },
+        {
+          "const": "write",
+          "description": "Writes on the notepad with the pencil. Dictation only: the notepad\nis a dictation prop.",
+          "type": "string"
+        },
+        {
+          "const": "ready",
+          "description": "Both hands raised, ready.",
+          "type": "string"
+        },
+        {
+          "const": "scribble",
+          "description": "One hand scribbles beside the body; the eyes follow it.",
+          "type": "string"
+        },
+        {
+          "const": "scratch-head",
+          "description": "One hand scratches the head; the eyes look up.",
+          "type": "string"
+        },
+        {
+          "const": "hammer",
+          "description": "Both hands hammer in turn.",
+          "type": "string"
+        },
+        {
+          "const": "offer",
+          "description": "Both hands open toward the user.",
+          "type": "string"
+        },
+        {
+          "const": "startle",
+          "description": "A startled hop with both hands up, then one hand raised.",
+          "type": "string"
+        },
+        {
+          "const": "droop",
+          "description": "Flinches; the hands drop and the eyes turn sad.",
+          "type": "string"
+        },
+        {
+          "const": "beckon",
+          "description": "Waves again and again, hopping.",
+          "type": "string"
+        },
+        {
+          "const": "cheer",
+          "description": "Cheers with both hands up and hops.",
+          "type": "string"
+        }
+      ]
+    },
+    "Hands": {
+      "additionalProperties": false,
+      "description": "Two dough hands: a thin arm capsule ending in a round palm, fused into the\nbody by smooth union.",
+      "properties": {
+        "arm_radius": {
+          "format": "double",
+          "maximum": 4.0,
+          "minimum": 1.5,
+          "type": "number"
+        },
+        "arm_softness": {
+          "format": "double",
+          "maximum": 8.0,
+          "minimum": 1.0,
+          "type": "number"
+        },
+        "palm_radius": {
+          "description": "At least one unit wider than the arm, so the hand reads as a hand.",
+          "format": "double",
+          "maximum": 6.5,
+          "minimum": 3.0,
+          "type": "number"
+        },
+        "palm_softness": {
+          "format": "double",
+          "maximum": 5.0,
+          "minimum": 1.0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "arm_radius",
+        "palm_radius",
+        "arm_softness",
+        "palm_softness"
+      ],
+      "type": "object"
+    },
+    "Lamp": {
+      "additionalProperties": false,
+      "description": "Where the lamp sits inside the body. Its colour and strength are the\nengine's: they always show the state.",
+      "properties": {
+        "radius": {
+          "description": "The glow's radius. At least the body's half-height.",
+          "format": "double",
+          "maximum": 40.0,
+          "minimum": 18.0,
+          "type": "number"
+        },
+        "x": {
+          "format": "double",
+          "maximum": 6.0,
+          "minimum": -6.0,
+          "type": "number"
+        },
+        "y": {
+          "format": "double",
+          "maximum": 8.0,
+          "minimum": -4.0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "radius"
+      ],
+      "type": "object"
+    },
+    "Poses": {
+      "additionalProperties": false,
+      "description": "One gesture per state. The keys are the twelve states of\ndocs/design-system.md; which state shows, and when, is the engine's.",
+      "properties": {
+        "agent-done": {
+          "$ref": "#/$defs/Gesture"
+        },
+        "agent-needs-you": {
+          "$ref": "#/$defs/Gesture"
+        },
+        "command": {
+          "$ref": "#/$defs/Gesture"
+        },
+        "confirm": {
+          "$ref": "#/$defs/Gesture"
+        },
+        "dictation": {
+          "$ref": "#/$defs/Gesture"
+        },
+        "error": {
+          "$ref": "#/$defs/Gesture"
+        },
+        "idle": {
+          "$ref": "#/$defs/Gesture"
+        },
+        "preparing": {
+          "$ref": "#/$defs/Gesture"
+        },
+        "thinking": {
+          "$ref": "#/$defs/Gesture"
+        },
+        "tool": {
+          "$ref": "#/$defs/Gesture"
+        },
+        "transcribing": {
+          "$ref": "#/$defs/Gesture"
+        },
+        "wake": {
+          "$ref": "#/$defs/Gesture"
+        }
+      },
+      "required": [
+        "idle",
+        "preparing",
+        "dictation",
+        "command",
+        "transcribing",
+        "thinking",
+        "tool",
+        "confirm",
+        "wake",
+        "error",
+        "agent-needs-you",
+        "agent-done"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A `creature.json`.",
+  "properties": {
+    "body": {
+      "$ref": "#/$defs/Body"
+    },
+    "eyes": {
+      "$ref": "#/$defs/Eyes"
+    },
+    "hands": {
+      "$ref": "#/$defs/Hands"
+    },
+    "id": {
+      "description": "Stable kebab-case id, `[a-z][a-z0-9-]*`. Also the directory name under\n`creatures/`.",
+      "maxLength": 40,
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "type": "string"
+    },
+    "lamp": {
+      "$ref": "#/$defs/Lamp"
+    },
+    "name": {
+      "$ref": "#/$defs/CreatureName",
+      "description": "The name the user gave the creature, per UI language."
+    },
+    "poses": {
+      "$ref": "#/$defs/Poses",
+      "description": "The gesture the creature makes in each state."
+    },
+    "schema": {
+      "description": "Creature-schema version. Must be [`SCHEMA_VERSION`].",
+      "format": "uint32",
+      "maximum": 1,
+      "minimum": 1,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema",
+    "id",
+    "name",
+    "body",
+    "hands",
+    "eyes",
+    "lamp",
+    "poses"
+  ],
+  "title": "Creature",
+  "type": "object"
+}

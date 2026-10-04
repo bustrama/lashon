@@ -8,6 +8,7 @@
 pub mod audio;
 #[cfg(feature = "command-mode")]
 pub mod command_mode;
+pub mod creature;
 pub mod hardware;
 pub mod hotkey;
 pub mod inject;
