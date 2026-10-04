@@ -344,6 +344,16 @@ pub fn forget_reveal(app: &AppHandle) {
 
 // ---- Commands ----
 
+/// Only the overlay's card arms and answers requests. The Hub and the
+/// tutorial load the same frontend, and must not.
+fn from_card(webview: &tauri::Webview) -> Result<(), String> {
+    if webview.label() == overlay::WINDOW {
+        Ok(())
+    } else {
+        Err("not-the-card".to_string())
+    }
+}
+
 /// The card on screen, for an overlay that (re)loaded after it was sent.
 #[tauri::command]
 pub async fn approval_current(app: AppHandle) -> Option<Card> {
@@ -358,7 +368,8 @@ pub async fn approval_current(app: AppHandle) -> Option<Card> {
 
 /// The card has had the request's whole text in view for the arm delay.
 #[tauri::command]
-pub async fn approval_armed(app: AppHandle, id: Id) -> Result<(), String> {
+pub async fn approval_armed(app: AppHandle, webview: tauri::Webview, id: Id) -> Result<(), String> {
+    from_card(&webview)?;
     lock(&app.state::<Approvals>().queue)
         .arm(id)
         .map_err(|refusal| refusal.code().to_string())
@@ -366,7 +377,13 @@ pub async fn approval_armed(app: AppHandle, id: Id) -> Result<(), String> {
 
 /// A click on the card's Allow or Deny.
 #[tauri::command]
-pub async fn approval_answer(app: AppHandle, id: Id, decision: Decision) -> Result<(), String> {
+pub async fn approval_answer(
+    app: AppHandle,
+    webview: tauri::Webview,
+    id: Id,
+    decision: Decision,
+) -> Result<(), String> {
+    from_card(&webview)?;
     answer(&app, id, decision, "click").map_err(|refusal| refusal.code().to_string())
 }
 

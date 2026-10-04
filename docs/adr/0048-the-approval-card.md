@@ -46,6 +46,9 @@ Every request for the user's yes or no goes through one broker:
   events, commands, the timeout task, the hotkeys and the window.
 - **Asking.** Command mode awaits `approval::ask`. The recipe runtime's
   synchronous gate blocks on `approval::ask_blocking`.
+- **Answering.** Only the overlay's card arms and answers a request. The Hub
+  and the tutorial load the same frontend, so `approval_armed` and
+  `approval_answer` refuse a call from any other webview (`not-the-card`).
 
 One request is on screen at a time. Others wait in order, and the card shows
 how many are waiting.
