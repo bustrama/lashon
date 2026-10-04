@@ -56,7 +56,8 @@ legal clearance:
     - the sidecar handshake lines and the `x-lashon-auth` metadata key. This is
       a cross-language contract, so the Rust and Python sides change together.
   - **the bundle identifier**, `dev.lashon.desktop` → `app.ottid.desktop`, the
-    reverse-DNS form of the recommended domain
+    reverse-DNS form of `ottid.app`. That domain is not registered for now.
+    The identifier only has to be unique, so owning the domain is not required.
 - **Existing installs carry over:**
   - On its first launch, the app moves the old identifier's data directories to
     the new ones, but only when the new ones don't exist yet. These are renames
@@ -97,11 +98,12 @@ legal clearance:
 
 These are the owner's tasks, done before the rename reaches a release:
 
-- Register the domain. `ottid.app` is recommended, and `ottid.co.il` is
-  optional.
 - Run the official trademark searches (USPTO, EUIPO/TMview and the Israel
   Patent Office) in the relevant classes, at least 9 and 42.
 - Get advice from an IP lawyer.
+
+No domain is registered for now (owner, 2026-10-04). The website stays on
+GitHub Pages at `bustrama.github.io/ottid/`.
 
 ## Consequences
 
@@ -116,8 +118,8 @@ These are the owner's tasks, done before the rename reaches a release:
 - **The Pages site does not redirect.** `bustrama.github.io/lashon/` stops
   resolving after the rename. Links that v1.x builds open there (the wake-word
   tutorial and the MCP guide) will break. The rename release updates those
-  links, and the site moves to the custom domain once it is registered, which
-  makes future renames safe.
+  links. There is no custom domain for now, so a future rename would break the
+  site's links again.
 - **The installer upgrades in place.** The rename release is smoke-tested over a
   real v1.1.0 install: the old app must be gone, and its settings, history and
   models must be kept.
