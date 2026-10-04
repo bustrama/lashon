@@ -78,6 +78,7 @@ A Cargo workspace at the repo root ties the two Rust crates together.
 npm install
 npm run tauri dev          # launches the tongue window
 npm run check              # svelte-check (type-check)
+npm test                   # frontend unit tests (Vitest)
 npm run build              # frontend production build
 
 # Rust — run from the repo root

@@ -55,6 +55,18 @@ which is authoritative. Use the tokens and never hardcode a colour.
 --state-success #5fb887 done
 --state-error   #e8625a error ("rose")
 --state-cloud   #7a8590 working: transcribing, thinking
+
+/* The creature (same in both OS themes) */
+--creature-charcoal   #14181c               the body
+--creature-rim-dark   rgba(247,200,163,.3)  rim on dark backgrounds
+--creature-rim-light  rgba(255,255,255,.1)  rim on light backgrounds
+--creature-shadow     rgba(10,14,18,.3)     drop shadow on light backgrounds
+--creature-rain-head  #d7e6ff               command rain's lead glyph
+
+/* Dictation's props (the pencil's body is --saffron) */
+--prop-paper #efe7da  --prop-binding #2a3036  --prop-ring   #8a939c
+--prop-ink   rgba(38,42,48,.85)               --prop-lead   #3a2f22
+--prop-eraser #e89a8a --prop-shadow rgba(0,0,0,.35)
 ```
 
 Each mode chroma has a `-glow` variant at 55% alpha.
@@ -130,10 +142,10 @@ it, hide it or shrink it (ADR-0041).
 
 ### Palette
 
-- The **body** is charcoal `#14181c` in **both** OS themes. A creature is not a
-  surface; it has to read on any wallpaper.
-- The **rim** is a hairline at the edge: peach at 30% on dark backgrounds, white
-  at 10% on light ones.
+- The **body** is charcoal (`--creature-charcoal`) in **both** OS themes. A
+  creature is not a surface; it has to read on any wallpaper.
+- The **rim** is a hairline at the edge: peach at 30% on dark backgrounds
+  (`--creature-rim-dark`), white at 10% on light ones (`--creature-rim-light`).
 - The **eyes** are `--peach`. The **lamp** takes the state token.
 - **Bubbles and cards** next to Ottid follow the OS theme (`--ink-*` or
   `--vellum-*`).
@@ -156,13 +168,14 @@ floor. Never design a pose that needs a hand in front of the belly.
 
 **Props** have their own colours and **may** sit in front of the body:
 
-- **Notepad** (dictation): cream paper `#efe7da`, a dark binding with rings, and
-  graphite lines. It is held at the creature's right side, tilted slightly.
+- **Notepad** (dictation): cream paper, a dark binding with rings, and graphite
+  lines (the `--prop-*` tokens). It is held at the creature's right side, tilted
+  slightly, and comes with the `write` gesture.
 - **Pencil** (dictation): a saffron body, a dark graphite tip and a pink eraser.
   The palm grips it about 5.6 units above the tip, so the tip stays visible.
 - **Code rain** (command): Hebrew letters and digits fall *inside* the body,
   clipped to the silhouette's alpha and added on top as light. The head glyph is
-  near-white blue, and the trail is cobalt.
+  near-white blue (`--creature-rain-head`), and the trail is cobalt.
 
 ### Motion
 
@@ -189,13 +202,28 @@ without the smile.
 
 ### Rendering
 
+The engine is `apps/desktop/src/lib/creature/`
+([ADR-0045](adr/0045-the-creature-engine.md)). `Creature.svelte` takes the
+overlay's props; the engine draws whatever creature file it is given, and the
+bundled one is [`creatures/ottid/creature.json`](../creatures/ottid/creature.json).
+
 - The body is a 2D **signed-distance field**, evaluated per pixel by a **WebGL**
   fragment shader. Limbs join by smooth union. The floor is a smooth
-  intersection and the ceiling a smooth union.
-- Eyes, props and rain draw on a 2D canvas on top, in the body's local
-  transform.
-- Render only while visible, and drop the frame rate when idle. The CPU path in
-  `puddle.html` is a readable reference, not for the app.
+  intersection and the ceiling a smooth union. The lamp, the rim, the code rain
+  and the halo or drop shadow are in the same shader.
+- Eyes and props draw on a 2D canvas on top, in the body's local transform.
+- **Without WebGL** (or after a lost GPU context), a 2D fallback draws the same
+  silhouette as an ellipse with arms and palms, with the lamp, rim, halo, eyes
+  and props. It drops the wobble, the smooth fillets and the rain.
+- It draws only while the page and the creature are visible. At rest it drops to
+  30 fps; under reduced motion it draws only when what it shows changes. The
+  engine reports what its frames cost (`onStats`); about 0.1–0.2 ms of CPU per
+  frame on a desktop GPU.
+- Colours come from the tokens above, read from the page; never from literals
+  and never from a creature file.
+- In development, `/creature-lab` shows every state side by side in any
+  placement, with the frame cost. The CPU path in `puddle.html` is a readable
+  reference, not for the app.
 
 ### Reduced motion and accessibility
 
@@ -215,7 +243,7 @@ ripple, its stretch and the lamp's strength. It also sets the writing speed
 
 | State | Lamp | Eyes | Hands and body | When |
 |---|---|---|---|---|
-| **Idle** | `--peach`, dim and steady | Wander slowly, blink | Rest. Sometimes waves hello and smiles. | No interaction |
+| **Idle** | `--peach`, dim and steady. With the wake word armed, `--state-cloud` at 30% or more: the microphone is open. | Wander slowly, blink | Rest. Sometimes waves hello and smiles. | No interaction |
 | **Preparing** | `--saffron`, slowly ramping up | Lids mostly open | Stretches with both hands overhead, then rests | Model loading or first-run download |
 | **Dictation** | `--saffron` × level | On the notepad | Writes on the notepad with the pencil, faster when the voice is louder. Flips the page when it is full. | Dictation listening |
 | **Command** | `--garnet` × level | Forward, slight tilt | Both hands raised, ready. Code rain falls inside the body, faster when the voice is louder. | Command listening |
