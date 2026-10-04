@@ -5,9 +5,9 @@
 //! open file, duplicate, delete — surfaces as a `#[tauri::command]`
 //! in this module. The lib-side logic lives in
 //! [`ottid_core::recipes`] and [`ottid_core::recipes::storage`];
-//! this module is the thin Tauri wrapper that resolves env paths,
-//! plugs the `EventBasedConfirm` from M8 into the runtime, and emits
-//! the matching tongue events.
+//! this module is the thin Tauri wrapper that resolves env paths and
+//! plugs the approval card (`crate::approval`, docs/adr/0048) into the
+//! runtime's confirmation gate.
 //!
 //! Tracing on these commands logs shapes only — counts, ids,
 //! permissions list — never argument values. The runtime itself
@@ -15,12 +15,11 @@
 //! `.claude/rules/security.md`.
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Listener};
+use serde::Serialize;
+use tauri::AppHandle;
 
+use ottid_core::approval::{Decision, Request};
 use ottid_core::recipes::storage::{
     collect_hub_listings, delete_user_recipe as core_delete_user_recipe, duplicate_to_user,
     find_recipe_by_id, load_recipe, update_recipe_comment as core_update_recipe_comment,
@@ -35,32 +34,6 @@ use ottid_core::recipes::{execute_recipe, ConfirmDecision, ConfirmHandler, Recip
 pub struct RunOutcome {
     pub steps_executed: usize,
     pub summary: String,
-}
-
-/// Payload of the `recipe:confirm` event the Hub modal listens for.
-/// Same shape as the M8 `command:confirm` event so the frontend can
-/// route both through the same modal component — the only difference
-/// is the event name, so we can subscribe / unsubscribe per surface
-/// without mixing recipe + Command-mode confirmations.
-#[derive(Debug, Clone, Serialize)]
-struct RecipeConfirmRequest {
-    id: String,
-    /// Logical "tool" name for the modal copy. For recipes the only
-    /// destructive step type is `run_shell`, so this is always
-    /// `"run_shell"` in v1. Kept as a field so the modal can
-    /// dispatch the same way as M8.
-    tool: String,
-    /// The interpolated command line — the user MUST see it
-    /// verbatim before approving. Matches the M8 `run_command` field
-    /// of the same name.
-    command_preview: String,
-}
-
-/// Payload of the `recipe:confirm:reply` event the Hub emits.
-#[derive(Debug, Deserialize)]
-struct RecipeConfirmReply {
-    id: String,
-    decision: String,
 }
 
 /// List every recipe the Hub Recipes tab should render. Errors are
@@ -99,9 +72,8 @@ pub async fn get_recipe(id: String) -> Result<Recipe, String> {
 }
 
 /// Execute a recipe with the slot values from the Hub's slot-fill
-/// modal. Wires the M8 `EventBasedConfirm` pattern so a `run_shell`
-/// step in the recipe surfaces the same modal the M8 `run_command`
-/// tool does — one confirmation flow, two callers.
+/// modal. A `run_shell` step asks through the same approval card as the
+/// M8 `run_command` tool — one confirmation flow, every caller.
 #[tauri::command]
 pub async fn run_recipe(
     app: AppHandle,
@@ -117,7 +89,7 @@ pub async fn run_recipe(
     let permission_count = recipe.permissions.len();
     let id_for_log = recipe.id.clone();
 
-    let confirm = EventBasedConfirm::new(app.clone());
+    let confirm = CardConfirm::new(app.clone());
     let run = execute_recipe(&recipe, args, &confirm)
         .await
         .map_err(|err| format_runtime_error(&err))?;
@@ -236,93 +208,34 @@ fn format_runtime_error(err: &RuntimeError) -> String {
     err.to_string()
 }
 
-/// Event-emitting confirmation gate for the recipe runtime. Same
-/// shape as the M8 `EventBasedConfirm` in `command_mode.rs`, but
-/// emits the `recipe:confirm` event (not `command:confirm`) so the
-/// two surfaces can be wired to independent modal components.
+/// The recipe runtime's confirmation gate: asks through the approval
+/// card (`crate::approval`) with the interpolated command line, exactly
+/// what would run.
 ///
-/// The ottid-core recipe [`ConfirmHandler`] trait is synchronous —
-/// the runtime calls it from an async context but parks the
-/// executor thread on the answer (an explicit decision: don't
-/// advance to the next step while the user is reading the prompt).
-/// A `std::sync::mpsc::sync_channel` is the matching primitive: the
-/// Tauri-event listener (which runs on a Tauri internal thread) sends
-/// the decision; the runtime's `confirm()` blocks on `recv_timeout`.
-/// No nested executor, no `block_on`.
+/// The ottid-core recipe [`ConfirmHandler`] trait is synchronous — the
+/// runtime calls it from an async context but parks the executor thread
+/// on the answer (an explicit decision: don't advance to the next step
+/// while the user is reading the prompt). The card denies the step after
+/// 30 s unanswered.
 ///
-/// A 30-second timeout protects against a forgotten modal wedging
-/// the take forever — same backstop as the M8 confirm.
-/// `pub(crate)` so the M9 dispatcher wire-up in `command_mode.rs`
-/// can reuse the same modal channel — voice-triggered recipes
-/// and Hub-click-triggered recipes both hit `recipe:confirm`, so
-/// the Svelte modal doesn't need to know which surface fired the
-/// recipe. Matches ADR-0028's "one modal per concern, not per
-/// trigger" pattern.
-pub(crate) struct EventBasedConfirm {
+/// `pub(crate)` so the M9 dispatcher in `command_mode.rs` reuses it:
+/// voice-triggered and Hub-triggered recipes both ask through the card
+/// (ADR-0028's "one modal per concern, not per trigger").
+pub(crate) struct CardConfirm {
     app: AppHandle,
 }
 
-impl EventBasedConfirm {
+impl CardConfirm {
     pub(crate) fn new(app: AppHandle) -> Self {
         Self { app }
     }
 }
 
-impl ConfirmHandler for EventBasedConfirm {
+impl ConfirmHandler for CardConfirm {
     fn confirm(&self, prompt: &str) -> ConfirmDecision {
-        let id = format!(
-            "recipe-confirm-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        );
-        let (tx, rx) = std::sync::mpsc::sync_channel::<ConfirmDecision>(1);
-        let tx = Arc::new(Mutex::new(Some(tx)));
-        let id_clone = id.clone();
-        let tx_clone = tx.clone();
-        let handler = self.app.listen("recipe:confirm:reply", move |event| {
-            let Ok(reply) = serde_json::from_str::<RecipeConfirmReply>(event.payload()) else {
-                return;
-            };
-            if reply.id != id_clone {
-                return;
-            }
-            let decision = if reply.decision == "allow" {
-                ConfirmDecision::Allow
-            } else {
-                ConfirmDecision::Deny
-            };
-            if let Ok(mut slot) = tx_clone.lock() {
-                if let Some(tx) = slot.take() {
-                    let _ = tx.send(decision);
-                }
-            }
-        });
-
-        if let Err(err) = self.app.emit(
-            "recipe:confirm",
-            RecipeConfirmRequest {
-                id,
-                tool: "run_shell".to_string(),
-                command_preview: prompt.to_string(),
-            },
-        ) {
-            tracing::warn!("recipes: failed to emit confirm request: {err}");
-            self.app.unlisten(handler);
-            return ConfirmDecision::Deny;
+        match crate::approval::ask_blocking(&self.app, Request::for_recipe_step(prompt)) {
+            Decision::Allow => ConfirmDecision::Allow,
+            Decision::Deny => ConfirmDecision::Deny,
         }
-
-        let decision = match rx.recv_timeout(Duration::from_secs(30)) {
-            Ok(d) => d,
-            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                tracing::warn!("recipes: confirmation timed out");
-                ConfirmDecision::Deny
-            }
-            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => ConfirmDecision::Deny,
-        };
-        self.app.unlisten(handler);
-        decision
     }
 }

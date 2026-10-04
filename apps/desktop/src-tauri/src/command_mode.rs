@@ -220,7 +220,7 @@ async fn run(app: &AppHandle, transcript: String) -> anyhow::Result<()> {
     );
     let matcher = CascadeMatcher::default_phase_1c_v1();
     let recipe_confirm: std::sync::Arc<dyn RecipeConfirmHandler> =
-        std::sync::Arc::new(crate::recipes::EventBasedConfirm::new(app.clone()));
+        std::sync::Arc::new(crate::recipes::CardConfirm::new(app.clone()));
     match try_recipe_cascade(&matcher, &recipes, recipe_confirm, &transcript).await {
         Ok(CommandRoute::Recipe {
             recipe_id,

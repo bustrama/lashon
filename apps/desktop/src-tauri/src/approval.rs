@@ -4,7 +4,8 @@
 //! The queue and its rules are `ottid_core::approval`, unit-tested there.
 //! This module adds what needs Tauri:
 //!
-//! - the reply channel back to each asker;
+//! - the reply channel back to each asker, async (command mode) or blocking
+//!   (the recipe runtime's synchronous gate);
 //! - the `approval:changed` and `approval:nudge` events the card listens to,
 //!   and the commands it answers with;
 //! - the timer that denies a request nobody answers;
@@ -18,8 +19,8 @@
 //! commands here are async, and the hotkey and menu handlers hand their work
 //! to the async runtime. `side` is always taken before `queue`, never after.
 
-use std::sync::{Mutex, MutexGuard};
-use std::time::Instant;
+use std::sync::{mpsc, Mutex, MutexGuard};
+use std::time::{Duration, Instant};
 
 use ottid_core::approval::{
     Decision, Id, Queue, Refusal, Request, Shown, ALLOW_ACCELERATOR, ALLOW_KEYS, DENY_ACCELERATOR,
@@ -39,10 +40,18 @@ const EVENT_CHANGED: &str = "approval:changed";
 /// Allow was pressed before the card was armed.
 const EVENT_NUDGE: &str = "approval:nudge";
 
+/// How long a blocking asker waits before giving up on its own. The broker
+/// answers every request within `approval::TIMEOUT` of showing it, but one
+/// may first wait behind others; this only frees the thread if that
+/// promise is ever broken.
+const BLOCKING_BACKSTOP: Duration = Duration::from_secs(600);
+
 /// Where an answer goes.
 enum Reply {
     /// An async asker awaits it.
     Async(oneshot::Sender<Decision>),
+    /// A blocking asker parks its thread on it.
+    Blocking(mpsc::SyncSender<Decision>),
 }
 
 impl Reply {
@@ -50,6 +59,9 @@ impl Reply {
         match self {
             Reply::Async(tx) => {
                 let _ = tx.send(decision);
+            }
+            Reply::Blocking(tx) => {
+                let _ = tx.try_send(decision);
             }
         }
     }
@@ -112,6 +124,20 @@ pub async fn ask(app: &AppHandle, request: Request) -> Decision {
     let decision = rx.await.unwrap_or(Decision::Deny);
     pending.id = None;
     decision
+}
+
+/// Ask the user and block this thread until the answer, for the recipe
+/// runtime's synchronous confirmation gate.
+pub fn ask_blocking(app: &AppHandle, request: Request) -> Decision {
+    let (tx, rx) = mpsc::sync_channel(1);
+    let id = submit(app, request, Reply::Blocking(tx));
+    match rx.recv_timeout(BLOCKING_BACKSTOP) {
+        Ok(decision) => decision,
+        Err(_) => {
+            withdraw(app, id);
+            Decision::Deny
+        }
+    }
 }
 
 /// Withdraws a request whose asker went away before it was answered.
