@@ -4,7 +4,8 @@
 //! shared audio-embedding model — both openWakeWord's, Apache-2.0 — followed by
 //! a small per-phrase classifier. [`WakeWord`] runs them over a rolling audio
 //! buffer and scores how likely the wake phrase was just spoken; [`Trigger`]
-//! turns that score stream into a debounced fire.
+//! turns that score stream into a debounced fire. [`Armed`] tracks whether
+//! the detector is listening at all, for the UI.
 //!
 //! The melspectrogram and embedding models ship via `models/manifests/`. The
 //! classifier is an offline-trained artifact (see docs/adr/0016) loaded by
@@ -221,9 +222,85 @@ impl Trigger {
     }
 }
 
+/// Whether the wake-word detector is listening, as the UI is told.
+///
+/// The detector restarts on every wake-word settings change: a new worker
+/// starts while the old one is still winding down. Each worker gets a
+/// generation from [`Armed::begin`], and only the newest generation's
+/// reports count, so a late "stopped" from the old worker can't overwrite
+/// what the new one reported.
+#[derive(Debug, Clone, Default)]
+pub struct Armed {
+    generation: u64,
+    listening: bool,
+}
+
+impl Armed {
+    /// A new worker starts; returns its generation. What the UI shows stays
+    /// as it is until that worker reports.
+    pub fn begin(&mut self) -> u64 {
+        self.generation += 1;
+        self.generation
+    }
+
+    /// Worker `generation` reports whether it is listening. Returns the new
+    /// value when it changed what the UI should show, `None` otherwise
+    /// (unchanged, or a report from a superseded worker).
+    pub fn report(&mut self, generation: u64, listening: bool) -> Option<bool> {
+        if generation != self.generation || listening == self.listening {
+            return None;
+        }
+        self.listening = listening;
+        Some(listening)
+    }
+
+    /// Whether the detector is listening.
+    pub fn is_listening(&self) -> bool {
+        self.listening
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn armed_reports_only_changes() {
+        let mut armed = Armed::default();
+        assert!(!armed.is_listening());
+        let generation = armed.begin();
+        assert_eq!(armed.report(generation, false), None);
+        assert_eq!(armed.report(generation, true), Some(true));
+        assert_eq!(armed.report(generation, true), None);
+        assert!(armed.is_listening());
+        assert_eq!(armed.report(generation, false), Some(false));
+        assert!(!armed.is_listening());
+    }
+
+    #[test]
+    fn a_superseded_worker_cannot_disarm_its_successor() {
+        let mut armed = Armed::default();
+        let old = armed.begin();
+        assert_eq!(armed.report(old, true), Some(true));
+        // Settings changed: a new worker starts and listens at once…
+        let new = armed.begin();
+        assert_eq!(armed.report(new, true), None);
+        // …and the old one stops afterwards.
+        assert_eq!(armed.report(old, false), None);
+        assert!(armed.is_listening());
+    }
+
+    #[test]
+    fn beginning_a_worker_keeps_the_last_report() {
+        let mut armed = Armed::default();
+        let old = armed.begin();
+        armed.report(old, true);
+        // Until the new worker decides, the UI keeps showing the old state.
+        let new = armed.begin();
+        assert!(armed.is_listening());
+        // The new worker finds every slot off.
+        assert_eq!(armed.report(new, false), Some(false));
+    }
 
     #[test]
     fn one_frame_over_threshold_does_not_fire() {

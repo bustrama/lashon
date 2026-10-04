@@ -50,9 +50,8 @@
 	//     terminal event — see onCommandResult).
 	let takeMode = $state<TakeMode>('idle');
 
-	// Wake-listening — true when the always-on wake-word detector is armed.
-	// Plumbed from settings via the `wakeword.enabled` flag, refreshed live
-	// on `settings:changed`. Pure visual signal — the detector runs in Rust.
+	// Wake-listening — true while the wake-word detector is listening, as
+	// the Rust worker reports it (`wake:armed`). Pure visual signal.
 	let wakeActive = $state(false);
 
 	// The wake word was just heard: the creature's startled "wake" event,
@@ -401,9 +400,22 @@
 			getSetting('hotkeys.dictation').then((chord) => (dictationShortcut = chord)),
 			getSetting('hotkeys.command').then((chord) => (commandShortcut = chord))
 		]).then(refreshShortcuts);
-		// Read wake-word enablement so the creature's idle can show the
-		// detector is armed. Live-refreshed on `settings:changed` below.
-		void getSetting('wakeword.enabled').then((on) => (wakeActive = !!on));
+		// Whether the wake-word detector is listening, for the creature's
+		// idle. Only Rust knows (a slot enabled, its classifier installed,
+		// the microphone open), so render what it reports: `wake:armed` on
+		// every change, and `wake_armed` for the state before this mounted.
+		// Ask only once subscribed, and let any event that lands first win.
+		let armedHeard = false;
+		const armedUnlisten = listen<{ armed: boolean }>('wake:armed', (event) => {
+			armedHeard = true;
+			wakeActive = event.payload.armed;
+		});
+		void armedUnlisten
+			.then(() => invoke<boolean>('wake_armed'))
+			.then((armed) => {
+				if (!armedHeard) wakeActive = armed;
+			})
+			.catch(() => {});
 		// The Hub broadcasts `settings:changed` when a hotkey is rebound —
 		// reload it and re-register so the new chord takes effect at once.
 		const settingsUnlisten = listen<{ key: string }>('settings:changed', (event) => {
@@ -417,8 +429,6 @@
 					commandShortcut = chord;
 					refreshShortcuts();
 				});
-			} else if (event.payload.key === 'wakeword.enabled') {
-				void getSetting('wakeword.enabled').then((on) => (wakeActive = !!on));
 			}
 		});
 
@@ -434,6 +444,7 @@
 			void commandToolUnlisten.then((unlisten) => unlisten());
 			void commandTranscriptUnlisten.then((unlisten) => unlisten());
 			void wakeUnlisten.then((unlisten) => unlisten());
+			void armedUnlisten.then((unlisten) => unlisten());
 			void settingsUnlisten.then((unlisten) => unlisten());
 			// The shortcuts are process-global and intentionally outlive this
 			// component: a dev remount re-registers them, and unregistering
