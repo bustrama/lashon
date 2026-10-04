@@ -208,11 +208,17 @@ capability `global-shortcut:allow-unregister-all` is replaced by
 - **A queued request waits longer.** It may wait behind others before its
   30 s start. The blocking recipe asker has a 600 s backstop, so its thread is
   freed even if the broker never answers.
-- **Showing the hidden overlay doesn't take focus.** ADR-0044 noted that after
-  Hide then Show, `SW_SHOW` might activate the window. With `WS_EX_NOACTIVATE`
-  on the overlay, revealing it for a card was observed not to change the
-  foreground window. That held even while Ottid's own process owned the
-  foreground, when an activation would have been allowed.
+- **Showing the hidden overlay doesn't take focus.** Every show is
+  `SW_SHOWNOACTIVATE` ([ADR-0044](0044-a-click-through-overlay-window.md)),
+  and the window is `WS_EX_NOACTIVATE`. Revealing it for a card was observed
+  not to change the foreground window, even while Ottid's own process owned
+  the foreground, when an activation would have been allowed.
+- **Focus stays with the user's app.** The risks left are the overlay's
+  right-click menu, which hands the foreground back when it closes
+  (`Foreground::give_back`), and a button keeping focus, which the card
+  prevents. As a backstop, a click answer hands the foreground back the same
+  way, to the window that was in front when the card came on screen, if the
+  overlay ever ends up in front.
 - **The free edition has no broker.** Command mode is compiled out
   ([ADR-0034](0034-command-mode-editioning.md)), and the card never shows.
 - **A debug build can show a sample card** with `approval_preview` (`long` and

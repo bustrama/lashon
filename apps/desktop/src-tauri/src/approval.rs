@@ -27,6 +27,7 @@ use ottid_core::approval::{
     Cancel, Decision, Id, Queue, Refusal, Request, Shown, ALLOW_ACCELERATOR, ALLOW_KEYS,
     DENY_ACCELERATOR, DENY_KEYS,
 };
+use ottid_core::overlay::Foreground;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
@@ -97,6 +98,8 @@ struct Side {
     revealed: bool,
     /// The request a timeout is running for.
     timer_for: Option<Id>,
+    /// The window in front when that request came on screen.
+    before: Option<Foreground>,
 }
 
 /// Tauri-managed state: the pending requests.
@@ -226,12 +229,14 @@ fn changed(app: &AppHandle) {
             conceal(app);
         }
         side.timer_for = None;
+        side.before = None;
     }
 
     let shown = lock(&state.queue).shown(Instant::now());
     if let Some(shown) = &shown {
         if side.timer_for != Some(shown.id) {
             side.timer_for = Some(shown.id);
+            side.before = Foreground::remember();
             spawn_timeout(app.clone(), shown.id);
         }
     }
@@ -367,6 +372,21 @@ pub fn forget_reveal(app: &AppHandle) {
     });
 }
 
+/// The overlay never takes focus (ADR-0044), so a click on the card leaves
+/// the user's app in front. Should a click ever bring the overlay forward
+/// anyway, hand the front back to the window that had it when the card
+/// came on screen. Nothing happens while anything else is in front.
+fn give_back(webview: &tauri::Webview, before: Option<Foreground>) {
+    #[cfg(windows)]
+    if let (Some(before), Ok(hwnd)) = (before, webview.window().hwnd()) {
+        if before.give_back(hwnd.0 as isize) {
+            tracing::info!(target: LOG, "gave the foreground back after a click on the card");
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = (webview, before);
+}
+
 // ---- Commands ----
 
 /// Only the overlay's card arms and answers requests. The Hub and the
@@ -409,7 +429,10 @@ pub async fn approval_answer(
     decision: Decision,
 ) -> Result<(), String> {
     from_card(&webview)?;
-    answer(&app, id, decision, "click").map_err(|refusal| refusal.code().to_string())
+    let before = lock(&app.state::<Approvals>().side).before;
+    answer(&app, id, decision, "click").map_err(|refusal| refusal.code().to_string())?;
+    give_back(&webview, before);
+    Ok(())
 }
 
 /// Development only: show a sample request on the card, to try the card,
