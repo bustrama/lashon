@@ -102,9 +102,12 @@ Contrast: text tokens meet WCAG AA at 14 px and above on their own background.
 
 ### The approval card
 
-Before a destructive step runs, from a command-mode tool, a recipe step or
-later an agent, the island shows the approval card
-([ADR-0048](adr/0048-the-approval-card.md)).
+Before a destructive step runs, from a command-mode tool or a recipe step,
+the island shows the approval card
+([ADR-0048](adr/0048-the-approval-card.md)). So does a coding agent's
+permission request: once the user connects Claude Code in the Hub's **Coding
+agents** section, its permission prompts come here too
+([ADR-0049](adr/0049-claude-code-hooks-bridge.md)).
 
 - **The whole request, never cut off.** For `run_command` the card shows the
   command and its folder; for any other tool, every argument. The text is
@@ -133,7 +136,12 @@ later an agent, the island shows the approval card
   another app never approves. A tap swaps the countdown line for "hold it
   for a second", in `--aqua`.
 - **Time limit.** A line under the buttons counts down the 30 s, after which
-  the request is denied.
+  the request is denied. An agent's request is never denied for lapsing. It
+  goes back to the agent's own prompt ("Back to the terminal in Ns").
+- **An agent's request.** The eyebrow names the agent ("Claude Code needs
+  your approval"), in its own isolate. A shell tool (`Bash`, `PowerShell`)
+  shows its command line and folder, like `run_command`. Any other tool shows
+  its whole input as JSON.
 - **Several requests.** One card shows at a time, with "N waiting" in its
   header. The next one replaces it in place.
 
@@ -305,7 +313,7 @@ ripple, its stretch and the lamp's strength. It also sets the writing speed
 | **Confirm** | `--peach`, steady | Pleading tilt, wide open | Both hands open toward the user ("ok?") | Not entered by the app: a pending approval shows **Needs you** ([ADR-0048](adr/0048-the-approval-card.md)). Creatures still define it. |
 | **Wake** *(event)* | Flash in the mode's colour, then steady | Wide | Startled hop with both hands up, then the listening pose | Wake word heard |
 | **Error** *(event)* | `--state-error`, flash that fades | Sad: lids low, tilted | Flinches and squashes, hands droop | Any failure |
-| **Agent needs you** | `--aqua`, fast pulse | Wide, toward the user | Waves again and again, hopping | An approval waits on the card; later, Claude Code waits for permission or input (Phase C) |
+| **Agent needs you** | `--aqua`, fast pulse | Wide, toward the user | Waves again and again, hopping | An approval waits on the card, Ottid's own or Claude Code's ([ADR-0049](adr/0049-claude-code-hooks-bridge.md)) |
 | **Agent done** *(event)* | `--state-success`, flash that fades | Smiling | Cheers with both hands up and hops | Claude Code finished (Phase C) |
 
 States not designed yet are built from the same vocabulary: a lamp colour from

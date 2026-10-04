@@ -58,6 +58,21 @@ loopback bind constrains locality while the token authenticates the caller. See
 [ADR-0002](adr/0002-grpc-loopback-tcp-transport.md), and
 [ADR-0010](adr/0010-harden-the-stt-sidecar-trust-boundary.md).
 
+**The Claude Code hooks bridge** is the one inbound listener, and only in the
+command-mode edition. Once the user connects Claude Code from the Hub, Claude
+Code's `PermissionRequest` hook runs `ottid-hook`, which hands the request to
+the approval card ([ADR-0048](adr/0048-the-approval-card.md)) and prints the
+user's answer back. Ottid listens only while that hook is installed.
+
+- **The endpoint.** A named pipe whose DACL admits only the user's SID, or a
+  socket in a 0700 directory.
+- **Authentication.** Each side proves it holds a per-process token, kept in
+  a file only the user can read, with an HMAC over fresh nonces. The token
+  never crosses the wire.
+- **Failure.** Anything short of the user's answer prints nothing, and Claude
+  Code asks in its own terminal prompt. See
+  [ADR-0049](adr/0049-claude-code-hooks-bridge.md).
+
 ## 4. The provider abstraction
 
 The single most important architectural decision: **every stage exposes a
@@ -125,6 +140,8 @@ The standing engineering risks that shape Ottid's design and review priorities.
 | Wake-word false activations | Med | Med | 2-frame threshold; sensitivity slider; battery-aware throttle |
 | Tool-execution accidents (deletes, sends) | Med | High | Confirmation-policy whitelist; spoken Hebrew/English confirmation; atomic undo log |
 | External agent CLI breaks its API | Med | Med | Pin tested agent versions; show a compatibility matrix; degrade gracefully |
+| Claude Code changes its hook contract | Med | Low | `ottid-hook` prints nothing it doesn't recognise, so Claude Code falls back to its own prompt; the hook's stdin and stdout live in one module (`agent_bridge::hook`) (ADR-0049) |
+| Another process reaches the hooks bridge | Low | High | User-only pipe DACL or 0700 socket directory, remote clients refused, mutual HMAC with a per-process token, frame and connection caps; the listener runs only while the hook is installed (ADR-0049) |
 | Cloud provider key exfiltration | Low | High | Keys in the OS keychain only; never logged; redacted from crash reports; ZDR opt-in where supported |
 | GPL/CC-NC contamination | Low | Med | `cargo-deny` + `pip-licenses` in CI; CC-NC TTS models surfaced as optional downloads, never bundled |
 | User confusion: local vs cloud routing | Med | Med | A cloud badge on every cloud provider chip; the provider name shown next to Ottid during use |
