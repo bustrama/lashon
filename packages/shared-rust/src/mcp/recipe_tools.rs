@@ -45,6 +45,15 @@ pub fn user_recipes_dir() -> PathBuf {
         return PathBuf::from(path);
     }
     let base = user_data_local_dir();
+    // No uninstall deletes this dir, even when a per-user install shares the
+    // folder (`%LOCALAPPDATA%\Ottid` is `ottid` to case-insensitive Windows;
+    // the installer's default is `%LOCALAPPDATA%\Programs\Ottid`). Tauri's
+    // NSIS uninstaller deletes only the files it installed, by name, and
+    // removes folders only when empty. Its one recursive delete is the
+    // opt-in "delete app data" box: it targets the `app.ottid.desktop` dirs,
+    // is never shown under `/S` or `/P`, and is ignored under `/UPDATE`. So
+    // the silent Lashon uninstall in `windows/hooks.nsh` leaves
+    // `lashon/recipes` for the move below.
     let dir = base.join("ottid").join("recipes");
     let legacy = base.join(crate::legacy::LEGACY_DIR_NAME);
     match crate::legacy::adopt_dir(&legacy.join("recipes"), &dir) {
