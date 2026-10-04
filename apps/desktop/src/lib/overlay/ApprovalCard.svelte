@@ -140,9 +140,25 @@
 		untrack(() => explain(true));
 	});
 
-	function allow(): void {
-		if (armed) onAnswer(card.id, 'allow');
-		else explain(false);
+	// Only a pointer answers. Enter or Space on a button, or an accessibility
+	// tool's invoke, arrives as a click with no presses (`detail` 0); the
+	// keyboard path is the hotkeys, which the broker gates the same way.
+	function allow(event: MouseEvent): void {
+		if (event.detail === 0) {
+			if (card.keys.allow) {
+				onSay(fill($t('approval.announce.allowKey'), { keys: card.keys.allow.join('+') }));
+			}
+		} else if (armed) {
+			onAnswer(card.id, 'allow');
+		} else {
+			explain(false);
+		}
+	}
+
+	// A press must not move focus to a button: if the overlay ever has the
+	// keyboard (after its menu), Enter or Space would press it.
+	function keepFocus(event: MouseEvent): void {
+		event.preventDefault();
 	}
 
 	onMount(() => {
@@ -243,13 +259,21 @@
 			class:charging
 			class:flash={hint && !overflowing}
 			aria-disabled={!armed}
+			tabindex="-1"
+			onmousedown={keepFocus}
 			onclick={allow}
 		>
 			<span class="charge" style="--arm-ms: {ARM_DELAY_MS}ms" aria-hidden="true"></span>
 			<span class="label">{$t('approval.allow')}</span>
 			{#if card.keys.allow}<kbd class="keys">{card.keys.allow.join('+')}</kbd>{/if}
 		</button>
-		<button type="button" class="deny" onclick={() => onAnswer(card.id, 'deny')}>
+		<button
+			type="button"
+			class="deny"
+			tabindex="-1"
+			onmousedown={keepFocus}
+			onclick={() => onAnswer(card.id, 'deny')}
+		>
 			<span class="label">{$t('approval.deny')}</span>
 			{#if card.keys.deny}<kbd class="keys">{card.keys.deny.join('+')}</kbd>{/if}
 		</button>

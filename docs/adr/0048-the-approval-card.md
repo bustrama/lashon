@@ -112,6 +112,13 @@ remaining delay as a fill, which reduced motion leaves out.
 **Clicking early.** A click on Allow before it arms doesn't count. The card
 says what is missing: scroll to the end, or wait a moment.
 
+**Only a pointer clicks.** The buttons are out of the tab order and a press
+doesn't focus them. If the overlay ever had the keyboard (after its menu),
+Enter or Space would otherwise press a focused button. Allow also ignores a
+click with no presses (`detail` 0), which is what Enter, Space or an
+accessibility tool's invoke produces; it says the hotkey instead. The
+keyboard path is the hotkeys, which the broker gates the same way.
+
 ### Keyboard: two hotkeys while a request is pending
 
 - **The chords.** `Ctrl+Shift+Y` allows and `Ctrl+Shift+N` denies.

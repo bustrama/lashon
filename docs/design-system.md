@@ -126,6 +126,8 @@ later an agent, the island shows the approval card
 - **Allow arms** 700 ms after the whole text has been on screen: the card has
   finished opening and the end has been seen. A click before that says what
   is missing and doesn't count. Deny works at once.
+- **Pointer only.** The buttons never take focus, so Enter or Space can't
+  press them. The keyboard answers with the hotkeys.
 - **Time limit.** A line under the buttons counts down the 30 s, after which
   the request is denied.
 - **Several requests.** One card shows at a time, with "N waiting" in its
