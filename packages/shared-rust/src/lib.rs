@@ -5,6 +5,8 @@
 //! link only the networking stack and run cleanly on every OS. See
 //! `docs/adr/0003-core-logic-in-a-tauri-independent-crate.md`.
 
+#[cfg(feature = "agent-hooks")]
+pub mod agent_bridge;
 pub mod approval;
 pub mod audio;
 #[cfg(feature = "command-mode")]

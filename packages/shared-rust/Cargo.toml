@@ -34,6 +34,16 @@ name = "ottid-recipe"
 path = "src/bin/ottid_recipe.rs"
 required-features = ["command-mode"]
 
+# The Claude Code hook client (ADR-0049). Claude Code runs it as a
+# `PermissionRequest` hook; it hands the request to Ottid's approval card and
+# prints the answer back, or prints nothing so Claude Code asks in its own
+# terminal prompt. Kept out of the Tauri shell for the same reason as
+# `ottid-mcp`: it must start fast and stay small.
+[[bin]]
+name = "ottid-hook"
+path = "src/bin/ottid_hook.rs"
+required-features = ["agent-hooks"]
+
 # Cargo features (docs/adr/0025).
 #
 # `local-llm` enables the `LocalLlmProvider` — a thin OpenAI-compat
@@ -56,8 +66,13 @@ default = ["command-mode"]
 # `command-mode` is the paid-tier umbrella (ADR-0034): the LLM dispatcher, the
 # tool set, recipes, the local LLM, and MCP. A free `--no-default-features`
 # build ships dictation only, with command mode compiled out of the binary.
-command-mode = ["local-llm", "mcp-server"]
+command-mode = ["local-llm", "mcp-server", "agent-hooks"]
 local-llm = []
+# `agent-hooks` is the Claude Code hooks bridge (ADR-0049): the
+# `ottid_core::agent_bridge` module and the `ottid-hook` client. It is Ottid's
+# first inbound listener, so it is part of the command-mode edition only; the
+# free dictation build has no listener at all.
+agent-hooks = ["dep:hmac", "dep:getrandom"]
 # `mcp-server` enables the `ottid_core::mcp` module + the `ottid-mcp`
 # stdio binary (ADR-0028). The feature gates the `rmcp` dep so a
 # library-only consumer of `ottid-core` doesn't pull the MCP transport
@@ -74,7 +89,9 @@ tonic = "=0.12.3"
 prost = "=0.13.5"
 tokio = { version = "=1.52.3", features = ["full"] }
 serde = { version = "=1.0.228", features = ["derive"] }
-serde_json = "=1.0.149"
+# `raw_value` lets the Claude Code settings editor (ADR-0049) carry every key
+# it doesn't own through byte for byte, in its original order.
+serde_json = { version = "=1.0.149", features = ["raw_value"] }
 anyhow = "=1.0.102"
 tracing = "=0.1.44"
 cpal = "=0.16.0"
@@ -191,6 +208,18 @@ rmcp = { version = "=1.7.0", default-features = false, features = [
 # version the Tauri shell uses to avoid two copies in the workspace
 # tree.
 tracing-subscriber = { version = "=0.3.23", features = ["env-filter"], optional = true }
+# The hooks bridge's mutual authentication (ADR-0049): HMAC-SHA256 over the
+# per-process token, verified in constant time. RustCrypto, the same family
+# and `digest` version as `sha2`; already in the tree through `hkdf`.
+hmac = { version = "=0.12.1", optional = true }
+# The bridge's token and nonces, from the OS's random source. The version
+# already in the tree.
+getrandom = { version = "=0.3.4", optional = true }
+
+# The hooks bridge's socket directory must belong to the user who runs Ottid
+# (ADR-0049); `geteuid` says who that is. The version already in the tree.
+[target.'cfg(unix)'.dependencies]
+libc = "=0.2.186"
 
 # Win32 Job Object wrapper for the STT sidecar — if the parent Ottid process
 # exits abruptly (panic, hard Ctrl+C of `cargo run`), `kill_on_drop(true)`
@@ -219,6 +248,11 @@ windows = { version = "=0.61.3", features = [
     "Win32_System_Shutdown",
     "Win32_System_Variant",
     "Win32_UI_Input_KeyboardAndMouse",
+    # The hooks bridge (ADR-0049): the user-only DACL on its named pipe and
+    # bridge file, and the hook client's watch on its parent process.
+    "Win32_Security_Authorization",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Diagnostics_ToolHelp",
 ] }
 
 # M9 Phase 1d storage-module unit tests need disposable directories under
