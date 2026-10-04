@@ -25,7 +25,7 @@
 	});
 </script>
 
-<div class="debug" data-tauri-drag-region>
+<div class="debug">
 	<span class="title">{$t('debug.title')}</span>
 	<span class="line {status}">{$t(`debug.${status}`)}</span>
 	{#if detail}
@@ -36,14 +36,14 @@
 <style>
 	.debug {
 		box-sizing: border-box;
-		width: 100vw;
-		height: 100vh;
+		width: 240px;
+		min-height: 96px;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
 		gap: 3px;
-		padding: 0 14px;
+		padding: 12px 14px;
 		border-radius: 22px;
 		background: var(--bg-glass);
 		backdrop-filter: blur(24px) saturate(180%);

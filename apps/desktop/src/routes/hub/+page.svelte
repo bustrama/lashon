@@ -6,7 +6,7 @@
 	// milestones add the rest. RTL-native, design tokens only.
 	import { onMount } from 'svelte';
 	import { getCurrentWindow } from '@tauri-apps/api/window';
-	import { emit } from '@tauri-apps/api/event';
+	import { emit, listen } from '@tauri-apps/api/event';
 	import { invoke } from '@tauri-apps/api/core';
 	import { getVersion } from '@tauri-apps/api/app';
 	import { openUrl } from '@tauri-apps/plugin-opener';
@@ -19,6 +19,7 @@
 	import RecipesSection from '$lib/recipes/RecipesSection.svelte';
 	import VoiceCorrectionsSection from '$lib/voice/VoiceCorrectionsSection.svelte';
 	import { FULL_EDITION } from '$lib/edition';
+	import { PLACEMENTS, type Placement } from '$lib/creature/types';
 
 	type Section =
 		| 'general'
@@ -240,6 +241,7 @@
 
 	let section = $state<Section>('general');
 	let language = $state<Lang>('he');
+	let placement = $state<Placement>(DEFAULTS['overlay.placement']);
 	let hotkey = $state('Control+Space');
 	// M8 Command-mode hotkey, configurable from the Shortcuts section.
 	// Initial value is the same default `settings.ts` ships — the live
@@ -400,6 +402,17 @@
 
 	onMount(() => {
 		void getSetting('ui.language').then((lang) => (language = lang));
+		void getSetting('overlay.placement').then((value) => (placement = value));
+		// The Rust shell owns the placement: dragging Ottid to an edge changes
+		// it too, and the shell broadcasts the new value.
+		const unlistenPlacement = listen<{ key: string; value?: Placement }>(
+			'settings:changed',
+			(event) => {
+				if (event.payload.key === 'overlay.placement' && event.payload.value) {
+					placement = event.payload.value;
+				}
+			}
+		);
 		void getSetting('hotkeys.dictation').then((chord) => (hotkey = chord));
 		void getSetting('hotkeys.command').then((chord) => (commandHotkey = chord));
 		void getSetting('hardware.tier').then((value) => {
@@ -447,6 +460,7 @@
 		});
 		return () => {
 			if (unlistenLocalLlm) unlistenLocalLlm();
+			void unlistenPlacement.then((stop) => stop()).catch(() => {});
 		};
 	});
 
@@ -735,6 +749,20 @@
 		void emit('settings:changed', { key: 'ui.language' }).catch(() => {});
 	}
 
+	// Move Ottid. The Rust shell places the window, saves the choice and
+	// broadcasts `settings:changed`, so the tray menu follows too.
+	async function selectPlacement(next: Placement): Promise<void> {
+		if (next === placement) return;
+		const previous = placement;
+		placement = next;
+		try {
+			await invoke('overlay_set_placement', { placement: next });
+		} catch (err) {
+			placement = previous;
+			console.error('hub: overlay_set_placement failed', err);
+		}
+	}
+
 	// Persist a rebound dictation hotkey and tell the tongue window to
 	// re-register it. HotkeyCapture has already validated the chord.
 	async function saveHotkey(accelerator: string): Promise<void> {
@@ -945,6 +973,23 @@
 										onclick={() => void selectLanguage(lang)}
 									>
 										{$t(lang === 'he' ? 'hub.general.langHe' : 'hub.general.langEn')}
+									</button>
+								{/each}
+							</div>
+						</div>
+						<div class="field">
+							<span class="field-label">{$t('hub.general.placement')}</span>
+							<p class="field-hint">{$t('hub.general.placementHint')}</p>
+							<div class="segmented" role="group" aria-label={$t('hub.general.placement')}>
+								{#each PLACEMENTS as option}
+									<button
+										type="button"
+										class="segment"
+										class:selected={placement === option}
+										aria-pressed={placement === option}
+										onclick={() => void selectPlacement(option)}
+									>
+										{$t(`hub.general.placements.${option}`)}
 									</button>
 								{/each}
 							</div>

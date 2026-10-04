@@ -22,6 +22,7 @@ pub mod llm;
 #[cfg(feature = "mcp-server")]
 pub mod mcp;
 pub mod model;
+pub mod overlay;
 pub mod provider;
 #[cfg(feature = "command-mode")]
 pub mod provider_registry;
