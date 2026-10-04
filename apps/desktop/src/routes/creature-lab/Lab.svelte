@@ -29,7 +29,7 @@
 	let pokes: Record<string, number> = $state({});
 	let gazes: Record<string, Gaze | null> = $state({});
 	let stats: Record<string, FrameStats> = $state({});
-	const cells: Record<string, HTMLElement> = {};
+	let cells: Record<string, HTMLElement> = $state({});
 
 	const level = $derived(voice ? speech : fixedLevel);
 	const shown = (state: CreatureState): CreatureState => (replaying ? 'idle' : state);

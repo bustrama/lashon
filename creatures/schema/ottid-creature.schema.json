@@ -49,7 +49,7 @@
     },
     "CreatureName": {
       "additionalProperties": false,
-      "description": "A display name in each UI language. Plain text: no control characters\nand no bidi embedding, override or isolate characters.",
+      "description": "A display name in each UI language. Plain text: no control characters,\nline breaks or invisible characters (Unicode's default-ignorable ones,\nsuch as zero-width spaces, bidi overrides and tag characters). The\nleft-to-right and right-to-left marks are allowed.",
       "properties": {
         "en": {
           "maxLength": 32,
@@ -90,7 +90,7 @@
     },
     "Eyes": {
       "additionalProperties": false,
-      "description": "Two eyes, mirrored about the midline. Positions are from the body's\ncentre, y down.",
+      "description": "Two eyes, mirrored about the midline. Positions are from the body's\ncentre, y down. The engine scales and shifts them as `x-ottid-eye-motion`\nsays, and the lamp must stay clear of them wherever they go.",
       "properties": {
         "colour": {
           "$ref": "#/$defs/EyeColour"
@@ -132,7 +132,13 @@
         "x",
         "y"
       ],
-      "type": "object"
+      "type": "object",
+      "x-ottid-eye-motion": {
+        "gaze_bend": 0.9,
+        "scale_max": 1.25,
+        "shift_x": 0.72,
+        "shift_y": 0.4
+      }
     },
     "Gesture": {
       "description": "The engine's gesture library. Each gesture sets the hands, the lids, the\ngaze and the body's squash; the engine supplies time, voice level and\nplacement. Gestures happen on the outline (the silhouette rule).",
@@ -345,10 +351,10 @@
       "$ref": "#/$defs/Hands"
     },
     "id": {
-      "description": "Stable kebab-case id, `[a-z][a-z0-9-]*`. Also the directory name under\n`creatures/`.",
+      "description": "Stable kebab-case id, `[a-z][a-z0-9-]*`. Also the directory name under\n`creatures/`, so never a device name Windows reserves: `con`, `prn`,\n`aux`, `nul`, `com0`–`com9` or `lpt0`–`lpt9`.",
       "maxLength": 40,
       "minLength": 1,
-      "pattern": "^[a-z][a-z0-9-]*$",
+      "pattern": "^(?!(?:con|prn|aux|nul|com[0-9]|lpt[0-9])$)[a-z][a-z0-9-]*$",
       "type": "string"
     },
     "lamp": {

@@ -1,5 +1,6 @@
 // The creature's body over time: every moving part on a spring, driven by
 // the state's pose. No DOM here, so it runs the same in tests and in the app.
+import { snapSpring, spring, stepSpring, type Spring } from '../../motion/spring';
 import type { CreatureData } from '../data';
 import type { CreatureState, Gaze, Placement } from '../types';
 import {
@@ -17,7 +18,6 @@ import {
 import { GESTURE_LIBRARY, type Impulse } from './gestures';
 import { glow as glowProgram } from './lamp';
 import { cyclePhase, CYCLES, gestureFor } from './pose';
-import { snapSpring, spring, stepSpring, type Spring } from './spring';
 
 /** What the host tells the creature (lib/creature/types.ts, plus `reduced`). */
 export interface SimInput {

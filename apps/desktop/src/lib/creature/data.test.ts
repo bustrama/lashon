@@ -12,6 +12,7 @@ import {
 	EYE_COLOUR_TOKEN,
 	GESTURES
 } from './data';
+import { EYE_MOTION } from './engine/eyes';
 import { lampToken } from './engine/lamp';
 import { CREATURE_TOKENS, parseColour } from './engine/palette';
 
@@ -42,6 +43,23 @@ describe('the creature file mirror', () => {
 		expect(Object.keys(DEFAULT_CREATURE).sort()).toEqual([...schema.required].sort());
 		expect(DEFAULT_CREATURE.schema).toBe(1);
 		for (const state of CREATURE_STATES) expect(GESTURES).toContain(DEFAULT_CREATURE.poses[state]);
+	});
+
+	it('moves the eyes within the limits the validator checks the lamp against', () => {
+		expect({ ...EYE_MOTION }).toEqual(schema.$defs.Eyes['x-ottid-eye-motion']);
+	});
+
+	it('publishes an id pattern that keeps Windows device names out, like the validator', () => {
+		// The id is also the creature's folder name. JSON Schema patterns are
+		// ECMA-262 regular expressions, so tools in TypeScript check with this.
+		const id = new RegExp(schema.properties.id.pattern, 'u');
+		const digits = [...'0123456789'];
+		const reserved = ['con', 'prn', 'aux', 'nul', ...digits.flatMap((d) => [`com${d}`, `lpt${d}`])];
+		for (const name of reserved) expect(id.test(name), name).toBe(false);
+		for (const name of [DEFAULT_CREATURE.id, 'console', 'com', 'com10', 'lpt-1', 'nul-2', 'my-creature-2']) {
+			expect(id.test(name), name).toBe(true);
+		}
+		for (const name of ['Ottid', '9lives', 'a/b', '']) expect(id.test(name), name).toBe(false);
 	});
 });
 

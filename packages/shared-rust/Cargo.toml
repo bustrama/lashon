@@ -157,6 +157,12 @@ serde_yaml_ng = "=0.10.0"
 # drift from the parser; a snapshot test checks the export against the
 # committed `docs/recipes/recipe.schema.json`.
 schemars = "=1.2.1"
+# Unicode's Default_Ignorable_Code_Point property, so the creature validator
+# rejects invisible characters in display names (zero-width spaces, tag
+# characters, fillers) from Unicode's own data rather than a hand-kept list.
+# Already built for `url` → `idna` with the same `compiled_data` feature, so
+# it adds no crate to the build.
+icu_properties = "=2.2.0"
 # M9 Phase 1c — regex tier of the intent cascade. `regex-lite` over the
 # full `regex` crate: ~80 KB vs ~500 KB, and we don't need Unicode
 # character classes (the patterns are anchored literals + `.+?` slots).

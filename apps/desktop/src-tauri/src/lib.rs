@@ -125,11 +125,28 @@ async fn install_wake_model(id: String) -> Result<String, String> {
 
 /// Show the tongue's right-click context menu — the same items as the tray.
 /// Invoked on a `contextmenu` event from the tongue window.
+///
+/// A sync command, so it runs on the main thread and `popup` returns only
+/// once the menu has closed. The item picked reaches `handle_menu_event`
+/// after that, through the event loop.
 #[tauri::command]
 fn show_tongue_menu(window: tauri::Window, menu: tauri::State<'_, Menu<tauri::Wry>>) {
     use tauri::menu::ContextMenu;
+    // The menu brings the overlay to the front (Windows closes a popup on a
+    // click elsewhere only when its owner is in front). Give the front back
+    // to the user's app afterwards, or the next dictation types into the
+    // overlay. An item that opens a window still focuses it: its handler
+    // runs after this.
+    #[cfg(windows)]
+    let previous = ottid_core::overlay::Foreground::remember();
+    #[cfg(windows)]
+    let overlay = window.hwnd().ok().map(|hwnd| hwnd.0 as isize);
     if let Err(err) = menu.popup(window) {
         tracing::warn!("could not show the tongue context menu: {err:#}");
+    }
+    #[cfg(windows)]
+    if let (Some(previous), Some(overlay)) = (previous, overlay) {
+        previous.give_back(overlay);
     }
 }
 
