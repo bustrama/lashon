@@ -433,5 +433,22 @@
 			"name": "Minimal",
 			"desc": "Basic hardware. Local dictation; other capabilities via the cloud."
 		}
+	},
+	"creature": {
+		"states": {
+			"idle": "Ottid ready",
+			"preparing": "Ottid getting ready",
+			"dictation": "Listening — dictation",
+			"command": "Listening — command",
+			"transcribing": "Transcribing",
+			"thinking": "Thinking",
+			"tool": "Working on it",
+			"confirm": "Waiting for your approval",
+			"wake": "Heard the wake word",
+			"error": "Something went wrong",
+			"agent-needs-you": "An agent needs you",
+			"agent-done": "The agent is done"
+		},
+		"wakeArmed": "Listening for the wake word"
 	}
 }

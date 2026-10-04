@@ -1,29 +1,20 @@
 <script lang="ts">
-	// The Tongue is a transparent, frameless, always-on-top overlay — just
-	// the Ottid mark, floating and draggable.
+	// The Tongue is a transparent, frameless, always-on-top overlay — Ottid,
+	// the creature (docs/adr/0040), floating and draggable, with its bubbles
+	// stacked underneath.
 	//
-	// REDESIGN — "המנורה / The Lamp" direction:
-	// - The mark's resting color is the locked peach. State is communicated
-	//   by a soft radial halo + a small supporting glyph in a circle at the
-	//   bottom-left of the mark.
-	// - Armed states (dictation / command / chat) tint the MARK itself to
-	//   the mode hue (saffron / garnet / indigo) for max glance-signal.
-	//   Active "doing" states keep the mark peach and let the halo carry
-	//   the state.
-	// - The glyph is mandatory: reduced-motion users still need to read
-	//   state from a single frame, so motion alone is not a signal.
-	//
-	// State derivation lives here — the parent feeds raw dictation +
-	// command-mode flags and we collapse them to one of 13 tongue states.
-	// Wake-listening and chat are wired but unreachable from current code
-	// (no chat mode yet, wake-active flag not yet plumbed; both light up
-	// the moment the parent passes them).
+	// The parent feeds the raw lifecycle events from the Rust FSM; they
+	// collapse to one of the creature's twelve states (lib/creature/state.ts).
+	// The creature changes pose with the state and its lamp always shows the
+	// state's colour, so a single still frame reads under reduced motion too.
+	// The live region below announces every state; the creature is never
+	// the only signal.
 	import { invoke } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
 	import { t } from '$lib/i18n';
 	import type { DictationState, DictationPartial } from '$lib/dictation';
-	import Mark from '$lib/components/Mark.svelte';
 	import StateGlyph from '$lib/components/StateGlyph.svelte';
+	import { Creature, creatureState, listens, STAGE } from '$lib/creature';
 
 	// Drag + click handling. The trade-off space here:
 	//
@@ -110,90 +101,61 @@
 		onContextMenu?: () => void;
 	} = $props();
 
-	// `chat` is reserved for M9 (chat mode + TTS). Re-add it to this union
-	// and re-add the matching branches in `halo` / `glyph` / `motionClass`
-	// when chat mode ships.
-	type TongueState =
-		| 'idle'
-		| 'prep'
-		| 'dict'
-		| 'cmd'
-		| 'transcribe'
-		| 'think'
-		| 'tool'
-		| 'confirm'
-		| 'wake'
-		| 'error';
+	// The wake word was just heard: the creature's startled "wake" event,
+	// shown briefly over the start of the take it triggers. A render cache of
+	// the `wake:detected` event; the detector itself runs in Rust.
+	const WAKE_MS = 900;
+	let woke = $state(false);
 
-	// State precedence: most urgent → most quiescent. The confirm modal
-	// outranks everything; the tool / thinking phases outrank the listening
-	// phases that produced them; wake-listening only shows when nothing
-	// else is happening.
-	const tongueState: TongueState = $derived.by(() => {
-		if (confirmRequest) return 'confirm';
-		if (commandState === 'tool') return 'tool';
-		if (commandState === 'thinking') return 'think';
-		if (dictationState === 'transcribing') return 'transcribe';
-		if (dictationState === 'capturing') {
-			return takeMode === 'command' ? 'cmd' : 'dict';
-		}
-		if (dictationState === 'preparing') return 'prep';
-		if (dictationState === 'error') return 'error';
-		if (wakeActive) return 'wake';
-		return 'idle';
+	$effect(() => {
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const unlistenPromise = listen('wake:detected', () => {
+			woke = true;
+			clearTimeout(timer);
+			timer = setTimeout(() => (woke = false), WAKE_MS);
+		});
+		return () => {
+			clearTimeout(timer);
+			void unlistenPromise.then((u) => u()).catch(() => {});
+		};
 	});
 
-	// Halo color, intensity, blur, and the radial-gradient fade stop per
-	// state. Idle / wake use the locked peach so the brand identity holds
-	// when nothing's happening; armed listening states use their distinct
-	// mode hue.
-	//
-	// `fade` is the % where the radial gradient hits transparent. SMALLER
-	// values = tighter, more focused glow that fades to clear earlier and
-	// doesn't fill the visible window like a solid color slab. The first
-	// pass had fade=62 across the board which made the saffron halo look
-	// like a solid yellow rectangle when listening — the halo's most-opaque
-	// CENTER was bigger than the visible window.
-	const halo = $derived.by(() => {
-		switch (tongueState) {
-			case 'idle':
-				return { color: 'var(--peach)', intensity: 0, blur: 22, fade: 50 };
-			case 'wake':
-				return { color: 'var(--state-cloud)', intensity: 0.4, blur: 22, fade: 45 };
-			case 'prep':
-				return { color: 'var(--state-cloud)', intensity: 0.32, blur: 22, fade: 50 };
-			case 'dict':
-				return { color: 'var(--saffron)', intensity: 0.55, blur: 28, fade: 38 };
-			case 'cmd':
-				return { color: 'var(--garnet)', intensity: 0.55, blur: 28, fade: 38 };
-			case 'transcribe':
-				return { color: 'var(--saffron)', intensity: 0.32, blur: 22, fade: 45 };
-			case 'think':
-				return { color: 'var(--state-cloud)', intensity: 0.4, blur: 22, fade: 48 };
-			case 'tool':
-				return { color: 'var(--garnet)', intensity: 0.4, blur: 22, fade: 48 };
-			case 'confirm':
-				return { color: 'var(--state-error)', intensity: 0.5, blur: 22, fade: 48 };
-			case 'error':
-				return { color: 'var(--state-error)', intensity: 0.45, blur: 22, fade: 48 };
-		}
-	});
+	const current = $derived(
+		creatureState({
+			dictation: dictationState,
+			takeMode,
+			commandState,
+			confirming: !!confirmRequest,
+			woke
+		})
+	);
+	// The take's mode, for the wake flash's colour.
+	const mode = $derived(takeMode === 'idle' ? null : takeMode);
+	// Listening: the voice level drives the creature.
+	const armed = $derived(listens(current));
 
-	// The MARK is peach by default. Armed listening states tint it to the
-	// mode hue + add a matching drop-shadow so the mark itself carries the
-	// signal alongside the halo. (When M9 adds chat, include 'chat' here.)
-	const armed = $derived(tongueState === 'dict' || tongueState === 'cmd');
-	const markColor = $derived(armed ? halo.color : 'var(--peach)');
-	const markGlow = $derived(armed ? halo.color : null);
+	// The cursor over the creature's body, for its attentive look. The body's
+	// hit element lets clicks fall through to the drag region (see the
+	// styles), so the hover test is geometric.
+	let stageEl: HTMLDivElement | undefined = $state();
+	let hovered = $state(false);
+
+	function onPointerMove(event: PointerEvent): void {
+		const hit = stageEl?.querySelector('[data-interactive="creature"]');
+		if (!hit) return;
+		const r = hit.getBoundingClientRect();
+		const x = (event.clientX - (r.left + r.width / 2)) / (r.width / 2);
+		const y = (event.clientY - (r.top + r.height / 2)) / (r.height / 2);
+		hovered = x * x + y * y <= 1;
+	}
 
 	// ---- Live mic-volume reactivity (armed listening) ----
 	// The Rust capture worker streams `dictation:level` at ~20 Hz: a single
 	// raw RMS scalar per event (no audio content — see security.md). We
 	// peak-normalise so quiet mics and hot mics both fill the 0..1 range,
-	// ease at 60 fps for smooth motion between readings, then publish a
-	// `--live-level` custom property on the mark stage. CSS reads it to
-	// scale the mark + halo + sonar glow in time with the voice — the
-	// "alive and reacts to volume" the old Waveform component delivered.
+	// and ease at 60 fps for smooth motion between readings. The creature
+	// takes it as its `level`: the lamp, the wobble and the pencil follow
+	// the voice.
 	//
 	// Tuning lifted from `Waveform.svelte` (proved across M3/M4 hardware).
 	// `LEVEL_PEAK_FLOOR` keeps room hiss from registering as speech;
@@ -211,8 +173,8 @@
 			return;
 		}
 		// Reduced-motion: don't subscribe, leave level pinned at 0. The
-		// sonar rings are already hidden in that mode and the mark sits in
-		// its armed tint — the ARIA-live region carries "listening".
+		// creature holds its listening pose with a steady lamp, and the
+		// ARIA-live region carries "listening".
 		if (
 			typeof window !== 'undefined' &&
 			window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -298,88 +260,11 @@
 		partialOverflowing = el.scrollHeight > el.clientHeight + 1;
 	});
 
-	type GlyphKind =
-		| 'pen'
-		| 'gear'
-		| 'gear-spin'
-		| 'bubble'
-		| 'dots'
-		| 'orbit'
-		| 'spark'
-		| 'wave'
-		| 'question'
-		| 'antenna'
-		| 'cross'
-		| 'ring';
-
-	// Glyph kind per state (the bottom-left supporting mark).
-	const glyph: { kind: GlyphKind; show: boolean } = $derived.by(() => {
-		switch (tongueState) {
-			case 'idle':
-				return { kind: 'pen', show: false };
-			case 'prep':
-				return { kind: 'ring', show: true };
-			case 'dict':
-				return { kind: 'pen', show: true };
-			case 'cmd':
-				return { kind: 'gear', show: true };
-			case 'transcribe':
-				return { kind: 'dots', show: true };
-			case 'think':
-				return { kind: 'orbit', show: true };
-			case 'tool':
-				return { kind: 'gear-spin', show: true };
-			case 'confirm':
-				return { kind: 'question', show: true };
-			case 'wake':
-				return { kind: 'antenna', show: true };
-			case 'error':
-				return { kind: 'cross', show: true };
-		}
-	});
-
-	// Motion class per state. Reduced-motion disables them all in CSS.
-	const motionClass = $derived.by(() => {
-		switch (tongueState) {
-			case 'idle':
-			case 'wake':
-				return 'tongue-anim-breath-slow';
-			case 'prep':
-			case 'think':
-			case 'tool':
-				return 'tongue-anim-breath-med';
-			case 'dict':
-			case 'cmd':
-				return 'tongue-anim-pulse-fast';
-			case 'transcribe':
-				return 'tongue-anim-shimmer';
-			case 'confirm':
-				return 'tongue-anim-breath-fast';
-			case 'error':
-				return '';
-		}
-	});
-
-	const MARK_SIZE = 96; // overall mark size in px
-
-	// `.mark-stage` is CONSTANT-SIZED across all states (= the max needed
-	// for any decoration the armed sonar can render). Per-state sizing
-	// caused the window to resize on every state transition, and the
-	// recenter logic to compensate for Win32's "keep top-left fixed"
-	// behaviour was never reliable — the mark visibly jumped every
-	// idle ↔ listening ↔ transcribing flip.
-	//
-	// With a constant stage: state changes only affect what's PAINTED
-	// inside the stage (halo, sonar rings, glyph badge appear/disappear).
-	// No reflow → no window resize → no mark jump. Decorations change
-	// around a stationary mark, which is exactly what the user asked
-	// for ("things needs to change around the ottid").
-	//
-	// Budget: armed sonar peaks at scale 2.2 on the 96 px mark = 211 px,
-	// rounded up to 221 for breathing room. ~62 px of transparent buffer
-	// around the mark on each side; click-through (`clickThrough.ts`)
-	// makes the buffer functionally invisible to the user.
-	const STAGE_SIZE = Math.ceil(MARK_SIZE * 2.3);
+	// The stage is CONSTANT-SIZED across all states: per-state sizing resized
+	// the window on every transition and the creature visibly jumped. State
+	// changes only change what the creature paints inside it; the window
+	// grows only when bubbles appear underneath. Its transparent margins are
+	// functionally invisible thanks to click-through (`clickThrough.ts`).
 
 	// Surface visibility — same rules as before, slightly tightened so we
 	// never show two competing slabs at once. The confirm modal pre-empts
@@ -457,13 +342,21 @@
 	}
 </script>
 
+<svelte:window
+	onpointermove={onPointerMove}
+	onpointerout={(e) => {
+		// Left the window altogether.
+		if (!e.relatedTarget) hovered = false;
+	}}
+/>
+
 <!-- `.tongue` is the outer layout wrapper; it is INTENTIONALLY not marked
      `data-interactive` because its transparent padding/gap regions are
      where click-through happens. Only the actually-visible children
-     (mark, halo-emitting bits, bubbles) carry the marker. The
+     (the creature's body, bubbles) carry the marker. The
      `clickThrough.ts` poll bbox-tests against those markers. -->
 <!-- Pre-redesign drag setup, restored: `data-tauri-drag-region` on
-     `.tongue` and `.mark-stage`. Clicks on the visible mark fall
+     `.tongue` and `.mark-stage`. Clicks on the creature fall
      through `pointer-events: none` cascade to `.tongue`, where Tauri's
      native drag handler fires startDragging — native-smooth drag.
      The maximize-on-dblclick side effect is caught by the resize
@@ -474,151 +367,32 @@
 	data-tauri-drag-region
 	data-interactive
 >
-	<!-- ─── The mark + its halo / glyph ─── -->
+	<!-- ─── Ottid ─── -->
+	<!-- The creature fills a fixed stage and marks its body
+	     `data-interactive="creature"` for the click-through poll. Pointer
+	     events fall through to this drag region (see the styles), so the
+	     native drag and the window's dblclick / contextmenu listeners keep
+	     working. -->
 	<div
 		class="mark-stage"
 		data-tauri-drag-region
-		style="width: {STAGE_SIZE}px; height: {STAGE_SIZE}px; --live-level: {liveLevel};"
+		bind:this={stageEl}
+		style="width: {STAGE.width}px; height: {STAGE.height}px;"
 	>
-		<!-- Outer halo — soft radial-gradient blur. Only painted when intensity > 0.
-		     Sized so its FULLY-TRANSPARENT outer edge lands just outside the
-		     visible window: with mark 96 px + 14 px padding, the window is
-		     ~124 px wide, so a 180 px halo with a 38% fade-stop puts the
-		     fade-out band inside the window edges rather than seeing only
-		     the saturated center. -->
-		{#if halo.intensity > 0}
-			<div
-				class="halo {armed
-					? 'halo-live'
-					: tongueState === 'idle'
-						? ''
-						: 'halo-anim-pulse-slow'}"
-				style="
-					--halo-color: {halo.color};
-					--halo-intensity: {halo.intensity};
-					--halo-blur: {halo.blur}px;
-					--halo-size: {MARK_SIZE * (armed ? 1.85 : 1.65)}px;
-					--halo-fade: {halo.fade}%;
-				"
-				aria-hidden="true"
-			></div>
-		{/if}
-
-		<!-- Wake-listening: a faint quiet ring centered on the mark. Positioned
-		     via top/left: 50% + transform translate(-50%, -50%) so the
-		     halo-pulse-slow animation (which embeds the same translate to
-		     keep the .halo element centered) breathes it in place without
-		     offsetting. -->
-		{#if tongueState === 'wake'}
-			<div
-				class="wake-ring halo-anim-pulse-slow"
-				style="--halo-intensity: 0.4;"
-				aria-hidden="true"
-			></div>
-		{/if}
-
-		<!-- Armed listening (dictation / command): three concentric "sonar"
-		     rings emanating outward from the mark, in the mode hue. Staggered
-		     delays (0 / 0.8 / 1.6 s) read as a continuous wave rather than
-		     three synced pulses. Reduced-motion hides them entirely (the
-		     halo + mark scale-pulse still convey state). -->
-		{#if armed}
-			{#each [0, 0.8, 1.6] as delay (delay)}
-				<!-- Border-color intensity + box-shadow glow track `--live-level`
-				     so each sonar ping "blooms" with the voice while the ambient
-				     keyframe keeps the scale/opacity sweep going (so the user can
-				     still see they're armed in silence). border-color and
-				     box-shadow are NOT animated by the keyframe, so they layer
-				     cleanly on top — the keyframe only touches transform + opacity. -->
-				<div
-					class="sonar-ring"
-					style="
-						width: {MARK_SIZE}px;
-						height: {MARK_SIZE}px;
-						border: 1.5px solid color-mix(in srgb, {halo.color} calc(40% + var(--live-level, 0) * 60%), transparent);
-						animation-delay: {delay}s;
-						box-shadow: 0 0 calc(8px + var(--live-level, 0) * 18px) color-mix(in srgb, {halo.color} calc(30% + var(--live-level, 0) * 50%), transparent);
-					"
-					aria-hidden="true"
-				></div>
-			{/each}
-		{/if}
-
-		<!-- Inner 96×96 wrapper for the mark + its tight decorations
-		     (state-ring, prep-ring, glyph-badge). The OUTER `.mark-stage`
-		     may be much larger than the mark (to accommodate halo/sonar
-		     overflow), but these decorations need to sit at the MARK's
-		     corner, not the stage's corner. -->
-		<div class="mark-and-badge">
-			<!-- Preparing: a progress ring around the mark. -->
-			{#if tongueState === 'prep'}
-				<svg
-					class="prep-ring"
-					width={MARK_SIZE + 24}
-					height={MARK_SIZE + 24}
-					viewBox="0 0 {MARK_SIZE + 24} {MARK_SIZE + 24}"
-					aria-hidden="true"
-				>
-					<circle
-						cx={(MARK_SIZE + 24) / 2}
-						cy={(MARK_SIZE + 24) / 2}
-						r={MARK_SIZE / 2 + 6}
-						stroke="var(--peach)"
-						stroke-width="1"
-						fill="none"
-						opacity="0.18"
-					/>
-					<circle
-						cx={(MARK_SIZE + 24) / 2}
-						cy={(MARK_SIZE + 24) / 2}
-						r={MARK_SIZE / 2 + 6}
-						stroke="var(--saffron)"
-						stroke-width="2"
-						fill="none"
-						stroke-dasharray="{(MARK_SIZE / 2 + 6) * 2 * Math.PI * 0.42} {(MARK_SIZE / 2 +
-							6) *
-							2 *
-							Math.PI}"
-						stroke-linecap="round"
-						transform="rotate(-90 {(MARK_SIZE + 24) / 2} {(MARK_SIZE + 24) / 2})"
-					/>
-				</svg>
-			{/if}
-			<!-- Confirm / Error: solid ring around the mark for
-			     non-motion legibility. -->
-			{#if tongueState === 'confirm' || tongueState === 'error'}
-				<div
-					class="state-ring"
-					style="--ring-color: {halo.color}"
-					aria-hidden="true"
-				></div>
-			{/if}
-
-			<!-- The mark itself. Tinted to mode hue when armed; peach otherwise.
-			     `pointer-events: none` lets clicks fall through to the
-			     ancestor `.tongue` (which carries `data-tauri-drag-region`),
-			     so the native Tauri drag handler runs AND the click events
-			     still bubble up to the window's dblclick / contextmenu
-			     listeners in +page.svelte. -->
-			<div class="mark-anim {armed ? 'mark-anim-live' : motionClass}">
-				<Mark size={MARK_SIZE} color={markColor} glow={markGlow} />
-			</div>
-
-			<!-- Supporting glyph — small circle at bottom-left (RTL-friendly). -->
-			{#if glyph.show}
-				<div
-					class="glyph-badge"
-					style="--badge-ring: {halo.color}"
-					aria-hidden="true"
-					data-interactive
-				>
-					<StateGlyph kind={glyph.kind} color={halo.color} />
-				</div>
-			{/if}
-		</div>
+		<Creature
+			state={current}
+			placement="float"
+			gaze={null}
+			level={liveLevel}
+			wakeArmed={wakeActive}
+			dragging={false}
+			{hovered}
+			pokes={0}
+			{mode}
+		/>
 	</div>
 
-	<!-- ─── Ephemeral surfaces. Stacked under the mark. ─── -->
+	<!-- ─── Ephemeral surfaces. Stacked under the creature. ─── -->
 
 	<!-- Live dictation partials (docs/adr/0035). Committed words render solid,
 	     the provisional tail muted; `dir="auto"` keeps Hebrew RTL and isolates
@@ -777,9 +551,11 @@
 		</div>
 	{/if}
 
-	<!-- Accessibility — sr-only announces every lifecycle change. -->
+	<!-- Accessibility — sr-only announces every state change. -->
 	<span class="sr-only" aria-live="polite" aria-atomic="true"
-		>{$t(`tongue.${dictationState}`)}</span
+		>{current === 'idle' && wakeActive
+			? $t('creature.wakeArmed')
+			: $t(`creature.states.${current}`)}</span
 	>
 	<!-- Committed dictation text, announced politely as it settles. Only the
 	     stable (committed) words are voiced — never the provisional tail — so a
@@ -803,152 +579,20 @@
 		min-width: 0;
 	}
 
-	/* ─── Mark stage ─── */
-	/* `.mark-stage` is sized dynamically (via inline style from the
-	   `stageSize` derivation) to contain every absolutely-positioned
-	   decoration the current state renders — halo, sonar rings, wake
-	   ring — without clipping at the window edge. The mark + badge live
-	   in an inner 96×96 `.mark-and-badge` wrapper centered via flex, so
-	   the badge always sits at the MARK's corner regardless of how big
-	   the surrounding stage gets. */
+	/* ─── Creature stage ─── */
+	/* A fixed stage the creature fills (lib/creature/types.ts, STAGE). */
 	.mark-stage {
 		position: relative;
-		display: flex;
-		align-items: center;
-		justify-content: center;
 		/* The transparent corners of the stage MUST pass clicks to whatever's
 		   underneath. The +page-level click-through plumbing relies on this. */
 		pointer-events: none;
 	}
-	.mark-and-badge {
-		position: relative;
-		width: 96px;
-		height: 96px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		/* The mark IS the visible content here; corners pass clicks through
-		   so the click-through poll's bbox check on .mark-anim still
-		   covers exactly the mark, not this wrapper. */
+	/* The body's hit area still marks the click-through region, but clicks
+	   on it fall through to the ancestor .tongue, which carries
+	   `data-tauri-drag-region` for the native drag and is where dblclick /
+	   contextmenu bubble up from. */
+	.mark-stage :global([data-interactive='creature']) {
 		pointer-events: none;
-	}
-
-	.halo {
-		position: absolute;
-		top: 50%;
-		left: 50%;
-		width: var(--halo-size);
-		height: var(--halo-size);
-		transform: translate(-50%, -50%);
-		border-radius: 50%;
-		/* `--halo-fade` is the stop at which the gradient hits transparent.
-		   Smaller = tighter, more focused glow. Lower values stop the
-		   halo from filling the visible window like a solid color slab. */
-		background: radial-gradient(
-			circle,
-			var(--halo-color) 0%,
-			transparent var(--halo-fade, 50%)
-		);
-		opacity: var(--halo-intensity);
-		filter: blur(var(--halo-blur));
-		pointer-events: none;
-	}
-
-	/* Wake-listening — a faint quiet cloud-toned ring centered on the
-	   mark. Cloud (steel grey) reads as PASSIVE; the brand peach is
-	   reserved for the mark itself. Positioned via top/left: 50% +
-	   transform translate(-50%, -50%) so it matches the .halo element's
-	   anchor and the halo-pulse-slow animation breathes it without
-	   offsetting (the keyframes embed the same translate). */
-	.wake-ring {
-		position: absolute;
-		top: 50%;
-		left: 50%;
-		width: 116px; /* MARK_SIZE + 20 */
-		height: 116px;
-		transform: translate(-50%, -50%);
-		border-radius: 50%;
-		border: 1px solid var(--state-cloud);
-		opacity: 0.4;
-		pointer-events: none;
-	}
-
-	/* Sonar rings — three concentric rings expanding outward from the
-	   mark during armed listening. Each starts small + opaque and grows
-	   to ~2.2× while fading to clear, like sonar pings. Staggered delays
-	   on each instance produce a continuous wave.
-
-	   `animation-fill-mode: backwards` is critical: without it, rings 2
-	   and 3 (delays 0.8s / 1.6s) show their NORMAL CSS state during the
-	   delay — without the keyframe's `translate(-50%, -50%)`, so they sit
-	   with their top-left corner at stage center, extending into the
-	   lower-right quadrant for up to 1.6 s before animating in. Adding
-	   matching initial `transform` + `opacity` belt-and-braces it against
-	   any frame where the animation registration hasn't taken effect. */
-	.sonar-ring {
-		position: absolute;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%) scale(0.6);
-		opacity: 0.55;
-		border-radius: 50%;
-		pointer-events: none;
-		animation: tongue-sonar 2.4s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
-		animation-fill-mode: backwards;
-	}
-	@keyframes tongue-sonar {
-		0% {
-			transform: translate(-50%, -50%) scale(0.6);
-			opacity: 0.55;
-		}
-		80% {
-			opacity: 0;
-		}
-		100% {
-			transform: translate(-50%, -50%) scale(2.2);
-			opacity: 0;
-		}
-	}
-
-	.prep-ring {
-		position: absolute;
-		top: -12px;
-		left: -12px;
-		pointer-events: none;
-	}
-
-	.state-ring {
-		position: absolute;
-		inset: -8px;
-		border-radius: 50%;
-		border: 2px solid var(--ring-color);
-		box-shadow: 0 0 0 1px var(--ink);
-		pointer-events: none;
-	}
-
-	.mark-anim {
-		position: relative;
-		display: inline-block;
-		transform-origin: center;
-		/* Clicks on the visible mark fall through to the ancestor .tongue
-		   (which carries `data-tauri-drag-region` for drag and is where
-		   the click events bubble up from for dblclick / contextmenu). */
-		pointer-events: none;
-	}
-
-	.glyph-badge {
-		position: absolute;
-		bottom: -2px;
-		inset-inline-start: -2px;
-		width: 22px;
-		height: 22px;
-		border-radius: 50%;
-		background: var(--ink);
-		box-shadow: 0 0 0 1.5px var(--badge-ring);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		pointer-events: auto;
 	}
 
 	/* ─── Bubble surfaces ─── */
@@ -1314,127 +958,11 @@
 	}
 
 	/* ─── Keyframes ─── */
-	.tongue-anim-breath-slow {
-		animation: tongue-breath-slow 5.5s ease-in-out infinite;
-	}
-	.tongue-anim-breath-med {
-		animation: tongue-breath-med 2.4s ease-in-out infinite;
-	}
-	.tongue-anim-breath-fast {
-		animation: tongue-breath-fast 0.95s ease-in-out infinite;
-	}
-	.tongue-anim-pulse-fast {
-		animation: tongue-pulse-fast 1.1s ease-in-out infinite;
-	}
-	.tongue-anim-shimmer {
-		animation: tongue-shimmer 1.6s linear infinite;
-	}
-
-	/* Level-driven mark motion (armed listening). Replaces the time-based
-	   pulse-fast keyframe for `dict`/`cmd` — the mark physically scales up
-	   with voice loudness instead of breathing on a fixed cadence. Silence
-	   = rest size; loud peak ≈ +14%. The brightness bump adds a glance-
-	   visible "warm-up" without changing the mark's tinted color.
-	   Transition matches one rAF frame (≈33 ms at 60 fps) so the motion
-	   stays in sync with the JS easing without double-smoothing too hard. */
-	.mark-anim-live {
-		transform: scale(calc(1 + var(--live-level, 0) * 0.14));
-		filter: brightness(calc(1 + var(--live-level, 0) * 0.18));
-		transition:
-			transform 33ms linear,
-			filter 33ms linear;
-	}
-
-	/* Level-driven halo (armed listening). Replaces halo-anim-pulse for
-	   `dict`/`cmd`. Opacity gets a +0.3 boost at peak voice; scale gets
-	   +35%. Keeps the static `.halo`'s centering translate so the halo
-	   stays anchored on the mark while it inflates with the voice. */
-	.halo.halo-live {
-		opacity: calc(var(--halo-intensity, 0.55) + var(--live-level, 0) * 0.3);
-		transform: translate(-50%, -50%) scale(calc(1 + var(--live-level, 0) * 0.35));
-		transition:
-			opacity 33ms linear,
-			transform 33ms linear;
-	}
-
-	.halo-anim-pulse {
-		animation: halo-pulse 1.4s ease-in-out infinite;
-	}
-	.halo-anim-pulse-slow {
-		animation: halo-pulse 3.5s ease-in-out infinite;
-	}
 	.orbit-spin {
 		animation: tongue-orbit 6s linear infinite;
 		transform-origin: center;
 	}
 
-	@keyframes tongue-breath-slow {
-		0%,
-		100% {
-			transform: scale(1);
-		}
-		50% {
-			transform: scale(1.04);
-		}
-	}
-	@keyframes tongue-breath-med {
-		0%,
-		100% {
-			transform: scale(1);
-		}
-		50% {
-			transform: scale(1.06);
-		}
-	}
-	@keyframes tongue-breath-fast {
-		0%,
-		100% {
-			transform: scale(1);
-		}
-		50% {
-			transform: scale(1.09);
-		}
-	}
-	/* Listening pulse — combines a visible scale-up with a brightness
-	   pulse. The previous opacity-only pulse (1 → 0.78) was barely
-	   perceptible behind a 38px-blur halo and gave the impression that
-	   nothing was moving even though the take was live. */
-	@keyframes tongue-pulse-fast {
-		0%,
-		100% {
-			transform: scale(1);
-			filter: brightness(1);
-		}
-		50% {
-			transform: scale(1.08);
-			filter: brightness(1.15);
-		}
-	}
-	@keyframes tongue-shimmer {
-		0% {
-			filter: brightness(1);
-		}
-		50% {
-			filter: brightness(1.2);
-		}
-		100% {
-			filter: brightness(1);
-		}
-	}
-	/* Halo pulse — breathes outward + intensifies. Bigger swing than the
-	   first pass (1 → 1.25 scale, +0.25 opacity) so the listening state is
-	   unambiguously animated, even behind a heavy blur. */
-	@keyframes halo-pulse {
-		0%,
-		100% {
-			opacity: var(--halo-intensity, 0.55);
-			transform: translate(-50%, -50%) scale(1);
-		}
-		50% {
-			opacity: calc(var(--halo-intensity, 0.55) + 0.25);
-			transform: translate(-50%, -50%) scale(1.25);
-		}
-	}
 	@keyframes tongue-orbit {
 		0% {
 			transform: rotate(0);
@@ -1464,24 +992,10 @@
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.tongue-anim-breath-slow,
-		.tongue-anim-breath-med,
-		.tongue-anim-breath-fast,
-		.tongue-anim-pulse-fast,
-		.tongue-anim-shimmer,
-		.halo-anim-pulse,
-		.halo-anim-pulse-slow,
 		.orbit-spin,
 		.bubble-wave > span,
 		.bubble {
 			animation: none;
-		}
-		/* Sonar rings get hidden, not just paused — the halo + mark
-		   scale-pulse still convey state, and a frozen ring frame would
-		   look like dead UI. */
-		.sonar-ring {
-			animation: none;
-			opacity: 0 !important;
 		}
 	}
 
