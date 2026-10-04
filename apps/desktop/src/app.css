@@ -117,6 +117,23 @@
 	--state-error: #e8625a;    /* "rose" in the design system */
 	--state-cloud: #7a8590;    /* cool steel — distinct from the warm peach */
 
+	/* — The creature (docs/adr/0040). Charcoal in both OS themes: a creature
+	     is not a surface and has to read on any wallpaper. The lamp and halo
+	     take the state tokens above; the engine reads these as numbers. — */
+	--creature-charcoal: #14181c;
+	--creature-rim-dark: rgba(247, 200, 163, 0.3);   /* peach hairline on dark */
+	--creature-rim-light: rgba(255, 255, 255, 0.1);  /* white hairline on light */
+	--creature-shadow: rgba(10, 14, 18, 0.3);        /* drop shadow on light */
+	--creature-rain-head: #d7e6ff;                    /* command rain's lead glyph */
+	/* Dictation's notepad and pencil (the pencil's body is --saffron). */
+	--prop-paper: #efe7da;
+	--prop-binding: #2a3036;
+	--prop-ring: #8a939c;
+	--prop-ink: rgba(38, 42, 48, 0.85);
+	--prop-lead: #3a2f22;
+	--prop-eraser: #e89a8a;
+	--prop-shadow: rgba(0, 0, 0, 0.35);
+
 	/* — Legacy aliases. Kept so the Hub + Tutorial windows (not part of
 	     this redesign PR) compile without touching every file. Map onto
 	     the new palette so the Lamp tones bleed through everywhere. — */
