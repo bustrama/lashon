@@ -8,6 +8,8 @@
 //! capture, transcription, and text injection to the ottid-core crate.
 
 #[cfg(feature = "command-mode")]
+mod approval;
+#[cfg(feature = "command-mode")]
 mod command_mode;
 mod dictation;
 #[cfg(feature = "command-mode")]
@@ -262,7 +264,8 @@ pub fn run() {
     #[cfg(feature = "command-mode")]
     let builder = builder
         .manage(LlamaServerState::default())
-        .manage(command_mode::ActiveDispatch::default());
+        .manage(command_mode::ActiveDispatch::default())
+        .manage(approval::Approvals::default());
 
     builder
         // Menu selections from the tongue's right-click context menu arrive
@@ -300,6 +303,14 @@ pub fn run() {
             command_mode::command_mode_dispatch_text,
             #[cfg(feature = "command-mode")]
             command_mode::cancel_command,
+            #[cfg(feature = "command-mode")]
+            approval::approval_current,
+            #[cfg(feature = "command-mode")]
+            approval::approval_armed,
+            #[cfg(feature = "command-mode")]
+            approval::approval_answer,
+            #[cfg(all(feature = "command-mode", debug_assertions))]
+            approval::approval_preview,
             #[cfg(feature = "command-mode")]
             llm::get_llm_providers,
             #[cfg(feature = "command-mode")]
@@ -585,8 +596,15 @@ fn handle_menu_event(app: &tauri::AppHandle, id: &str) {
         return;
     }
     match id {
-        "show" => focus_main_window(app),
+        "show" => {
+            // The user's choice outlasts an approval card that showed Ottid.
+            #[cfg(feature = "command-mode")]
+            approval::forget_reveal(app);
+            focus_main_window(app)
+        }
         "hide" => {
+            #[cfg(feature = "command-mode")]
+            approval::forget_reveal(app);
             if let Some(window) = app.get_webview_window(overlay::WINDOW) {
                 let _ = window.hide();
             }

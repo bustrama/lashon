@@ -13,15 +13,14 @@
 	import type { CommandState, TakeMode } from '$lib/creature';
 	import StateGlyph from '$lib/components/StateGlyph.svelte';
 	import { CLOSE_EASING, CLOSE_MS, prefersReducedMotion, springEasing } from '$lib/motion/spring';
+	import ApprovalCardView from './ApprovalCard.svelte';
+	import {
+		announcement,
+		type ApprovalCard,
+		type ApprovalDecision,
+		type ApprovalNudge
+	} from './approval';
 	import type { IslandSide } from './frame';
-
-	type ConfirmRequest = {
-		id: string;
-		tool: string;
-		args_preview: string;
-		command_preview?: string;
-		cwd_preview?: string;
-	};
 
 	let {
 		side,
@@ -34,9 +33,10 @@
 		commandTranscript,
 		commandCancellable,
 		commandFlash,
-		confirmRequest,
-		onAllow,
-		onDeny,
+		approval,
+		approvalNudge,
+		onApprovalArmed,
+		onApprovalAnswer,
 		onCancel,
 		extra
 	}: {
@@ -51,9 +51,12 @@
 		commandTranscript: string | null;
 		commandCancellable: boolean;
 		commandFlash: string | null;
-		confirmRequest: ConfirmRequest | null;
-		onAllow: () => void;
-		onDeny: () => void;
+		/** The request the approval broker shows (docs/adr/0048). */
+		approval: ApprovalCard | null;
+		/** The latest early press of the Allow hotkey. */
+		approvalNudge: ApprovalNudge | null;
+		onApprovalArmed: (id: number) => void;
+		onApprovalAnswer: (id: number, decision: ApprovalDecision) => void;
 		onCancel: () => void;
 		/** Another card to show (the debug surface). */
 		extra?: Snippet;
@@ -62,11 +65,10 @@
 	// One card at a time per kind, in a fixed precedence: the approval card
 	// pre-empts everything, the transcript (it carries Cancel) pre-empts the
 	// progress line, and the live text only shows during a dictation take.
-	const showConfirm = $derived(!!confirmRequest);
-	const showFlash = $derived(!!commandFlash && !confirmRequest);
-	const showTranscript = $derived(!!commandTranscript && !commandFlash && !confirmRequest);
+	const showFlash = $derived(!!commandFlash && !approval);
+	const showTranscript = $derived(!!commandTranscript && !commandFlash && !approval);
 	const showProgress = $derived(
-		commandState !== 'idle' && !commandFlash && !confirmRequest && !showTranscript
+		commandState !== 'idle' && !commandFlash && !approval && !showTranscript
 	);
 	const hasPartialText = $derived(
 		!!partial && (partial.committed.length > 0 || partial.provisional.length > 0)
@@ -76,7 +78,7 @@
 			takeMode !== 'command' &&
 			commandState === 'idle' &&
 			!commandFlash &&
-			!confirmRequest
+			!approval
 	);
 
 	const progressLabel = $derived(
@@ -116,6 +118,45 @@
 		partialOverflowing = el.scrollHeight > el.clientHeight + 1;
 	});
 
+	// ---- Approval ----
+	// The overlay never has focus, so a screen reader meets the card through
+	// live regions: the assertive one reads the whole request once, when it
+	// is shown; the polite one says why Allow isn't taken yet. Each is
+	// emptied first, so the same words twice are still announced.
+	let approvalAnnounced = $state('');
+	let approvalSaid = $state('');
+	let announcedId: number | null = null;
+	let announceTimer: ReturnType<typeof setTimeout> | undefined;
+	let sayTimer: ReturnType<typeof setTimeout> | undefined;
+	$effect(() => {
+		const card = approval;
+		const id = card?.id ?? null;
+		if (id === announcedId) return;
+		announcedId = id;
+		clearTimeout(announceTimer);
+		approvalAnnounced = '';
+		if (card) {
+			const text = announcement(card, $t);
+			announceTimer = setTimeout(() => (approvalAnnounced = text), 60);
+		}
+	});
+	function say(text: string): void {
+		clearTimeout(sayTimer);
+		approvalSaid = '';
+		sayTimer = setTimeout(() => (approvalSaid = text), 60);
+	}
+	$effect(() => () => {
+		clearTimeout(announceTimer);
+		clearTimeout(sayTimer);
+	});
+
+	// The card has finished opening; Allow's arm delay counts from here.
+	let approvalSettled = $state(false);
+	$effect(() => {
+		if (!approval) approvalSettled = false;
+		else if (prefersReducedMotion()) approvalSettled = true;
+	});
+
 	// ---- Open and close ----
 	// Cards spring open toward the user and close on an eased curve with no
 	// overshoot. Reduced motion shows and hides them at once.
@@ -151,52 +192,25 @@
 		</div>
 	{/if}
 
-	{#if showConfirm && confirmRequest}
+	{#if approval}
+		<!-- The next request in the queue swaps in place: the card opens once. -->
 		<div
-			class="confirm-card"
-			role="alertdialog"
-			aria-live="assertive"
+			class="card-approval"
 			data-interactive="island"
 			in:cardIn
 			out:cardOut
+			onintroend={() => (approvalSettled = true)}
 		>
-			<div class="confirm-header">
-				<span class="confirm-dot" aria-hidden="true"></span>
-				<span class="confirm-eyebrow he-sans">{$t('command.confirm.requires') || 'דורש אישור'}</span>
-			</div>
-			<div class="confirm-question he">
-				{$t('command.confirm.question').replace('{tool}', '')}
-				<span class="confirm-tool mono">{confirmRequest.tool}</span>?
-			</div>
-			{#if confirmRequest.command_preview}
-				<!-- `run_command`: the literal command and cwd, untruncated. The
-				     user must be able to read every character before approving a
-				     shell call (docs/stories/m8-os-tools.md). -->
-				<div class="confirm-command mono" dir="ltr">
-					<div class="confirm-command-label">$</div>
-					<pre class="confirm-command-body">{confirmRequest.command_preview}</pre>
-				</div>
-				{#if confirmRequest.cwd_preview}
-					<div class="confirm-cwd mono" dir="ltr">
-						<span class="confirm-cwd-label he-sans">{$t('command.confirm.cwd') || 'cwd'}:</span>
-						<code>{confirmRequest.cwd_preview}</code>
-					</div>
-				{/if}
-			{:else if confirmRequest.args_preview && confirmRequest.args_preview !== '{}'}
-				<div class="confirm-args mono" dir="ltr">
-					{confirmRequest.args_preview.length > 240
-						? confirmRequest.args_preview.slice(0, 240) + '…'
-						: confirmRequest.args_preview}
-				</div>
-			{/if}
-			<div class="confirm-actions">
-				<button type="button" class="confirm-allow he-sans" onclick={onAllow}>
-					{$t('command.confirm.allow')}
-				</button>
-				<button type="button" class="confirm-deny he-sans" onclick={onDeny}>
-					{$t('command.confirm.deny')}
-				</button>
-			</div>
+			{#key approval.id}
+				<ApprovalCardView
+					card={approval}
+					settled={approvalSettled}
+					nudge={approvalNudge}
+					onArmed={onApprovalArmed}
+					onAnswer={onApprovalAnswer}
+					onSay={say}
+				/>
+			{/key}
 		</div>
 	{/if}
 
@@ -307,6 +321,11 @@
 	{#if showPartial && partial?.committed}
 		<span class="sr-only" aria-live="polite" aria-atomic="true">{partial.committed}</span>
 	{/if}
+
+	<!-- Always mounted: a live region that appears together with its text
+	     is often not read. -->
+	<span class="sr-only" aria-live="assertive" aria-atomic="true">{approvalAnnounced}</span>
+	<span class="sr-only" aria-live="polite" aria-atomic="true">{approvalSaid}</span>
 </div>
 
 <style>
@@ -498,147 +517,11 @@
 	}
 
 	/* ─── Approval card ─── */
-	.confirm-card {
-		width: 340px;
+	.card-approval {
+		display: flex;
+		min-height: 0;
 		max-height: var(--island-max-h, none);
-		overflow: auto;
-		box-sizing: border-box;
-		padding: 16px;
-		border-radius: 16px;
-		background: rgba(11, 18, 22, 0.85);
-		backdrop-filter: blur(28px) saturate(120%);
-		-webkit-backdrop-filter: blur(28px) saturate(120%);
-		color: var(--ink-text);
-		direction: rtl;
-		font-family: var(--font-he-sans);
 		pointer-events: auto;
-		box-shadow:
-			0 12px 40px rgba(0, 0, 0, 0.4),
-			0 0 0 1px rgba(221, 228, 233, 0.1),
-			0 0 0 1.5px color-mix(in srgb, var(--state-error) 33%, transparent),
-			0 0 32px color-mix(in srgb, var(--state-error) 20%, transparent);
-	}
-	.confirm-header {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		margin-bottom: 10px;
-	}
-	.confirm-dot {
-		width: 6px;
-		height: 6px;
-		border-radius: 999px;
-		background: var(--state-error);
-		flex: 0 0 auto;
-	}
-	.confirm-eyebrow {
-		font-size: 11px;
-		color: var(--state-error);
-		font-weight: 700;
-		letter-spacing: 1px;
-		text-transform: uppercase;
-	}
-	.confirm-question {
-		font-family: var(--font-he-display);
-		font-size: 18px;
-		font-weight: 500;
-		line-height: 1.4;
-		margin-bottom: 6px;
-	}
-	.confirm-tool {
-		color: var(--garnet);
-		font-family: var(--font-mono);
-		font-size: 15px;
-	}
-	.confirm-command {
-		background: rgba(0, 0, 0, 0.45);
-		padding: 10px 12px;
-		border-radius: 8px;
-		margin-bottom: 8px;
-		display: flex;
-		gap: 8px;
-		align-items: flex-start;
-		max-height: 180px;
-		overflow: auto;
-	}
-	.confirm-command-label {
-		color: var(--state-error);
-		font-weight: 700;
-		flex: 0 0 auto;
-		opacity: 0.85;
-	}
-	.confirm-command-body {
-		margin: 0;
-		font-family: var(--font-mono);
-		font-size: 13px;
-		line-height: 1.45;
-		color: var(--ink-text);
-		white-space: pre-wrap;
-		word-break: break-all;
-	}
-	.confirm-cwd {
-		display: flex;
-		gap: 6px;
-		align-items: baseline;
-		font-size: 11px;
-		color: var(--ink-faint);
-		margin-bottom: 8px;
-	}
-	.confirm-cwd-label {
-		color: var(--ink-text);
-		opacity: 0.65;
-	}
-	.confirm-args {
-		background: rgba(0, 0, 0, 0.35);
-		padding: 8px 10px;
-		border-radius: 8px;
-		font-size: 11.5px;
-		color: var(--ink-mute);
-		text-align: left;
-		margin: 0 0 14px;
-		box-shadow: inset 0 0 0 1px var(--ink-line);
-		white-space: pre-wrap;
-		word-break: break-all;
-		max-height: 96px;
-		overflow: auto;
-	}
-	.confirm-actions {
-		display: flex;
-		gap: 8px;
-	}
-	.confirm-allow,
-	.confirm-deny {
-		flex: 1;
-		padding: 10px 12px;
-		border-radius: 9px;
-		font-family: var(--font-he-sans);
-		font-weight: 700;
-		font-size: 14px;
-		cursor: pointer;
-	}
-	.confirm-allow {
-		background: var(--state-error);
-		color: #fff;
-		border: none;
-		box-shadow: 0 1px 0 rgba(255, 255, 255, 0.15) inset;
-	}
-	.confirm-allow:hover {
-		filter: brightness(1.08);
-	}
-	.confirm-deny {
-		background: transparent;
-		color: var(--ink-text);
-		border: 1px solid var(--ink-line-2);
-		font-weight: 600;
-	}
-	.confirm-deny:hover {
-		background: rgba(255, 255, 255, 0.04);
-		border-color: rgba(221, 228, 233, 0.3);
-	}
-	.confirm-allow:focus-visible,
-	.confirm-deny:focus-visible {
-		outline: 3px solid var(--garnet);
-		outline-offset: 2px;
 	}
 
 	:global(.he-sans) {
