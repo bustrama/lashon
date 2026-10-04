@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ottid · puddle</title>
+<style>
+:root{--bg:#0e1216;--card:#151b21;--line:rgba(221,228,233,.12);--text:#dde4e9;--mute:rgba(221,228,233,.62);--peach:#f7c8a3}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Heebo,'Segoe UI',system-ui,sans-serif;padding:20px 16px 40px}
+h1{font-size:20px;font-weight:600;margin:0 0 4px}
+.sub{color:var(--mute);font-size:14px;margin:0 0 14px;line-height:1.55;max-width:920px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.lbl{color:var(--mute);font-size:13px;min-width:52px}
+button{background:transparent;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font:inherit;font-size:14px;cursor:pointer}
+button.on{border-color:var(--peach);color:var(--peach)}
+.stages{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;margin-top:12px}
+canvas{width:100%;height:260px;display:block;border-radius:12px;border:1px solid var(--line);cursor:pointer}
+.cap{font-size:12px;color:var(--mute);text-align:center;margin-top:4px}
+</style>
+</head>
+<body>
+<h1>Ottid · שלולית עם ידיים</h1>
+<p class="sub">גוף אחד ושתי ידיים מבצק, בלי שום תוספת. על שורת המשימות הידיים נשענות על הרצפה. כשהוא צף הוא חותר בעדינות. מהתקרה הוא תלוי בשתי הידיים ומתנדנד. כשמדברים הקו של הגוף רוטט, ולפעמים הוא מנפנף לשלום לבד. לחיצה עליו היא ליטוף.</p>
+<div class="bar"><span class="lbl">איפה</span><button data-m="task" class="on">על שורת המשימות</button><button data-m="float">צף</button><button data-m="hang">מהתקרה</button></div>
+<div class="bar" id="states"><span class="lbl">מצב</span></div>
+<div class="bar"><span class="lbl">נסה</span><button id="bWave">נפנוף</button></div>
+<div class="stages">
+  <div><canvas id="cDark"></canvas><div class="cap">Windows כהה · ×2 ובגודל אמיתי (1:1)</div></div>
+  <div><canvas id="cLight"></canvas><div class="cap">Windows בהיר · ×2 ובגודל אמיתי (1:1)</div></div>
+</div>
+
+<script>
+const BEZ = 7, TASK = 26, R = 22, RX = 29, RY = 20.2, FLAT = 11, EYE_Y = -1.3, CORE_Y = 5.5;
+const BODY = [20, 24, 28], PEACH = '247,200,163';
+const STATES = {
+  idle:   { rgb: PEACH,         label: 'מנוחה' },
+  dict:   { rgb: '232,177,74',  label: 'הכתבה', level: true },
+  cmd:    { rgb: '77,141,240',  label: 'פקודה', level: true },
+  think:  { rgb: '122,133,144', label: 'חושב' },
+  claude: { rgb: '63,203,192',  label: 'Claude צריך אותך' },
+};
+let MODE = 'task', STATE = 'idle', NOW = 0, mouse = null, mouseT = 0;
+
+function spring(x, r, d) { return { x, v: 0, t: x, w: 2 * Math.PI / r, z: d }; }
+function step(s, dt) { const n = Math.max(1, Math.ceil(dt * 240)), h = dt / n; for (let i = 0; i < n; i++) { const a = -s.w * s.w * (s.x - s.t) - 2 * s.z * s.w * s.v; s.v += a * h; s.x += s.v * h; } }
+function mic(T) { return Math.max(0, Math.min(1, .55 * Math.sin(T * 8.3) + .35 * Math.sin(T * 3.1 + 1) + .2 * Math.sin(T * 13.7) + .15)); }
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+function smin(a, b, k) { const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.min(a, b) - h * h * k * .25; }
+function smax(a, b, k) { return -smin(-a, -b, k); }
+function capsule(px, py, ax, ay, bx, by, r) { const pax = px - ax, pay = py - ay, bax = bx - ax, bay = by - ay, l = bax * bax + bay * bay, h = l > 1e-6 ? clamp((pax * bax + pay * bay) / l, 0, 1) : 0; return Math.hypot(pax - bax * h, pay - bay * h) - r; }
+
+function withLids(g, px, py, rw, rh, side, lt, tilt, lb, draw) {
+  const top = py - rh, full = rh * 2, X = rw * 2.4, base = top + lt * full, y = xr => base + tilt * rh * 2 * (xr / rw) * side;
+  g.save();
+  g.beginPath(); g.moveTo(px - X, y(-X)); g.lineTo(px + X, y(X)); g.lineTo(px + X, py + rh + 30); g.lineTo(px - X, py + rh + 30); g.closePath(); g.clip();
+  if (lb > .01) { const cy = py + rh + rh * 1.25 - lb * full * .78, erx = rw * 2.1; g.beginPath(); g.rect(px - X, top - 30, 2 * X, full + 90); g.moveTo(px + erx, cy); g.ellipse(px, cy, erx, rh * 1.3, 0, 0, Math.PI * 2); g.clip('evenodd'); }
+  draw(); g.restore();
+}
+function drawEyes(g, s, k) {
+  const lt = Math.max(s.lt.x, s.blink > 0 ? 1 - Math.abs(Math.cos(s.blink * Math.PI)) : 0);
+  const gx = Math.sin(s.gx.x * .9), gy = Math.sin(s.gy.x * .9), ER = 3.3, EH = 5, SEP = 8;
+  for (const side of [-1, 1]) {
+    const er = ER * s.sc.x, eh = EH * s.sc.x, px = side * SEP + .72 * ER * gx, py = .4 * EH * gy;
+    const rw = er * (1 - .22 * Math.abs(gx)), rh = eh * (1 - .15 * Math.abs(gy));
+    withLids(g, px, py, rw, rh, side, lt, s.tilt.x, s.lb.x, () => { g.shadowColor = `rgba(${PEACH},.85)`; g.shadowBlur = 4 * k; g.fillStyle = '#f7c8a3'; g.beginPath(); g.ellipse(px, py, rw, rh, 0, 0, 7); g.fill(); g.shadowBlur = 0; });
+  }
+}
+
+// each hand = shoulder + hand point, both on springs so the dough lags and overshoots
+const arm = () => ({ sx: spring(0, .3, .6), sy: spring(0, .3, .6), hx: spring(0, .22, .5), hy: spring(0, .22, .5) });
+const sim = { ph: .7, rot: spring(0, 1.1, .45), sq: spring(1, .38, .25), hop: spring(0, .42, .38), jig: spring(0, .5, .3),
+  lt: spring(.12, .12, .9), lb: spring(0, .18, .9), tilt: spring(0, .18, .9), sc: spring(1, .25, .7), gx: spring(0, .22, .85), gy: spring(0, .22, .85),
+  arms: { '-1': arm(), '1': arm() },
+  glow: 0, blink: 0, nextBlink: 1.5, nextFidget: 3, happyUntil: -1, lookUntil: -1, look: [0, 0], waveUntil: -1, waveSide: 1, nextCall: 0, lvl: 0, mouseNear: false, mg: [0, 0] };
+
+function geom(T) {
+  const hang = MODE === 'hang', ry = hang ? RY * 1.08 : RY;
+  const ceil = -(ry + 11 + 3 * Math.sin(T * 1.3));
+  return { hang, ry, ceil, flat: MODE === 'task' ? FLAT : null };
+}
+
+// pose targets for the hands, per placement and gesture
+function armTargets(T, G) {
+  const s = sim, waving = T < s.waveUntil;
+  for (const sd of [-1, 1]) {
+    const a = s.arms[sd];
+    let shx, shy, hx, hy;
+    if (G.hang) {
+      // arms leave from the sides and reach up-and-out to the edge, like hanging from a bar
+      shx = sd * 21; shy = -G.ry * .35;
+      if (waving && sd === s.waveSide) { const e = .25 + .45 * Math.sin(T * 9); hx = shx + sd * 16 * Math.cos(e); hy = shy - 16 * Math.sin(e); }
+      else { hx = sd * 31; hy = G.ceil + 2; }
+    } else {
+      shx = sd * 24; shy = 1;
+      let e, L;
+      if (waving && sd === s.waveSide) { e = .95 + .4 * Math.sin(T * 9); L = 20; }
+      else if (MODE === 'float') { e = -.2 + .25 * Math.sin(T * 2.2 + sd * .8); L = 14; }
+      else { e = -.6; L = 13; }
+      hx = shx + sd * L * Math.cos(e); hy = shy - L * Math.sin(e);
+    }
+    a.sx.t = shx; a.sy.t = shy; a.hx.t = hx; a.hy.t = hy;
+  }
+}
+
+// one implicit shape: body ellipse ∪ two dough arms (∪ the ceiling when hanging), floor-clipped when sitting
+function params(s, T, G) {
+  return { rx: RX, ry: G.ry, wob: (.022 + .07 * s.lvl + .05 * Math.max(0, s.jig.x)) * R, t1: 1.3 * T + s.ph, t2: -1.9 * T + 1, t3: 2.7 * T + 2,
+    flat: G.flat, hang: G.hang, arms: [-1, 1].map(sd => { const a = s.arms[sd]; return [a.sx.x, a.sy.x, a.hx.x, a.hy.x]; }) };
+}
+function field(x, y, P, ceil) {
+  const k0 = Math.hypot(x / P.rx, y / P.ry), k1 = Math.hypot(x / (P.rx * P.rx), y / (P.ry * P.ry)) || 1e-6;
+  let d = k0 * (k0 - 1) / k1;
+  const a = Math.atan2(y / P.ry, x / P.rx);
+  d -= P.wob * (.6 * Math.sin(2 * a + P.t1) + .5 * Math.sin(3 * a + P.t2) + .3 * Math.sin(5 * a + P.t3));
+  // a thin dough arm ending in a rounder palm, so it reads as a hand and not an ear
+  for (const m of P.arms) { d = smin(d, capsule(x, y, m[0], m[1], m[2], m[3], 2.6), 4.5); d = smin(d, Math.hypot(x - m[2], y - m[3]) - 4.6, 2.5); }
+  if (P.hang) d = smin(d, ceil, 5);
+  if (P.flat !== null) d = smax(d, y - P.flat, 3);
+  return d;
+}
+
+const OFF = {};
+function renderBlob(g, key, T, Z, ax, h, w, dpr, light) {
+  const s = sim, G = geom(T), P = params(s, T, G);
+  const sy = s.sq.x, sx = 1 / Math.sqrt(sy), rot = s.rot.x, cr = Math.cos(rot), sr = Math.sin(rot);
+  let ay, anchor;
+  if (MODE === 'hang') { ay = BEZ; anchor = G.ceil; }
+  else if (MODE === 'task') { ay = h - TASK + Math.min(0, s.hop.x) * Z; anchor = FLAT; }
+  else { ay = (BEZ + h - TASK) / 2 + 12 + (2.6 * Math.sin(T * 1.8 + s.ph) + s.hop.x) * Z; anchor = 0; }
+  const toS = (lx, ly) => { const X = lx * sx, Y = (ly - anchor) * sy; return [ax + (X * cr - Y * sr) * Z, ay + (X * sr + Y * cr) * Z]; };
+  const top = MODE === 'hang' ? G.ceil - 3 : -40, bot = MODE === 'task' ? FLAT + 2 : G.ry + 10;
+  const cs = [toS(-58, top), toS(58, top), toS(-58, bot), toS(58, bot)];
+  const x0 = Math.max(0, Math.floor(Math.min(...cs.map(p => p[0])) - 3)), x1 = Math.min(w, Math.ceil(Math.max(...cs.map(p => p[0])) + 3));
+  const y0 = Math.max(0, Math.floor(Math.min(...cs.map(p => p[1])) - 3)), y1 = Math.min(h, Math.ceil(Math.max(...cs.map(p => p[1])) + 3));
+  const W = Math.max(1, Math.round((x1 - x0) * dpr)), H = Math.max(1, Math.round((y1 - y0) * dpr));
+  const off = OFF[key] || (OFF[key] = document.createElement('canvas'));
+  if (off.width !== W || off.height !== H) { off.width = W; off.height = H; }
+  const oc = off.getContext('2d'), img = oc.createImageData(W, H), D = img.data;
+  const idle = STATE === 'idle', L = STATES[STATE].rgb.split(',').map(Number), lampA = idle ? .18 : .3 + .55 * s.glow;
+  const RC = light ? [255, 255, 255] : [247, 200, 163], rimA = light ? .1 : .3, pxl = 1 / (Z * dpr);
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    const vx = (x0 + (i + .5) / dpr - ax) / Z, vy = (y0 + (j + .5) / dpr - ay) / Z;
+    const lx = (vx * cr + vy * sr) / sx, ly = (-vx * sr + vy * cr) / sy + anchor;
+    const d = field(lx, ly, P, vy), cov = clamp(.5 - d / pxl, 0, 1), o = (j * W + i) * 4;
+    if (cov <= 0) continue;
+    const t = Math.hypot(lx, ly - CORE_Y) / 25, lg = t < .6 ? lampA * (1 - t / .6 * .65) : lampA * .35 * Math.max(0, 1 - (t - .6) / .4);
+    const rim = rimA * clamp(1 - Math.abs(d / pxl + .9) / .9, 0, 1);
+    for (let ch = 0; ch < 3; ch++) { let v = BODY[ch] + (L[ch] - BODY[ch]) * lg; v += (RC[ch] - v) * rim; D[o + ch] = v; }
+    D[o + 3] = cov * 255;
+  }
+  oc.putImageData(img, 0, 0);
+  g.save();
+  if (light) { g.shadowColor = 'rgba(10,14,18,.3)'; g.shadowBlur = 8 * Z * dpr; g.shadowOffsetY = 1.6 * Z * dpr; }
+  else { g.shadowColor = `rgba(${STATES[STATE].rgb},${.14 + .32 * s.glow})`; g.shadowBlur = (5 + 9 * s.glow) * Z * dpr; }
+  g.drawImage(off, x0, y0, x1 - x0, y1 - y0);
+  g.restore();
+  g.save(); g.translate(ax, ay); g.rotate(rot); g.scale(Z * sx, Z * sy); g.translate(0, -anchor + EYE_Y);
+  drawEyes(g, s, Z * dpr); g.restore();
+}
+
+function draw(cv, T, light) {
+  const dpr = devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const bg = g.createLinearGradient(0, 0, w, h);
+  if (light) { bg.addColorStop(0, '#e9eef3'); bg.addColorStop(1, '#dce4ec'); } else { bg.addColorStop(0, '#1e2328'); bg.addColorStop(1, '#15191d'); }
+  g.fillStyle = bg; g.fillRect(0, 0, w, h);
+  g.fillStyle = light ? 'rgba(243,245,247,.97)' : 'rgba(32,35,39,.97)'; g.fillRect(0, h - TASK, w, TASK);
+  g.fillStyle = light ? 'rgba(0,0,0,.08)' : 'rgba(255,255,255,.06)'; g.fillRect(0, h - TASK, w, 1);
+  for (let i = -2; i <= 2; i++) { g.fillStyle = light ? 'rgba(0,0,0,.12)' : 'rgba(255,255,255,.12)'; g.fillRect(w * .5 + i * 20 - 6, h - TASK + 7, 12, 12); }
+  g.fillStyle = light ? 'rgba(0,0,0,.4)' : 'rgba(255,255,255,.4)'; g.font = '10px system-ui'; g.textAlign = 'center'; g.fillText('1:1', w * .85, h - 8);
+  renderBlob(g, cv.id + 'big', T, 2, w * .4, h, w, dpr, light);
+  renderBlob(g, cv.id + 'mini', T, 1, w * .85, h, w, dpr, light);
+  g.fillStyle = '#030405'; g.fillRect(0, 0, w, BEZ);
+}
+
+function poke(T, k = 1, happy = true) {
+  const s = sim;
+  if (MODE === 'hang') s.sq.v += 2.6 * k; else { s.hop.v -= 150 * k; s.sq.v += 1.6 * k; }
+  s.jig.v += 3 * k; if (happy) s.happyUntil = T + .9;
+}
+function wave(T, dur = 1.8) { sim.waveUntil = T + dur; sim.waveSide = Math.random() < .5 ? -1 : 1; }
+
+function update(T, dt) {
+  const s = sim, S = STATES[STATE], G = geom(T);
+  s.lvl = S.level ? mic(T) : 0;
+  let gT = 0;
+  if (S.level) gT = .3 + .7 * s.lvl; else if (STATE === 'think') gT = .3 + .3 * (.5 + .5 * Math.sin(T * 2.6)); else if (STATE === 'claude') gT = .55 + .45 * Math.sin(T * 6.5);
+  s.glow += (gT - s.glow) * Math.min(1, dt * 10);
+  s.nextFidget -= dt;
+  if (s.nextFidget <= 0) {
+    const r = Math.random();
+    if (r < .3) s.jig.v += 3;
+    else if (r < .6) { s.look = [(Math.random() * 2 - 1) * .9, (Math.random() * 2 - 1) * .5]; s.lookUntil = T + 1.3; }
+    else if (r < .85) wave(T);
+    else poke(T, .5);
+    s.nextFidget = 4 + Math.random() * 4;
+  }
+  if (STATE === 'claude') { s.nextCall -= dt; if (s.nextCall <= 0) { wave(T, 1.2); poke(T, .5, false); s.nextCall = 2.2; } }
+  armTargets(T, G);
+  s.rot.t = G.hang ? .06 * (.75 * Math.sin(T * 1.25 + s.ph) + .25 * Math.sin(T * 2.9 + 1 + s.ph)) : .025 * Math.sin(T * .9 + s.ph);
+  s.sq.t = 1 + .02 * Math.sin(T * 1.6 + s.ph) + .07 * s.lvl;
+  s.lt.t = STATE === 'think' ? .3 : (S.level || STATE === 'claude') ? 0 : .12;
+  s.lb.t = T < s.happyUntil || T < s.waveUntil ? .62 : 0;
+  s.sc.t = STATE === 'claude' ? 1.2 : S.level ? 1.12 : 1;
+  s.tilt.t = STATE === 'claude' ? -.06 : 0;
+  if (s.mouseNear) { s.gx.t = s.mg[0]; s.gy.t = s.mg[1]; }
+  else if (T < s.lookUntil) { s.gx.t = s.look[0]; s.gy.t = s.look[1]; }
+  else if (STATE === 'think') { s.gx.t = .35 * Math.sin(T * .7); s.gy.t = -.75; }
+  else { s.gx.t = .4 * Math.sin(T * .55 + s.ph); s.gy.t = .15 * Math.sin(T * .8 + s.ph); }
+  for (const k of ['rot', 'sq', 'hop', 'jig', 'lt', 'lb', 'tilt', 'sc', 'gx', 'gy']) step(s[k], dt);
+  for (const sd of [-1, 1]) for (const k of ['sx', 'sy', 'hx', 'hy']) step(s.arms[sd][k], dt);
+  s.nextBlink -= dt; if (s.nextBlink <= 0) { s.blink = 1; s.nextBlink = 2.4 + Math.random() * 3.6; }
+  s.blink = Math.max(0, s.blink - dt * 7);
+}
+
+const $ = id => document.getElementById(id);
+for (const [k, s] of Object.entries(STATES)) {
+  const b = document.createElement('button'); b.textContent = s.label; b.dataset.k = k; if (k === STATE) b.className = 'on';
+  b.onclick = () => { STATE = k; document.querySelectorAll('#states button').forEach(x => x.classList.toggle('on', x.dataset.k === k)); };
+  $('states').appendChild(b);
+}
+document.querySelectorAll('button[data-m]').forEach(b => b.onclick = () => {
+  MODE = b.dataset.m; document.querySelectorAll('button[data-m]').forEach(x => x.classList.toggle('on', x === b)); sim.jig.v += 2.5;
+});
+$('bWave').onclick = () => wave(NOW);
+$('cDark').onclick = $('cLight').onclick = () => poke(NOW);
+document.addEventListener('mousemove', e => { mouse = [e.clientX, e.clientY]; mouseT = performance.now(); });
+
+{ const G = geom(0); armTargets(0, G); for (const sd of [-1, 1]) for (const k of ['sx', 'sy', 'hx', 'hy']) sim.arms[sd][k].x = sim.arms[sd][k].t; }
+let last = performance.now(), t0 = last;
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now; const T = (now - t0) / 1000; NOW = T;
+  const r = $('cDark').getBoundingClientRect(), live = mouse && performance.now() - mouseT < 4000;
+  sim.mouseNear = !!live && mouse[1] > r.top - 200 && mouse[1] < r.bottom + 200;
+  if (sim.mouseNear) sim.mg = [clamp((mouse[0] - r.left - r.width * .4) / 200, -1, 1), clamp((mouse[1] - r.top - r.height * .6) / 200, -1, 1)];
+  update(T, dt);
+  draw($('cDark'), T, false);
+  draw($('cLight'), T, true);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
