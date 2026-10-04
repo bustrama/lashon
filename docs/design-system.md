@@ -115,8 +115,9 @@ later an agent, the island shows the approval card
   operators stay in left-to-right order. Plain bidi would swap two Hebrew
   arguments and mirror a `>` between them.
 - **Hidden characters show by code point.** A bidi override, a zero-width
-  character or a look-alike space is drawn as a small `--saffron` badge such
-  as `U+202E`, never obeyed.
+  character, a look-alike space or filler, or a combining mark that isn't on
+  a Hebrew letter is drawn as a small `--saffron` badge such as `U+202E`,
+  never obeyed. Niqqud on Hebrew letters shows as it is.
 - **The look.** Dark glass with an `--aqua` border and glow, matching the
   creature's lamp. Allow is rose (`--state-error`): it runs something that
   can't be taken back. It stays dim until it arms, and fills from the inline

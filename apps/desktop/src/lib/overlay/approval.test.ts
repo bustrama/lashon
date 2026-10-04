@@ -97,6 +97,65 @@ describe('segments', () => {
 		]);
 	});
 
+	it('shows fillers and other characters Unicode marks as ignorable', () => {
+		// Hangul fillers draw as blank letters; the grapheme joiner draws
+		// nothing; the blank braille cell looks like a space.
+		for (const ch of ['\u3164', '\uFFA0', '\u115F', '\u1160', '\u034F', '\u2800']) {
+			expect(segments(`a${ch}b`)).toEqual([
+				{ kind: 'text', text: 'a' },
+				{ kind: 'hidden', code: codePoint(ch) },
+				{ kind: 'text', text: 'b' }
+			]);
+		}
+	});
+
+	it('shows private-use and unassigned code points', () => {
+		for (const ch of ['\uE000', '\u{F0000}', '\u0378']) {
+			expect(segments(ch)).toEqual([{ kind: 'hidden', code: codePoint(ch) }]);
+		}
+	});
+
+	it('shows a combining mark that is not on a Hebrew letter', () => {
+		// A stroke or slash overlay disguises what it is drawn on: "=" with
+		// U+0338 looks like "≠".
+		expect(segments('a\u0336b')).toEqual([
+			{ kind: 'text', text: 'a' },
+			{ kind: 'hidden', code: 'U+0336' },
+			{ kind: 'text', text: 'b' }
+		]);
+		expect(segments('=\u0338')).toEqual([
+			{ kind: 'text', text: '=' },
+			{ kind: 'hidden', code: 'U+0338' }
+		]);
+		// A decomposed accent is a different name from the composed one.
+		expect(segments('cafe\u0301')).toEqual([
+			{ kind: 'text', text: 'cafe' },
+			{ kind: 'hidden', code: 'U+0301' }
+		]);
+		// Niqqud with nothing under it, or on a Latin letter.
+		expect(segments('\u05B8')).toEqual([{ kind: 'hidden', code: 'U+05B8' }]);
+		expect(segments(' \u05BC')).toEqual([
+			{ kind: 'text', text: ' ' },
+			{ kind: 'hidden', code: 'U+05BC' }
+		]);
+		expect(segments('a\u05B8')).toEqual([
+			{ kind: 'text', text: 'a' },
+			{ kind: 'hidden', code: 'U+05B8' }
+		]);
+	});
+
+	it('keeps stacked niqqud and cantillation on a Hebrew letter', () => {
+		// Shin with its dot, dagesh and qamats, then a cantillation mark.
+		const text = 'שּׁ\u05B8\u0591';
+		expect(segments(text)).toEqual([{ kind: 'text', text }]);
+		// A mark after a hidden character is not on a letter any more.
+		expect(segments('ש\u200B\u05B8')).toEqual([
+			{ kind: 'text', text: 'ש' },
+			{ kind: 'hidden', code: 'U+200B' },
+			{ kind: 'hidden', code: 'U+05B8' }
+		]);
+	});
+
 	it('returns nothing for empty text', () => {
 		expect(segments('')).toEqual([]);
 	});

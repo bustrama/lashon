@@ -50,12 +50,21 @@ export type Piece =
 
 // Characters that draw nothing, draw as something else, or reorder the text
 // around them: controls, format characters (bidi overrides and isolates,
-// zero-width characters, tags), lone surrogates, line and paragraph
-// separators, variation selectors, and every space but the ASCII one. A
-// command line could otherwise read differently from what runs.
-const HIDDEN = /[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}\p{Zs}\p{Variation_Selector}]/u;
+// zero-width characters, tags), lone surrogates, unassigned and private-use
+// code points, line and paragraph separators, every space but the ASCII
+// one, whatever else Unicode marks as ignorable (variation selectors, the
+// Hangul fillers, the combining grapheme joiner), and the blank braille
+// cell. A command line could otherwise read differently from what runs.
+const HIDDEN =
+	/[\p{Cc}\p{Cf}\p{Cs}\p{Cn}\p{Co}\p{Zl}\p{Zp}\p{Zs}\p{Default_Ignorable_Code_Point}⠀]/u;
 // The only ones a command line shows as themselves.
 const SHOWN_AS_IS = new Set(['\t', '\n', ' ']);
+// A combining mark draws on the character before it, and can disguise it:
+// a stroke or slash overlay, an accent on a look-alike. Only Hebrew marks
+// on a Hebrew letter (niqqud, dagesh, cantillation) show as they are.
+const MARK = /\p{M}/u;
+const HEBREW = /\p{Script=Hebrew}/u;
+const LETTER = /\p{L}/u;
 // The separators of a command line: ASCII whitespace, punctuation and
 // symbols. None of them has a direction of its own.
 const SEPARATOR = /[\t\n !-/:-@[-`{-~]/;
@@ -71,13 +80,20 @@ export function codePoint(ch: string): string {
 export function segments(text: string): Segment[] {
 	const out: Segment[] = [];
 	let run = '';
+	// The last character drawn is a Hebrew letter, or a mark drawn on one.
+	let onHebrew = false;
 	for (const ch of text) {
-		if (HIDDEN.test(ch) && !SHOWN_AS_IS.has(ch)) {
+		const mark = MARK.test(ch);
+		const hidden =
+			(HIDDEN.test(ch) && !SHOWN_AS_IS.has(ch)) || (mark && !(onHebrew && HEBREW.test(ch)));
+		if (hidden) {
 			if (run) out.push({ kind: 'text', text: run });
 			run = '';
 			out.push({ kind: 'hidden', code: codePoint(ch) });
+			onHebrew = false;
 		} else {
 			run += ch;
+			if (!mark) onHebrew = HEBREW.test(ch) && LETTER.test(ch);
 		}
 	}
 	if (run) out.push({ kind: 'text', text: run });
