@@ -118,6 +118,8 @@ Software Foundation. It is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; see [`LICENSE`](LICENSE) for the full terms.
 
 Bundled and optional third-party components retain their own licenses; see
-[`NOTICE`](NOTICE). Only MIT/Apache-licensed models ship in the installer;
+[`NOTICE`](NOTICE). Source files derived from other projects' code are listed,
+with those projects' notices, in [`THIRD-PARTY-NOTICES`](THIRD-PARTY-NOTICES).
+Only MIT/Apache-licensed models ship in the installer;
 non-commercially-licensed models are surfaced as clearly-badged opt-in
 downloads, never bundled.

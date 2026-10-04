@@ -8,6 +8,9 @@ here; the CI license-scan job (cargo-deny, pip-licenses) enforces that none
 carry an AGPL or CC-BY-NC license. (Ottid's own code is GPL-3.0-only as of
 docs/adr/0032; permissively-licensed dependencies remain GPLv3-compatible.)
 
+Source files of Ottid's own that are derived from third-party source code are
+listed, with those projects' license notices, in THIRD-PARTY-NOTICES.
+
 --------------------------------------------------------------------------------
 Heebo (font family)
 --------------------------------------------------------------------------------
