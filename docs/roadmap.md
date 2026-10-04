@@ -104,7 +104,10 @@ for the OSS-economics rationale and the SignPath-reputation / paid-cert
 triggers that would unblock it. The other halves of M13 track separately:
 in-app auto-update ([`adr/0017`](adr/0017-auto-update-via-tauri-plugin-updater.md))
 and cross-OS installers ([`adr/0018`](adr/0018-cross-os-installer-matrix.md))
-land in `v0.6.0`.
+land in `v0.6.0`. The signing half came back on the critical path with the
+open-core decision ([`adr/0032`](adr/0032-ship-as-open-core-product.md)); it is
+wired with Azure Artifact Signing
+([`adr/0043`](adr/0043-sign-windows-releases-with-azure-artifact-signing.md)).
 
 **Total estimate:** ~60–80 dev-days of focused work for v1.0. UI, Rust core, and
 the Python sidecars can advance in parallel after M5.
