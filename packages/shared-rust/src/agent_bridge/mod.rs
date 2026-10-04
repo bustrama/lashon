@@ -33,8 +33,11 @@
 //!   prompt on any failure.
 //! - [`server`]: one connection's exchange, and the listener.
 //! - [`endpoint`]: the bridge file, the pipe or socket, and their ACLs.
+//! - [`claude_settings`]: adding and removing the hook in Claude Code's user
+//!   settings.
 
 pub mod auth;
+pub mod claude_settings;
 pub mod client;
 pub mod endpoint;
 pub mod hook;
