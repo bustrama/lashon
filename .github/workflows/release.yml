@@ -99,12 +99,14 @@ jobs:
           [[ "$HAS_UPDATER_KEY" == true ]] \
             || missing+=("the updater key (TAURI_SIGNING_PRIVATE_KEY)")
 
-          if (( ${#missing[@]} == 0 )); then
+          # An explicitly unsigned build skips signing even when it is
+          # configured, so the escape hatch still works if signing breaks.
+          if [[ "$allow_unsigned" == true ]]; then
+            sign=false
+            echo "::warning title=Unsigned pre-release::Explicitly unsigned: both signatures are skipped. This build is marked as a pre-release and the in-app updater will not serve it."
+          elif (( ${#missing[@]} == 0 )); then
             sign=true
             echo "Signing is configured: Authenticode + updater signature."
-          elif [[ "$allow_unsigned" == true ]]; then
-            sign=false
-            echo "::warning title=Unsigned pre-release::Not signed — missing ${missing[*]}. This build is marked as a pre-release and the in-app updater will not serve it."
           else
             echo "::error title=Signing is not configured::Missing in the 'release' environment: ${missing[*]}. A release is never published unsigned (docs/adr/0043). For a deliberate unsigned pre-release, push a tag containing '-unsigned' (e.g. v1.2.0-unsigned.1) or tick 'allow_unsigned' on a manual run."
             exit 1

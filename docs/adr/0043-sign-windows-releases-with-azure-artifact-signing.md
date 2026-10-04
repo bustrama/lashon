@@ -149,8 +149,9 @@ What we read in the Tauri source (tag `tauri-cli-v2.11.2`) shaped this:
   fails before the build starts.
 - **The only way to build unsigned.** The one exception is an explicitly
   unsigned pre-release: a tag containing `-unsigned` (`v1.2.0-unsigned.1`), or a
-  manual run with `allow_unsigned` ticked. Such a build passes `--no-sign` and
-  is released as a GitHub pre-release, which keeps it out of
+  manual run with `allow_unsigned` ticked. Such a build passes `--no-sign` even
+  when signing is configured, so the escape hatch still works if signing
+  breaks. It is released as a GitHub pre-release, which keeps it out of
   `/releases/latest`, the updater's feed. Its release notes say it is unsigned.
 - **Nothing is published from CI.** The run creates a draft. The owner
   smoke-tests a real install of the draft's installer, then publishes it by
