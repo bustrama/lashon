@@ -58,6 +58,8 @@ pub fn store_key(key_name: &str, secret: &str) -> Result<()> {
     entry(key_name)?
         .set_password(secret)
         .with_context(|| format!("writing keychain entry for {key_name}"))?;
+    // A pre-rename copy would only be a stale duplicate of a secret.
+    forget_legacy_key(key_name);
     Ok(())
 }
 
@@ -81,8 +83,48 @@ pub fn read_key(key_name: &str) -> Result<Option<String>> {
     }
     match entry(key_name)?.get_password() {
         Ok(secret) => Ok(Some(secret)),
-        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(keyring::Error::NoEntry) => adopt_legacy_key(key_name),
         Err(err) => Err(err).with_context(|| format!("reading keychain entry for {key_name}")),
+    }
+}
+
+/// Keys saved before the rename live under the old service name
+/// (docs/adr/0042). On the first read that misses, move the key across:
+/// store it under [`SERVICE`], then drop the old entry.
+fn adopt_legacy_key(key_name: &str) -> Result<Option<String>> {
+    let legacy = legacy_entry(key_name)?;
+    let secret = match legacy.get_password() {
+        Ok(secret) => secret,
+        Err(keyring::Error::NoEntry) => return Ok(None),
+        Err(err) => {
+            return Err(err)
+                .with_context(|| format!("reading pre-rename keychain entry for {key_name}"))
+        }
+    };
+    tracing::info!(
+        key_name,
+        "keychain: adopting a key stored before the rename"
+    );
+    store_key(key_name, &secret)?;
+    Ok(Some(secret))
+}
+
+fn legacy_entry(key_name: &str) -> Result<Entry> {
+    Entry::new(crate::legacy::LEGACY_KEYCHAIN_SERVICE, key_name)
+        .with_context(|| format!("opening pre-rename keychain entry for {key_name}"))
+}
+
+/// Drop the pre-rename copy of a key. Best effort: once the key exists
+/// under [`SERVICE`] a leftover old copy is never read again.
+fn forget_legacy_key(key_name: &str) {
+    match legacy_entry(key_name).map(|entry| entry.delete_credential()) {
+        Ok(Ok(())) | Ok(Err(keyring::Error::NoEntry)) => {}
+        Ok(Err(err)) => {
+            tracing::debug!(key_name, error = %err, "keychain: could not drop the pre-rename entry")
+        }
+        Err(err) => {
+            tracing::debug!(key_name, error = %err, "keychain: could not open the pre-rename entry")
+        }
     }
 }
 
@@ -101,8 +143,12 @@ pub fn has_key(key_name: &str) -> bool {
 }
 
 /// Remove a stored key. Idempotent: deleting a non-existent key is `Ok(())`.
+///
+/// Also removes a pre-rename copy, or [`read_key`] would adopt the deleted
+/// key straight back.
 pub fn delete_key(key_name: &str) -> Result<()> {
     tracing::debug!(key_name, "keychain: deleting key");
+    forget_legacy_key(key_name);
     match entry(key_name)?.delete_credential() {
         Ok(()) => Ok(()),
         Err(keyring::Error::NoEntry) => Ok(()),
@@ -199,5 +245,33 @@ mod tests {
         // Make sure it's gone first.
         let _ = delete_key(key_name);
         delete_key(key_name).expect("idempotent delete");
+    }
+
+    #[test]
+    #[ignore = "needs a running OS keychain"]
+    fn pre_rename_key_is_adopted_on_read_and_deleted_with_the_key() {
+        let key_name = "test.legacy-adopt";
+        let _ = delete_key(key_name);
+        legacy_entry(key_name)
+            .unwrap()
+            .set_password("sk-old")
+            .expect("seed legacy");
+
+        assert_eq!(
+            read_key(key_name).expect("read"),
+            Some("sk-old".to_string())
+        );
+        // Now stored under the current service, and the old copy is gone.
+        assert_eq!(
+            entry(key_name).unwrap().get_password().expect("adopted"),
+            "sk-old"
+        );
+        assert!(matches!(
+            legacy_entry(key_name).unwrap().get_password(),
+            Err(keyring::Error::NoEntry)
+        ));
+
+        delete_key(key_name).expect("delete");
+        assert_eq!(read_key(key_name).expect("read after delete"), None);
     }
 }

@@ -21,57 +21,20 @@
 //! Lives next to `ottid-mcp` (the stdio MCP server binary, ADR-0028)
 //! under the `mcp-server` feature only because both are
 //! optional-by-feature; the recipe runtime itself is feature-free.
-//! Reuses the same `OTTID_BUNDLED_RECIPES_DIR` / `OTTID_USER_RECIPES_DIR`
-//! env-var overrides ADR-0028 introduced.
+//! Resolves both recipe dirs exactly as the MCP server does (same
+//! `OTTID_BUNDLED_RECIPES_DIR` / `OTTID_USER_RECIPES_DIR` overrides,
+//! ADR-0028), including the pre-rename recipes carry-over.
 
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use anyhow::{anyhow, bail, Result};
 
+use ottid_core::mcp::recipe_tools::{bundled_recipes_dir, user_recipes_dir};
 use ottid_core::recipes::{
     execute_recipe, AlwaysAllow, AlwaysDeny, ConfirmDecision, ConfirmHandler, Recipe, RuntimeError,
 };
-
-/// `OTTID_BUNDLED_RECIPES_DIR` (with cargo-dev fallback) — mirrors
-/// the constant the MCP server uses so the two binaries find the same
-/// starters when both are installed alongside the Tauri shell.
-fn bundled_recipes_dir() -> PathBuf {
-    if let Some(path) = std::env::var_os("OTTID_BUNDLED_RECIPES_DIR") {
-        return PathBuf::from(path);
-    }
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../recipes/starters")
-}
-
-fn user_recipes_dir() -> PathBuf {
-    if let Some(path) = std::env::var_os("OTTID_USER_RECIPES_DIR") {
-        return PathBuf::from(path);
-    }
-    user_data_local_dir().join("ottid").join("recipes")
-}
-
-#[cfg(target_os = "windows")]
-fn user_data_local_dir() -> PathBuf {
-    std::env::var_os("LOCALAPPDATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."))
-}
-
-#[cfg(target_os = "macos")]
-fn user_data_local_dir() -> PathBuf {
-    std::env::var_os("HOME")
-        .map(|h| PathBuf::from(h).join("Library/Application Support"))
-        .unwrap_or_else(|| PathBuf::from("."))
-}
-
-#[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
-fn user_data_local_dir() -> PathBuf {
-    std::env::var_os("XDG_DATA_HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")))
-        .unwrap_or_else(|| PathBuf::from("."))
-}
 
 /// Resolve a recipe by id. Walks the bundled + user dirs and matches
 /// on the recipe's `id:` field rather than the directory name —
@@ -242,10 +205,7 @@ async fn main() -> Result<()> {
 
     match execute_recipe(&recipe, slots, confirm.as_ref()).await {
         Ok(run) => {
-            eprintln!(
-                "ottid-recipe: done — {} steps executed",
-                run.steps_executed
-            );
+            eprintln!("ottid-recipe: done — {} steps executed", run.steps_executed);
             Ok(())
         }
         Err(RuntimeError::Denied { kind, .. }) => {

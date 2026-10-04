@@ -315,6 +315,12 @@ async fn check_for_updates(app: tauri::AppHandle) -> Result<String, String> {
 
 /// Build and run the Ottid desktop application.
 pub fn run() {
+    let context = tauri::generate_context!();
+    // Before the builder: Tauri creates the WebView data dir under the new
+    // identifier as soon as the windows exist, which would block the
+    // one-step move of the pre-rename data.
+    let adoption = adopt_legacy_app_dirs(&context.config().identifier);
+
     let builder = tauri::Builder::default()
         // Single-instance must be the FIRST plugin (issue #12). It intercepts a
         // second launch and hands off to the already-running process before any
@@ -412,7 +418,7 @@ pub fn run() {
             #[cfg(feature = "command-mode")]
             command_mode::set_word_aliases
         ])
-        .setup(|app| {
+        .setup(move |app| {
             // Initialize logging first, so every start-up step below is
             // captured: a rolling on-disk log for shipped builds plus a dev
             // console (issue #13). It lives in `setup` rather than at the top of
@@ -422,6 +428,9 @@ pub fn run() {
             init_tracing(app.handle());
             install_panic_hook();
             tracing::info!("Ottid starting");
+            for line in &adoption {
+                tracing::info!(target: "ottid::legacy", "{line}");
+            }
 
             // Point ottid-core at the bundled, frozen STT sidecar and a
             // per-user model directory before the dictation worker can spawn
@@ -491,8 +500,45 @@ pub fn run() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("error while running the Ottid application");
+}
+
+/// Move the pre-rename install's per-identifier dirs (settings, WebView
+/// storage, logs, models) to this identifier's dirs (ADR-0042).
+///
+/// Mirrors how Tauri resolves its app dirs: each per-user base dir joined
+/// with the identifier. Bases that coincide on an OS (Roaming data and
+/// config on Windows) are visited once. Returns a line per base that had
+/// something to move, to log once tracing is up.
+fn adopt_legacy_app_dirs(identifier: &str) -> Vec<String> {
+    use ottid_core::legacy::{adopt_dir, Adopted, LEGACY_IDENTIFIER};
+
+    let mut seen = Vec::new();
+    let mut report = Vec::new();
+    let bases = [
+        dirs::data_dir(),
+        dirs::data_local_dir(),
+        dirs::config_dir(),
+        dirs::cache_dir(),
+    ];
+    for base in bases.into_iter().flatten() {
+        if seen.contains(&base) {
+            continue;
+        }
+        let (old, new) = (base.join(LEGACY_IDENTIFIER), base.join(identifier));
+        match adopt_dir(&old, &new) {
+            Ok(Adopted::Nothing) => {}
+            Ok(adopted) => report.push(format!(
+                "adopted {} into {}: {adopted:?}",
+                old.display(),
+                new.display()
+            )),
+            Err(err) => report.push(format!("could not adopt {}: {err}", old.display())),
+        }
+        seen.push(base);
+    }
+    report
 }
 
 /// Whether the user has finished or skipped the first-run tutorial.

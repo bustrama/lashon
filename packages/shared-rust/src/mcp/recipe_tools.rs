@@ -37,11 +37,27 @@ pub fn bundled_recipes_dir() -> PathBuf {
 /// - Windows: `%LOCALAPPDATA%\ottid\recipes\`
 /// - macOS:   `~/Library/Application Support/ottid/recipes/`
 /// - Linux:   `$XDG_DATA_HOME/ottid/recipes/` (or `~/.local/share/...`)
+///
+/// Recipes written before the rename live in `<data_local_dir>/lashon/`;
+/// the first resolve moves them here (docs/adr/0042).
 pub fn user_recipes_dir() -> PathBuf {
     if let Some(path) = std::env::var_os(USER_RECIPES_ENV) {
         return PathBuf::from(path);
     }
-    user_data_local_dir().join("ottid").join("recipes")
+    let base = user_data_local_dir();
+    let dir = base.join("ottid").join("recipes");
+    let legacy = base.join(crate::legacy::LEGACY_DIR_NAME);
+    match crate::legacy::adopt_dir(&legacy.join("recipes"), &dir) {
+        Ok(crate::legacy::Adopted::Nothing) => {}
+        Ok(adopted) => {
+            tracing::info!(?adopted, "recipes: adopted the pre-rename recipes dir");
+            crate::legacy::remove_dir_if_empty(&legacy);
+        }
+        Err(err) => {
+            tracing::warn!(error = %err, "recipes: could not adopt the pre-rename recipes dir")
+        }
+    }
+    dir
 }
 
 #[cfg(target_os = "windows")]

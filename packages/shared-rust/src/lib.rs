@@ -12,6 +12,7 @@ pub mod hardware;
 pub mod hotkey;
 pub mod inject;
 pub mod keychain;
+pub mod legacy;
 pub mod local_agreement;
 #[cfg(feature = "command-mode")]
 pub mod llama_server;
