@@ -66,11 +66,32 @@ legal clearance:
     the machine never ends up with two apps.
 - **What stays:**
   - git history, and the tags and assets of past releases
+  - the ADRs and stories. They are records of their time, so they keep the
+    names they were written with. The table below maps those names to the new
+    ones.
   - the wake-word model `hey_lashon`, until a model for the new name is trained.
     It is trained on a spoken phrase, so renaming the file would not change what
     it hears.
 - **The public story uses the English word "ditto".** Public material does not
   tie the name to any third-party character or franchise.
+
+### Old names → new names
+
+| Before | After |
+|---|---|
+| Lashon / לשון (product) | Ottid / אוטיד |
+| `dev.lashon.desktop` (bundle identifier) | `app.ottid.desktop` |
+| `lashon` (Tauri crate, `lashon.exe`), `lashon_lib` | `ottid`, `ottid_lib` |
+| `lashon-core` / `lashon_core::…` | `ottid-core` / `ottid_core::…` |
+| `lashon-mcp`, `lashon-recipe` | `ottid-mcp`, `ottid-recipe` |
+| `lashon_stt` (Python package), `lashon-stt` (frozen sidecar) | `ottid_stt`, `ottid-stt` |
+| `LASHON_*` environment variables, `VITE_LASHON_EDITION` | `OTTID_*`, `VITE_OTTID_EDITION` |
+| `LASHON_STT_TOKEN` / `LASHON_STT_PORT`, `x-lashon-auth`, proto package `lashon.stt.v1` | `OTTID_STT_TOKEN` / `OTTID_STT_PORT`, `x-ottid-auth`, `ottid.stt.v1` |
+| Keychain service `lashon` | `ottid` (old keys are adopted on first read) |
+| `<data-local>/lashon/recipes` | `<data-local>/ottid/recipes` (moved on first use) |
+| MCP tool names `lashon.*` | `ottid.*` |
+| `lashon-recipe.schema.json`, `lashon.system.*.md` | `ottid-recipe.schema.json`, `ottid.system.*.md` |
+| `bustrama/lashon`, `bustrama.github.io/lashon` | `bustrama/ottid`, `bustrama.github.io/ottid` |
 
 ## Before it ships
 
