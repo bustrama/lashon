@@ -77,10 +77,25 @@ Windows 11.
 
 ## 4. Signing
 
-v0.1.0 ships **unsigned** (ADR-0006). Windows SmartScreen warns on first run.
-Signing every binary with a code-signing certificate — Certum Open Source, Azure
-Trusted Signing, or an OV/EV certificate — is the v0.1.x follow-up; it slots in
-as a final step here, via `tauri.conf.json`'s `bundle.windows` signing options.
+Only the release workflow signs, with Azure Artifact Signing
+([ADR-0043](adr/0043-sign-windows-releases-with-azure-artifact-signing.md)). A
+local build like the one above is unsigned, and Windows SmartScreen warns on
+its first run.
+
+To sign a local build by hand, you need the `az login` session of an identity
+that holds the *Artifact Signing Certificate Profile Signer* role. Set the
+environment variables listed in `scripts/sign-windows.ps1`, then:
+
+1. Sign the staged resources:
+   `powershell -ExecutionPolicy Bypass -File scripts/sign-windows.ps1 -Tree apps/desktop/src-tauri/binaries`
+2. Build with `npm run tauri build -- --config src-tauri/tauri.signing.conf.json`.
+   Because `createUpdaterArtifacts` is on, this build also needs the updater
+   key in `TAURI_SIGNING_PRIVATE_KEY`.
+3. Check the result with
+   `scripts/sign-windows.ps1 -Verify <install-or-portable-dir>`.
+
+In the portable zip, sign the staged `ottid.exe` separately. Tauri restores
+`target/release/ottid.exe` to its unsigned build after bundling.
 
 ## Notes
 
