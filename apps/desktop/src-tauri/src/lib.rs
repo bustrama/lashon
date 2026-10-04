@@ -288,6 +288,7 @@ pub fn run() {
             overlay::overlay_set_placement,
             dictation::dictation_hotkey_pressed,
             dictation::dictation_hotkey_released,
+            wakeword::wake_armed,
             // --- command-mode-only commands; compiled out of the free build (ADR-0034) ---
             #[cfg(feature = "command-mode")]
             dictation::command_hotkey_pressed,

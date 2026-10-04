@@ -19,10 +19,15 @@
 //! On `settings:changed` events under `wakeword.*` the controller
 //! restarts the worker, picking up new slot configs without an app
 //! restart.
+//!
+//! Whether the detector is really listening (a slot enabled, its
+//! classifier installed, the microphone open) is known only here, so the
+//! worker reports it: the `wake:armed` event on every change, and the
+//! `wake_armed` command on demand. The overlay shows it on the creature.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::RecvTimeoutError;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::time::Duration;
 
@@ -30,7 +35,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_store::StoreExt;
 
-use ottid_core::wake::{Trigger, WakeWord, CHUNK_SAMPLES};
+use ottid_core::wake::{Armed, Trigger, WakeWord, CHUNK_SAMPLES};
 use ottid_core::{audio, model};
 
 use crate::dictation::DictationChannel;
@@ -88,6 +93,33 @@ impl SlotMode {
 #[derive(Debug, Clone, Serialize)]
 struct WakeDetectedEvent {
     mode: &'static str,
+}
+
+/// Payload of the `wake:armed` event: the detector started (`true`) or
+/// stopped (`false`) listening for a wake word. The overlay shows it on
+/// the creature's idle; `wake_armed` answers the same question on demand.
+#[derive(Debug, Clone, Serialize)]
+struct WakeArmedEvent {
+    armed: bool,
+}
+
+/// Shared between the controller and its workers.
+type SharedArmed = Arc<Mutex<Armed>>;
+
+fn lock_armed(armed: &SharedArmed) -> MutexGuard<'_, Armed> {
+    // Two plain fields: still meaningful after a panic elsewhere.
+    armed
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// Record what worker `generation` is doing, and tell the frontend when
+/// that changes whether Ottid is listening for a wake word.
+fn report_armed(app: &AppHandle, armed: &SharedArmed, generation: u64, listening: bool) {
+    let changed = lock_armed(armed).report(generation, listening);
+    if let Some(armed) = changed {
+        let _ = app.emit("wake:armed", WakeArmedEvent { armed });
+    }
 }
 
 /// Settings for one wake slot. The slot is **off** when `enabled` is
@@ -291,12 +323,14 @@ impl SlotEngine {
 /// old worker's `running` flag is `false`, so it stops producing detections.
 pub struct WakeController {
     running: Arc<AtomicBool>,
+    armed: SharedArmed,
 }
 
 impl WakeController {
     pub fn new() -> Self {
         Self {
             running: Arc::new(AtomicBool::new(false)),
+            armed: SharedArmed::default(),
         }
     }
 
@@ -305,13 +339,35 @@ impl WakeController {
         self.running.store(false, Ordering::Relaxed);
         let running = Arc::new(AtomicBool::new(true));
         self.running = running.clone();
-        if let Err(err) = thread::Builder::new()
-            .name("ottid-wakeword".into())
-            .spawn(move || run_worker(app, gates, running))
-        {
+        let armed = self.armed.clone();
+        let generation = lock_armed(&armed).begin();
+        let spawned = thread::Builder::new().name("ottid-wakeword".into()).spawn({
+            let app = app.clone();
+            let armed = armed.clone();
+            move || run_worker(app, gates, running, armed, generation)
+        });
+        if let Err(err) = spawned {
             tracing::error!("wake word: could not spawn the worker thread: {err}");
+            report_armed(&app, &armed, generation, false);
         }
     }
+
+    /// Whether the detector is listening for a wake word right now.
+    pub fn is_armed(&self) -> bool {
+        lock_armed(&self.armed).is_listening()
+    }
+}
+
+/// Whether Ottid is listening for a wake word, for a frontend that mounted
+/// after the last `wake:armed` event.
+#[tauri::command]
+pub async fn wake_armed(
+    controller: tauri::State<'_, Arc<Mutex<WakeController>>>,
+) -> Result<bool, String> {
+    Ok(controller
+        .lock()
+        .map(|ctrl| ctrl.is_armed())
+        .unwrap_or(false))
 }
 
 impl Default for WakeController {
@@ -320,8 +376,28 @@ impl Default for WakeController {
     }
 }
 
-fn run_worker(app: AppHandle, gates: Gates, running: Arc<AtomicBool>) {
-    let (dictation_settings, command_settings) = read_settings(&app);
+fn run_worker(
+    app: AppHandle,
+    gates: Gates,
+    running: Arc<AtomicBool>,
+    armed: SharedArmed,
+    generation: u64,
+) {
+    listen(&app, &gates, &running, &armed, generation);
+    // However it ended (every slot off, no microphone, the microphone gone,
+    // or superseded by a newer worker), this worker no longer listens.
+    report_armed(&app, &armed, generation, false);
+}
+
+/// Load the enabled slots and listen until `running` drops.
+fn listen(
+    app: &AppHandle,
+    gates: &Gates,
+    running: &AtomicBool,
+    armed: &SharedArmed,
+    generation: u64,
+) {
+    let (dictation_settings, command_settings) = read_settings(app);
 
     let mut slots: Vec<SlotEngine> = Vec::with_capacity(2);
     if let Some(slot) = SlotEngine::load(SlotMode::Dictation, &dictation_settings) {
@@ -370,6 +446,7 @@ fn run_worker(app: AppHandle, gates: Gates, running: Arc<AtomicBool>) {
             return;
         }
     };
+    report_armed(app, armed, generation, true);
 
     let mut pending: Vec<f32> = Vec::new();
     let mut suspended = false;
@@ -400,7 +477,7 @@ fn run_worker(app: AppHandle, gates: Gates, running: Arc<AtomicBool>) {
                 while pending.len() >= CHUNK_SAMPLES {
                     let frame: Vec<f32> = pending.drain(..CHUNK_SAMPLES).collect();
                     for slot in &mut slots {
-                        slot.observe(&frame, &app);
+                        slot.observe(&frame, app);
                     }
                 }
             }
