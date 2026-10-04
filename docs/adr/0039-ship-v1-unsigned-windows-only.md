@@ -7,6 +7,10 @@ release installer without code signing" invariant
 ([`.claude/rules/security.md`](../../.claude/rules/security.md),
 [ADR-0006](0006-release-packaging-and-signing.md)) — the same kind of recorded
 exception the unsigned `v0.1.0` preview took. Decided by the product owner.
+The exception ends with the first release signed under
+[ADR-0043](0043-sign-windows-releases-with-azure-artifact-signing.md), whose
+release workflow refuses to build an unsigned release unless it is explicitly
+marked as an unsigned pre-release.
 
 ## Context
 

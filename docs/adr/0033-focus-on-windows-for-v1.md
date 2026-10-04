@@ -5,6 +5,8 @@
 Accepted — 2026-06-11. Pauses the macOS / Linux halves of
 [ADR-0018](0018-cross-os-installer-matrix.md) and narrows the open-core v1.0
 plan to Windows.
+Its signing line (SignPath Foundation) is replaced by
+[ADR-0043](0043-sign-windows-releases-with-azure-artifact-signing.md).
 
 ## Context
 
