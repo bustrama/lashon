@@ -8,13 +8,15 @@ export const ARM_DELAY_MS = 700;
 /** Mirrors `ottid_core::approval::HOLD`: how long the Allow hotkey is held. */
 export const HOLD_MS = 1000;
 
-export type ApprovalSource = 'command' | 'recipe';
+export type ApprovalSource = 'command' | 'recipe' | 'agent';
 export type ApprovalDecision = 'allow' | 'deny';
 
 /** The card the broker sends on `approval:changed` (`Card` in approval.rs). */
 export interface ApprovalCard {
 	id: number;
 	source: ApprovalSource;
+	/** The agent asking, for an `agent` request ("Claude Code"). */
+	agent?: string;
 	/** The tool or recipe step, e.g. `run_command`. */
 	tool: string;
 	/** The literal command line. */
@@ -25,7 +27,10 @@ export interface ApprovalCard {
 	details?: string;
 	/** Requests waiting behind this one. */
 	waiting: number;
-	/** Time left before the broker denies it, when it was sent. */
+	/**
+	 * Time left before the broker denies it (an agent's request goes back to
+	 * the agent's own prompt instead), when it was sent.
+	 */
 	expires_in_ms: number;
 	/** The keycaps of the registered hotkeys; null for one that isn't. */
 	keys: { allow: string[] | null; deny: string[] | null };
@@ -202,13 +207,35 @@ export function question(card: ApprovalCard, t: Translate): string {
 		: fill(t('approval.question.tool'), { tool: card.tool });
 }
 
+/** The agent asking, or null when Ottid itself asks. */
+export function askingAgent(card: ApprovalCard): string | null {
+	return card.source === 'agent' && card.agent ? card.agent : null;
+}
+
+/** Who needs the answer: Ottid, or the agent asking (docs/adr/0050). */
+export function eyebrow(card: ApprovalCard, t: Translate): string {
+	const agent = askingAgent(card);
+	return agent ? fill(t('approval.eyebrowAgent'), { agent }) : t('approval.eyebrow');
+}
+
+/**
+ * What happens when the card's time runs out, as an i18n key: Ottid's own
+ * requests are denied, and an agent's goes back to the agent's own prompt
+ * (docs/adr/0050).
+ */
+export function lapseKey(card: ApprovalCard, kind: 'expires' | 'announce'): string {
+	const agent = card.source === 'agent';
+	if (kind === 'expires') return agent ? 'approval.expiresAgent' : 'approval.expires';
+	return agent ? 'approval.announce.timeoutAgent' : 'approval.announce.timeout';
+}
+
 /**
  * What the assertive live region says when a card appears: the whole
  * request, how to answer it, and when it lapses. The overlay never has
  * focus, so this is a screen reader's only way to the card.
  */
 export function announcement(card: ApprovalCard, t: Translate): string {
-	const parts = [t('approval.eyebrow') + '.', question(card, t)];
+	const parts = [eyebrow(card, t) + '.', question(card, t)];
 	if (card.source === 'recipe') parts.push(t('approval.source.recipe') + '.');
 	if (card.command !== undefined) {
 		parts.push(`${t('approval.announce.command')}: ${spoken(card.command, t)}.`);
@@ -224,7 +251,7 @@ export function announcement(card: ApprovalCard, t: Translate): string {
 		parts.push(fill(t('approval.announce.denyKey'), { keys: card.keys.deny.join('+') }));
 	}
 	parts.push(
-		fill(t('approval.announce.timeout'), { seconds: Math.ceil(card.expires_in_ms / 1000) })
+		fill(t(lapseKey(card, 'announce')), { seconds: Math.ceil(card.expires_in_ms / 1000) })
 	);
 	return parts.join(' ');
 }

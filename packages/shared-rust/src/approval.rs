@@ -2,7 +2,7 @@
 //! ([ADR-0048](../../../docs/adr/0048-the-approval-card.md)).
 //!
 //! Anything that needs the user's yes or no before it acts asks through one
-//! queue: a command-mode tool, a recipe's shell step, and later an agent. The
+//! queue: a command-mode tool, a recipe's shell step, and a coding agent. The
 //! overlay shows the oldest request as a card with the full text of what
 //! would run. This module is the decision logic, with the clock passed in.
 //! The Tauri shell (`apps/desktop/src-tauri/src/approval.rs`) owns the
@@ -63,6 +63,9 @@ const RUN_COMMAND: &str = "run_command";
 /// The recipe step that runs a shell command line.
 const RUN_SHELL: &str = "run_shell";
 
+/// A coding agent's tools that run a shell command line (Claude Code's).
+const AGENT_SHELLS: [&str; 2] = ["Bash", "PowerShell"];
+
 /// A request's id, unique for the life of the queue.
 pub type Id = u64;
 
@@ -91,6 +94,9 @@ pub enum Source {
     Command,
     /// A step of a recipe.
     Recipe,
+    /// A coding agent's tool call, such as Claude Code's through the hooks
+    /// bridge (ADR-0050).
+    Agent,
 }
 
 impl Source {
@@ -98,6 +104,7 @@ impl Source {
         match self {
             Source::Command => "command",
             Source::Recipe => "recipe",
+            Source::Agent => "agent",
         }
     }
 }
@@ -107,7 +114,11 @@ impl Source {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Request {
     pub source: Source,
-    /// The tool or step name, from a fixed set (safe to log).
+    /// The agent asking, for [`Source::Agent`] ("Claude Code").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
+    /// The tool or step name: from a fixed set, or an agent's tool name the
+    /// bridge has checked is plain ASCII (safe to log either way).
     pub tool: String,
     /// The literal shell command line, for a tool or step that runs one.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -145,19 +156,13 @@ impl Request {
                 }
             }
         }
-        let details = match &rest {
-            Value::Null => None,
-            Value::Object(map) if map.is_empty() => None,
-            other => {
-                Some(serde_json::to_string_pretty(other).unwrap_or_else(|_| other.to_string()))
-            }
-        };
         Self {
             source: Source::Command,
+            agent: None,
             tool: tool.to_string(),
             command,
             cwd,
-            details,
+            details: details_of(&rest),
         }
     }
 
@@ -166,11 +171,50 @@ impl Request {
     pub fn for_recipe_step(command: &str) -> Self {
         Self {
             source: Source::Recipe,
+            agent: None,
             tool: RUN_SHELL.to_string(),
             command: Some(command.to_string()),
             cwd: None,
             details: None,
         }
+    }
+
+    /// A coding agent's tool call (ADR-0050). A shell tool's command line
+    /// shows on its own, as `run_command`'s does; every other input, the
+    /// agent's own description of the command included, goes into
+    /// `details`. `cwd` is the folder the agent works in, shown for every
+    /// tool: it tells two sessions apart, and a relative path in the input
+    /// points into it.
+    pub fn for_agent(agent: &str, tool: &str, input: &Value, cwd: Option<&str>) -> Self {
+        let mut rest = input.clone();
+        let mut command = None;
+        if AGENT_SHELLS.contains(&tool) {
+            if let Value::Object(map) = &mut rest {
+                if let Some(Value::String(line)) = map.get("command") {
+                    command = Some(line.clone());
+                    map.remove("command");
+                }
+            }
+        }
+        Self {
+            source: Source::Agent,
+            agent: Some(agent.to_string()),
+            tool: tool.to_string(),
+            command,
+            cwd: cwd.filter(|dir| !dir.trim().is_empty()).map(str::to_string),
+            details: details_of(&rest),
+        }
+    }
+}
+
+/// Arguments left over after the command line, as pretty-printed JSON.
+/// JSON keeps a value that holds a line break or a quote from passing for
+/// another argument.
+fn details_of(rest: &Value) -> Option<String> {
+    match rest {
+        Value::Null => None,
+        Value::Object(map) if map.is_empty() => None,
+        other => Some(serde_json::to_string_pretty(other).unwrap_or_else(|_| other.to_string())),
     }
 }
 
@@ -634,6 +678,106 @@ mod tests {
             request.command.as_deref(),
             Some("Rename-Item 'דוח.txt' 'דוח 2026.txt'")
         );
+        assert_eq!(request.agent, None);
+    }
+
+    #[test]
+    fn an_agents_shell_call_shows_its_command_line_and_folder() {
+        let request = Request::for_agent(
+            "Claude Code",
+            "Bash",
+            &json!({
+                "command": "git push --force origin main",
+                "description": "Force-push the rebased branch",
+                "timeout": 120000
+            }),
+            Some("C:\\Users\\דנה\\פרויקט"),
+        );
+        assert_eq!(request.source, Source::Agent);
+        assert_eq!(request.agent.as_deref(), Some("Claude Code"));
+        assert_eq!(request.tool, "Bash");
+        assert_eq!(
+            request.command.as_deref(),
+            Some("git push --force origin main")
+        );
+        assert_eq!(request.cwd.as_deref(), Some("C:\\Users\\דנה\\פרויקט"));
+        // The agent's own description is shown too, as what it is: an
+        // argument, not the command.
+        let details = request.details.expect("the rest of the input");
+        assert!(
+            details.contains("Force-push the rebased branch"),
+            "{details}"
+        );
+        assert!(details.contains("\"timeout\": 120000"), "{details}");
+        assert!(!details.contains("git push"), "{details}");
+
+        let ps = Request::for_agent(
+            "Claude Code",
+            "PowerShell",
+            &json!({ "command": "Remove-Item x" }),
+            None,
+        );
+        assert_eq!(ps.command.as_deref(), Some("Remove-Item x"));
+        assert_eq!(ps.cwd, None);
+    }
+
+    #[test]
+    fn an_agents_other_tools_show_every_input_whole() {
+        let input = json!({
+            "file_path": "C:\\repo\\README.he.md",
+            "old_string": "שלום\nעולם",
+            "new_string": "שָׁלוֹם \u{202E}עולם"
+        });
+        let request = Request::for_agent("Claude Code", "Edit", &input, Some("C:\\repo"));
+        assert_eq!(request.command, None);
+        let details = request.details.expect("the input");
+        let back: Value = serde_json::from_str(&details).unwrap();
+        assert_eq!(back, input, "nothing dropped or changed");
+        // A `command` field of another tool is just input.
+        let other = Request::for_agent(
+            "Claude Code",
+            "mcp__x__run",
+            &json!({ "command": "y" }),
+            None,
+        );
+        assert_eq!(other.command, None);
+        assert!(other.details.unwrap().contains("\"command\": \"y\""));
+    }
+
+    #[test]
+    fn an_agents_blank_folder_or_empty_input_shows_nothing_extra() {
+        let request = Request::for_agent(
+            "Claude Code",
+            "Bash",
+            &json!({ "command": "ls" }),
+            Some("  "),
+        );
+        assert_eq!(request.cwd, None);
+        assert_eq!(request.details, None);
+        // A non-string command isn't a command line: it stays in details.
+        let odd = Request::for_agent(
+            "Claude Code",
+            "Bash",
+            &json!({ "command": ["rm", "-rf"] }),
+            None,
+        );
+        assert_eq!(odd.command, None);
+        assert!(odd.details.unwrap().contains("rm"));
+    }
+
+    #[test]
+    fn the_card_gets_the_agent_and_source() {
+        let request = Request::for_agent("Claude Code", "Bash", &json!({ "command": "ls" }), None);
+        let mut queue = Queue::new();
+        queue.push(request, (), Instant::now());
+        let card = serde_json::to_value(queue.shown(Instant::now()).unwrap()).unwrap();
+        assert_eq!(card["source"], "agent");
+        assert_eq!(card["agent"], "Claude Code");
+        // Other sources carry no agent field at all.
+        let mut queue = Queue::new();
+        queue.push(shell("dir"), (), Instant::now());
+        let card = serde_json::to_value(queue.shown(Instant::now()).unwrap()).unwrap();
+        assert!(card.get("agent").is_none());
     }
 
     #[test]

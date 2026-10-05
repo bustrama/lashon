@@ -7,6 +7,8 @@
 //! It owns the overlay window, the tray, and the global hotkeys, and delegates
 //! capture, transcription, and text injection to the ottid-core crate.
 
+#[cfg(all(feature = "command-mode", feature = "agent-hooks"))]
+mod agent_hooks;
 #[cfg(feature = "command-mode")]
 mod approval;
 #[cfg(feature = "command-mode")]
@@ -72,6 +74,9 @@ fn open_hub(app: tauri::AppHandle) {
 /// at startup — see `configure_stt_device_env`).
 #[tauri::command]
 fn restart_app(app: tauri::AppHandle) {
+    // A restart skips the exit event: stop the hooks bridge here.
+    #[cfg(all(feature = "command-mode", feature = "agent-hooks"))]
+    agent_hooks::stop(&app);
     app.restart();
 }
 
@@ -315,6 +320,10 @@ pub fn run() {
         .manage(command_mode::ActiveDispatch::default())
         .manage(approval::Approvals::default());
 
+    // The Claude Code hooks bridge (ADR-0050) — command-mode edition only.
+    #[cfg(all(feature = "command-mode", feature = "agent-hooks"))]
+    let builder = builder.manage(agent_hooks::AgentBridge::default());
+
     builder
         // Every menu selection arrives here once: the tray's and the
         // tongue's right-click context menu's. (A tray's own `on_menu_event`
@@ -399,7 +408,13 @@ pub fn run() {
             #[cfg(feature = "command-mode")]
             command_mode::get_word_aliases,
             #[cfg(feature = "command-mode")]
-            command_mode::set_word_aliases
+            command_mode::set_word_aliases,
+            #[cfg(all(feature = "command-mode", feature = "agent-hooks"))]
+            agent_hooks::agent_hooks_status,
+            #[cfg(all(feature = "command-mode", feature = "agent-hooks"))]
+            agent_hooks::agent_hooks_preview,
+            #[cfg(all(feature = "command-mode", feature = "agent-hooks"))]
+            agent_hooks::agent_hooks_apply
         ])
         .setup(move |app| {
             // Initialize logging first, so every start-up step below is
@@ -488,10 +503,26 @@ pub fn run() {
                 show_tutorial(app.handle(), false);
             }
 
+            // Answer Claude Code's permission prompts on the approval card,
+            // if the user installed the hook from the Hub (ADR-0050).
+            #[cfg(all(feature = "command-mode", feature = "agent-hooks"))]
+            {
+                let app = app.handle().clone();
+                tauri::async_runtime::spawn(async move { agent_hooks::start_if_installed(&app) });
+            }
+
             Ok(())
         })
-        .run(context)
-        .expect("error while running the Ottid application");
+        .build(context)
+        .expect("error while building the Ottid application")
+        .run(|_app, _event| {
+            // Stopping the hooks bridge deletes its file, and the token
+            // with it (ADR-0050).
+            #[cfg(all(feature = "command-mode", feature = "agent-hooks"))]
+            if let tauri::RunEvent::Exit = _event {
+                agent_hooks::stop(_app);
+            }
+        });
 }
 
 /// Move the pre-rename install's per-identifier dirs (settings, WebView

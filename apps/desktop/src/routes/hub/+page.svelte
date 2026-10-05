@@ -18,6 +18,7 @@
 	import Mark from '$lib/components/Mark.svelte';
 	import RecipesSection from '$lib/recipes/RecipesSection.svelte';
 	import VoiceCorrectionsSection from '$lib/voice/VoiceCorrectionsSection.svelte';
+	import ClaudeCodeSection from '$lib/agent/ClaudeCodeSection.svelte';
 	import { FULL_EDITION } from '$lib/edition';
 	import { PLACEMENTS, type Placement } from '$lib/creature/types';
 
@@ -29,6 +30,7 @@
 		| 'llm'
 		| 'recipes'
 		| 'voice'
+		| 'agents'
 		| 'about';
 	const ALL_SECTIONS: Section[] = [
 		'general',
@@ -38,15 +40,17 @@
 		'llm',
 		'recipes',
 		'voice',
+		'agents',
 		'about'
 	];
 	// The free (dictation-only) edition compiles out command mode, so its
-	// LLM / Recipes / Voice-corrections sections have no backing Tauri
-	// commands — drop them from the nav so the surface matches the binary
-	// (docs/adr/0034-command-mode-editioning.md).
+	// LLM / Recipes / Voice-corrections / Coding-agents sections have no
+	// backing Tauri commands — drop them from the nav so the surface matches
+	// the binary (docs/adr/0034-command-mode-editioning.md, docs/adr/0050).
+	const COMMAND_MODE_SECTIONS: Section[] = ['llm', 'recipes', 'voice', 'agents'];
 	const SECTIONS: Section[] = FULL_EDITION
 		? ALL_SECTIONS
-		: ALL_SECTIONS.filter((id) => id !== 'llm' && id !== 'recipes' && id !== 'voice');
+		: ALL_SECTIONS.filter((id) => !COMMAND_MODE_SECTIONS.includes(id));
 
 	// English subtitles for the section headers — the Lamp design pairs each
 	// Hebrew title with a small italic English sublabel ("כללי · General").
@@ -60,6 +64,7 @@
 		llm: 'Language models',
 		recipes: 'Recipes',
 		voice: 'Voice corrections',
+		agents: 'Coding agents',
 		about: 'About'
 	};
 
@@ -1570,6 +1575,8 @@
 					<RecipesSection onopenmcp={() => openExternal('https://bustrama.github.io/ottid/mcp/')} />
 				{:else if section === 'voice'}
 					<VoiceCorrectionsSection />
+				{:else if section === 'agents'}
+					<ClaudeCodeSection />
 				{:else}
 					<section aria-live="polite">
 						<h2 class="section-head">

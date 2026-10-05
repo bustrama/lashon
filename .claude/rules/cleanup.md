@@ -15,7 +15,7 @@ the same tiers and the same `--dry-run` switch.
 | Tier | What it removes | Recovery cost |
 |---|---|---|
 | `light` (default) | `target/` via `cargo clean`; empty orphan dirs under `.claude/worktrees/` that aren't in `git worktree list`. | One cold `cargo build` / `cargo test`. |
-| `medium` | `light` + `services/stt-sidecar/.venv`, `services/stt-sidecar/{build,dist}`, `apps/desktop/node_modules`, `apps/desktop/.svelte-kit`, `apps/desktop/build`, and the regenerable contents of `apps/desktop/src-tauri/binaries/{ottid-stt,llama-server,ottid-mcp}` (the `.gitkeep` and llama-server `README.md` stay). | `npm install`, recreate the venv (`python -m venv .venv` + `pip install -e .[cuda]`), re-freeze the sidecar with PyInstaller, re-mirror the llama-server release artefacts per `docs/adr/0025`, re-stage ottid-mcp with `scripts/stage-ottid-mcp.sh`. |
+| `medium` | `light` + `services/stt-sidecar/.venv`, `services/stt-sidecar/{build,dist}`, `apps/desktop/node_modules`, `apps/desktop/.svelte-kit`, `apps/desktop/build`, and the regenerable contents of `apps/desktop/src-tauri/binaries/{ottid-stt,ottid-hook,llama-server,ottid-mcp}` (the `.gitkeep` and llama-server `README.md` stay). | `npm install`, recreate the venv (`python -m venv .venv` + `pip install -e .[cuda]`), re-freeze the sidecar with PyInstaller, re-mirror the llama-server release artefacts per `docs/adr/0025`, re-stage ottid-mcp with `scripts/stage-ottid-mcp.sh`. |
 | `aggressive` | `medium` + `models/stt/` + `models/local-llm/`. | Multi-GB re-downloads on next run (Whisper-large-v3-turbo-ct2 from ivrit-ai, Qwen3-4B GGUF from the official `Qwen/Qwen3-4B-GGUF` repo). |
 
 ## What never gets touched

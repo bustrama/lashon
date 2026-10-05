@@ -39,6 +39,18 @@ Derived files (Ottid path  <-  Coucou path):
       <-  windows/src/island/fsm.ts                (IslandStateMachine hover
                                                      rules)
 
+The Claude Code hooks bridge's Windows named-pipe listener adapts the hardened
+pipe server of the fork https://github.com/YojoTan/coucou (MIT, under the same
+copyright and license file as Coucou): the explicit DACL that admits only the
+user's SID, `first_pipe_instance` and `reject_remote_clients`, and a fresh
+pipe instance per accepted connection. The protocol, its authentication and
+everything else in the bridge are Ottid's own.
+
+  packages/shared-rust/src/agent_bridge/endpoint.rs
+      <-  windows/src-tauri/src/pipe.rs            (pipe_sddl,
+                                                     create_instance, the
+                                                     accept loop)
+
   MIT License
 
   Copyright (c) 2026 Louis Raillé

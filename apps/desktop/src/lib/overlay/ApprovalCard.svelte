@@ -26,8 +26,10 @@
 		ARM_DELAY_MS,
 		ArmClock,
 		HOLD_MS,
+		askingAgent,
 		atEnd,
 		fill,
+		lapseKey,
 		nextPage,
 		pieces,
 		seenNudges,
@@ -83,6 +85,10 @@
 	let lastNudge = untrack(() => seenNudges(nudge, card.id));
 
 	const toolQuestion = $derived($t('approval.question.tool').split('{tool}'));
+	// The agent asking (docs/adr/0050), named in the eyebrow in its own
+	// isolate: a Latin name inside a Hebrew sentence.
+	const agent = $derived(askingAgent(card));
+	const agentEyebrow = $derived($t('approval.eyebrowAgent').split('{agent}'));
 
 	function metrics(el: HTMLElement): Scroll {
 		return {
@@ -238,7 +244,9 @@
 <div class="approval" role="group" aria-labelledby="approval-question-{card.id}">
 	<div class="head">
 		<span class="dot" aria-hidden="true"></span>
-		<span class="eyebrow">{$t('approval.eyebrow')}</span>
+		<span class="eyebrow">
+			{#if agent}{agentEyebrow[0]}<bdi>{agent}</bdi>{agentEyebrow[1] ?? ''}{:else}{$t('approval.eyebrow')}{/if}
+		</span>
 		{#if card.waiting > 0}
 			<span class="waiting">{fill($t('approval.waiting'), { count: card.waiting })}</span>
 		{/if}
@@ -311,7 +319,7 @@
 	{#if keyHint}
 		<p class="expires key-hint" aria-hidden="true">{keyHint}</p>
 	{:else}
-		<p class="expires" aria-hidden="true">{fill($t('approval.expires'), { seconds: secondsLeft })}</p>
+		<p class="expires" aria-hidden="true">{fill($t(lapseKey(card, 'expires')), { seconds: secondsLeft })}</p>
 	{/if}
 </div>
 

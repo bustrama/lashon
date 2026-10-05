@@ -31,7 +31,11 @@ tauri-build = { version = "=2.6.2", features = [] }
 # feature. A free `--no-default-features` build ships dictation only — command
 # mode (LLM, tools, recipes, local LLM, MCP) is compiled out of the binary.
 default = ["command-mode"]
-command-mode = ["ottid-core/command-mode"]
+command-mode = ["ottid-core/command-mode", "agent-hooks"]
+# The Claude Code hooks bridge (ADR-0050): the listener behind the approval
+# card and the Hub's install action. It needs the approval broker, so it does
+# nothing without `command-mode`.
+agent-hooks = ["ottid-core/agent-hooks"]
 
 [dependencies]
 ottid-core = { path = "../../../packages/shared-rust", default-features = false }

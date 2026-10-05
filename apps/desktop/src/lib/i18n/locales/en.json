@@ -136,7 +136,8 @@
 			"llm": "Language models",
 			"recipes": "Recipes",
 			"about": "About",
-			"voice": "Voice corrections"
+			"voice": "Voice corrections",
+			"agents": "Coding agents"
 		},
 		"general": {
 			"title": "General",
@@ -390,6 +391,63 @@
 			"errorLoad": "Load failed",
 			"loading": "Loading…",
 			"count": "{n} active corrections"
+		},
+		"agents": {
+			"title": "Coding agents",
+			"intro": "When Claude Code needs permission to run a command or edit a file, Ottid can show the request on its approval card, where you allow or deny it without going back to the terminal. If Ottid is closed, or nobody answers in time, Claude Code asks in the terminal as usual.",
+			"loading": "Loading…",
+			"settingsFile": "Settings file",
+			"state": {
+				"on": "Connected. Claude Code's permission requests show on Ottid's card.",
+				"off": "Not connected. Claude Code asks in the terminal.",
+				"stale": "Connected to another copy of Ottid. Connecting again points it at this one.",
+				"missing": "This build has no hook client (ottid-hook), so it can't connect.",
+				"unreadable": "Ottid can't read Claude Code's settings file, so it won't change it."
+			},
+			"missingHint": "In a local build, build it with:",
+			"notListening": "The hook is installed, but Ottid couldn't open its listener, so requests go back to the terminal. Restarting Ottid should fix it.",
+			"hooksDisabled": "disableAllHooks is on in the settings file, so Claude Code runs no hooks, Ottid's included.",
+			"scope": "The hook goes into Claude Code's user settings (user scope), so it applies to every project. Hooks set in a project or in local settings keep running alongside it.",
+			"once": "An answer on the card covers that one request; Ottid never adds standing permissions.",
+			"privacy": "Requests stay on this computer, on a channel only your user account can open. Ottid neither keeps what a request contains nor writes it to its log.",
+			"install": "Connect Claude Code",
+			"reinstall": "Point it at this copy",
+			"uninstall": "Disconnect",
+			"preview": {
+				"install": "This is what gets added to Claude Code's settings",
+				"uninstall": "This is what gets removed from Claude Code's settings",
+				"file": "In the file:",
+				"where": "In the list",
+				"replaces": "Earlier Ottid entries replaced: {n}",
+				"removes": "Ottid entries removed from hooks.PermissionRequest: {n}",
+				"backup": "The file is backed up in the same folder before it changes.",
+				"newFile": "The file doesn't exist yet, so it is created.",
+				"nothingElse": "No other setting in the file changes.",
+				"noChange": "Nothing to change: the file is already like this.",
+				"confirmInstall": "Confirm and connect",
+				"confirmUninstall": "Confirm and disconnect",
+				"cancel": "Cancel",
+				"applying": "Updating…"
+			},
+			"toast": {
+				"installed": "Ottid is connected to Claude Code",
+				"uninstalled": "Disconnected from Claude Code",
+				"backup": "Backup: {path}"
+			},
+			"error": {
+				"no-home": "The user's home folder wasn't found.",
+				"no-hook-binary": "This build has no hook client (ottid-hook).",
+				"not-the-hub": "Only the Settings window can change Claude Code's settings.",
+				"not-json": "The settings file isn't valid JSON. Fix it by hand first.",
+				"not-object": "The settings file isn't a JSON object.",
+				"hooks-not-object": "The hooks field in the settings file isn't an object.",
+				"event-not-list": "The hooks.PermissionRequest field in the settings file isn't a list.",
+				"duplicate-key": "The settings file has a duplicate key, so there's no telling which one Claude Code reads.",
+				"not-text": "The settings file isn't UTF-8 text.",
+				"changed": "The file changed since the preview. This is the change against the file as it is now; look it over again.",
+				"io": "Ottid couldn't read or write the settings file.",
+				"other": "Something went wrong."
+			}
 		}
 	},
 	"command": {
@@ -444,6 +502,7 @@
 	},
 	"approval": {
 		"eyebrow": "Ottid needs your approval",
+		"eyebrowAgent": "{agent} needs your approval",
 		"question": {
 			"command": "Run this command?",
 			"tool": "Use {tool}?"
@@ -456,6 +515,7 @@
 		"deny": "Deny",
 		"scrollToEnd": "Scroll to the end of the command to allow it",
 		"expires": "Denied automatically in {seconds}s",
+		"expiresAgent": "Back to the terminal in {seconds}s",
 		"waiting": "{count} more waiting",
 		"hiddenChar": "hidden character",
 		"hiddenCharTitle": "A character that doesn't show on screen: {code}",
@@ -464,7 +524,8 @@
 			"details": "The details",
 			"allowKey": "To allow, hold {keys} for a second.",
 			"denyKey": "To deny: {keys}.",
-			"timeout": "With no answer, the request is denied in {seconds} seconds."
+			"timeout": "With no answer, the request is denied in {seconds} seconds.",
+			"timeoutAgent": "With no answer, the request goes back to the terminal in {seconds} seconds."
 		},
 		"nudge": {
 			"more": "Showing more of the command. Allow works once all of it has been shown.",

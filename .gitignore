@@ -51,6 +51,12 @@ apps/desktop/src-tauri/binaries/ottid-stt/*
 apps/desktop/src-tauri/binaries/llama-server/*
 !apps/desktop/src-tauri/binaries/llama-server/.gitkeep
 !apps/desktop/src-tauri/binaries/llama-server/README.md
+# The Claude Code hook client (docs/adr/0050), built from ottid-core and
+# staged by a full-edition release build. .gitkeep keeps the resource glob
+# resolving on a clean checkout.
+apps/desktop/src-tauri/binaries/ottid-hook/*
+!apps/desktop/src-tauri/binaries/ottid-hook/.gitkeep
+
 # The ottid-mcp binary the full edition bundles (docs/adr/0049) — built and
 # staged by scripts/stage-ottid-mcp.sh. .gitkeep stays so the resource glob
 # resolves on a clean checkout (Tauri fails a glob that matches nothing).

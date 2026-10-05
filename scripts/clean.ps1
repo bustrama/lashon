@@ -199,6 +199,26 @@ try {
             }
         }
 
+        # Staged Claude Code hook client (docs/adr/0050) — keep .gitkeep.
+        $hookBin = Join-Path $root 'apps\desktop\src-tauri\binaries\ottid-hook'
+        if (Test-Path $hookBin) {
+            $items = Get-ChildItem -LiteralPath $hookBin -Force | Where-Object { $_.Name -ne '.gitkeep' }
+            $hookMB = ($items | ForEach-Object { Get-DirSizeMB -Path $_.FullName } | Measure-Object -Sum).Sum
+            if (-not $hookMB) { $hookMB = 0 }
+            if ($items.Count -eq 0) {
+                Write-Host "  - src-tauri/binaries/ottid-hook/*                       (clean)" -ForegroundColor DarkGray
+            }
+            elseif ($DryRun) {
+                Write-Host ("  - src-tauri/binaries/ottid-hook/* (keep .gitkeep)       {0,8} MB  (dry-run)" -f $hookMB) -ForegroundColor Yellow
+                $reclaimed += $hookMB
+            }
+            else {
+                $items | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+                Write-Host ("  - src-tauri/binaries/ottid-hook/* (keep .gitkeep)       {0,8} MB  deleted" -f $hookMB) -ForegroundColor Green
+                $reclaimed += $hookMB
+            }
+        }
+
         # llama-server bundle — keep .gitkeep + README.md, blow away the DLLs/exe.
         $llamaBin = Join-Path $root 'apps\desktop\src-tauri\binaries\llama-server'
         if (Test-Path $llamaBin) {
