@@ -580,10 +580,11 @@ mod tests {
         use windows::core::{PCWSTR, PWSTR};
         use windows::Win32::Foundation::{LocalFree, HANDLE, HLOCAL};
         use windows::Win32::Security::Authorization::{
-            ConvertSecurityDescriptorToStringSecurityDescriptorW, GetNamedSecurityInfoW,
-            GetSecurityInfo, SDDL_REVISION_1, SE_FILE_OBJECT, SE_KERNEL_OBJECT,
+            ConvertSecurityDescriptorToStringSecurityDescriptorW, ConvertSidToStringSidW,
+            ConvertStringSidToSidW, GetNamedSecurityInfoW, GetSecurityInfo, SDDL_REVISION_1,
+            SE_FILE_OBJECT, SE_KERNEL_OBJECT,
         };
-        use windows::Win32::Security::{DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR};
+        use windows::Win32::Security::{DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR, PSID};
 
         fn to_sddl(descriptor: PSECURITY_DESCRIPTOR) -> String {
             let mut text = PWSTR::null();
@@ -647,15 +648,36 @@ mod tests {
             to_sddl(descriptor)
         }
 
+        /// A trustee as SDDL writes it, back to a SID string. SDDL writes
+        /// well-known SIDs as aliases: the built-in Administrator account,
+        /// which CI runners use, comes back as `LA`, not `S-1-5-21-…-500`.
+        fn trustee_sid(trustee: &str) -> String {
+            let wide: Vec<u16> = trustee.encode_utf16().chain(std::iter::once(0)).collect();
+            let mut sid = PSID::default();
+            let mut text = PWSTR::null();
+            // SAFETY: a NUL-terminated string and out-parameters; both
+            // results are allocated by the system and freed with LocalFree.
+            unsafe {
+                ConvertStringSidToSidW(PCWSTR(wide.as_ptr()), &mut sid).unwrap();
+                ConvertSidToStringSidW(sid, &mut text).unwrap();
+                let canonical = text.to_string().unwrap();
+                let _ = LocalFree(Some(HLOCAL(text.0.cast())));
+                let _ = LocalFree(Some(HLOCAL(sid.0)));
+                canonical
+            }
+        }
+
         /// One protected entry, allowing this user, and nothing else.
         fn assert_user_only(sddl: &str) {
             let sid = current_user_sid().unwrap();
             assert!(sddl.starts_with("D:P"), "not protected: {sddl}");
             assert_eq!(sddl.matches('(').count(), 1, "more than one entry: {sddl}");
-            assert!(
-                sddl.contains(&format!(";;;{sid})")),
-                "not this user: {sddl}"
-            );
+            let trustee = sddl
+                .rsplit(";;;")
+                .next()
+                .and_then(|rest| rest.strip_suffix(')'))
+                .unwrap_or_else(|| panic!("no trustee: {sddl}"));
+            assert_eq!(trustee_sid(trustee), sid, "not this user: {sddl}");
             assert!(sddl.contains("(A;"), "not an allow entry: {sddl}");
             for broad in ["WD", "AN", "AU", "BU", "BA", "SY"] {
                 assert!(
@@ -672,6 +694,14 @@ mod tests {
                 "D:P(A;;GA;;;S-1-5-21-1-2-3-1001)"
             );
             assert!(current_user_sid().unwrap().starts_with("S-1-"));
+        }
+
+        #[test]
+        fn sddl_aliases_resolve_to_the_sid_they_stand_for() {
+            let sid = current_user_sid().unwrap();
+            assert_eq!(trustee_sid(&sid), sid);
+            // The built-in Administrator account is RID 500 on this machine.
+            assert!(trustee_sid("LA").ends_with("-500"));
         }
 
         #[test]
