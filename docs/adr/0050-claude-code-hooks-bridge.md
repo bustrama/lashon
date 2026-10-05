@@ -53,7 +53,10 @@ its input and the working folder on stdin.
 A small binary in `ottid-core` (`src/bin/ottid_hook.rs`).
 
 1. It reads stdin, capped. It checks that the event is `PermissionRequest`
-   and that the tool name is plain ASCII.
+   and that the tool name is plain ASCII. It stands aside for the tools whose
+   prompt collects an answer rather than a yes or no (`AskUserQuestion` and
+   `ExitPlanMode`): their answers travel back in `updatedInput`, which the
+   card can't fill, so an Allow would skip the user's choice.
 2. It reads the bridge file and connects.
 3. It runs the handshake, asks, and waits.
 

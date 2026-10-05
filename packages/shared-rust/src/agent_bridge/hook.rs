@@ -91,6 +91,8 @@ pub enum InputError {
     BadTool,
     #[error("the tool input isn't a JSON object")]
     BadInput,
+    #[error("the tool asks the user for an answer the card can't give")]
+    NeedsAnswer,
 }
 
 #[derive(Deserialize)]
@@ -101,6 +103,12 @@ struct Raw {
     cwd: Option<String>,
 }
 
+/// Claude Code's tools whose permission prompt collects an answer rather than
+/// a yes or no: the question picker, and the plan-mode exit, which also asks
+/// how to go on. Their answers travel back in `updatedInput`, which the card
+/// can't fill, so they stay with Claude Code's own prompt.
+const NEEDS_AN_ANSWER: [&str; 2] = ["AskUserQuestion", "ExitPlanMode"];
+
 /// Read Claude Code's hook input.
 pub fn parse(stdin: &[u8]) -> Result<HookInput, InputError> {
     let raw: Raw = serde_json::from_slice(stdin).map_err(|_| InputError::NotJson)?;
@@ -110,6 +118,9 @@ pub fn parse(stdin: &[u8]) -> Result<HookInput, InputError> {
     let tool = raw.tool_name.ok_or(InputError::BadTool)?;
     if !valid_tool_name(&tool) {
         return Err(InputError::BadTool);
+    }
+    if NEEDS_AN_ANSWER.contains(&tool.as_str()) {
+        return Err(InputError::NeedsAnswer);
     }
     let input = match raw.tool_input {
         Some(input @ Value::Object(_)) => input,
@@ -246,6 +257,20 @@ mod tests {
             "tool_input": "ls"
         }));
         assert_eq!(parse(&string_input), Err(InputError::BadInput));
+    }
+
+    #[test]
+    fn tools_that_ask_for_an_answer_stay_with_claude_code() {
+        // An Allow from the card would answer the question with nothing, or
+        // leave plan mode without the user's choice of how to go on.
+        for tool in ["AskUserQuestion", "ExitPlanMode"] {
+            let raw = input(json!({
+                "hook_event_name": "PermissionRequest",
+                "tool_name": tool,
+                "tool_input": { "questions": [] }
+            }));
+            assert_eq!(parse(&raw), Err(InputError::NeedsAnswer), "{tool}");
+        }
     }
 
     #[test]
