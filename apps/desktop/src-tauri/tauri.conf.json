@@ -81,6 +81,8 @@
       "binaries/ottid-stt/**/*",
       "binaries/llama-server/**/*",
       "binaries/ottid-hook/**/*",
+      "binaries/ottid-mcp/**/*",
+      "../../../recipes/starters/**/*",
       "../../../models/wake/wakewords/hey_lashon.onnx",
       "../../../models/wake/openwakeword/embedding_model.onnx",
       "../../../models/wake/openwakeword/melspectrogram.onnx",

@@ -1,5 +1,5 @@
 <!--
-	Hub "Coding agents" section (docs/adr/0049): connects Claude Code's
+	Hub "Coding agents" section (docs/adr/0050): connects Claude Code's
 	permission requests to Ottid's approval card by adding Ottid's hook to
 	Claude Code's user settings, and takes it out again.
 

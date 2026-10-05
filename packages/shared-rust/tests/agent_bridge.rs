@@ -1,4 +1,4 @@
-//! The hook client against a real in-process listener (ADR-0049): the
+//! The hook client against a real in-process listener (ADR-0050): the
 //! named pipe (Windows) or socket (Unix) with its ACLs, the bridge file, the
 //! handshake, and what the hook would print for each outcome.
 //!

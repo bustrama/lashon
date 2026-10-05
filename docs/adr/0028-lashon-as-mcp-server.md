@@ -4,6 +4,12 @@
 
 Accepted — landed on the `m9-mcp-server` branch as M9 Phase 1g v1.
 
+> **Amended 2026-10-05 by [ADR-0049](0049-bundle-ottid-mcp-and-the-starters-in-the-full-edition.md):**
+> the bundling described under "Binary location" (the Tauri shell ships the
+> binary as a resource) was never wired up. The full edition now ships
+> `ottid-mcp` at `binaries/ottid-mcp/ottid-mcp.exe` in the install folder,
+> with the starter recipes, and the binary finds them from its own location.
+
 ## Context
 
 M9 Phase 1a (ADR-0027) introduced **recipes**: parameterised desktop

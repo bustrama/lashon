@@ -14,7 +14,8 @@
                   node_modules, .svelte-kit, Tauri-side bundled binaries
                   (regenerated at packaging time).
                   Cost of recovery: npm install, recreate venv, re-mirror
-                  llama-server binaries from the ggml.llamacpp release.
+                  llama-server binaries from the ggml.llamacpp release,
+                  re-stage ottid-mcp (scripts/stage-ottid-mcp.sh).
 
       aggressive  medium + models/stt + models/local-llm.
                   Cost of recovery: multi-GB downloads on next run.
@@ -198,7 +199,7 @@ try {
             }
         }
 
-        # Staged Claude Code hook client (docs/adr/0049) — keep .gitkeep.
+        # Staged Claude Code hook client (docs/adr/0050) — keep .gitkeep.
         $hookBin = Join-Path $root 'apps\desktop\src-tauri\binaries\ottid-hook'
         if (Test-Path $hookBin) {
             $items = Get-ChildItem -LiteralPath $hookBin -Force | Where-Object { $_.Name -ne '.gitkeep' }
@@ -235,6 +236,26 @@ try {
                 $items | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
                 Write-Host ("  - src-tauri/binaries/llama-server/* (keep .gitkeep+README)  {0,8} MB  deleted" -f $llamaMB) -ForegroundColor Green
                 $reclaimed += $llamaMB
+            }
+        }
+
+        # ottid-mcp binary the full edition bundles — keep .gitkeep.
+        $mcpBin = Join-Path $root 'apps\desktop\src-tauri\binaries\ottid-mcp'
+        if (Test-Path $mcpBin) {
+            $items = Get-ChildItem -LiteralPath $mcpBin -Force | Where-Object { $_.Name -ne '.gitkeep' }
+            $mcpMB = ($items | ForEach-Object { Get-DirSizeMB -Path $_.FullName } | Measure-Object -Sum).Sum
+            if (-not $mcpMB) { $mcpMB = 0 }
+            if ($items.Count -eq 0) {
+                Write-Host "  - src-tauri/binaries/ottid-mcp/*                        (clean)" -ForegroundColor DarkGray
+            }
+            elseif ($DryRun) {
+                Write-Host ("  - src-tauri/binaries/ottid-mcp/* (keep .gitkeep)        {0,8} MB  (dry-run)" -f $mcpMB) -ForegroundColor Yellow
+                $reclaimed += $mcpMB
+            }
+            else {
+                $items | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+                Write-Host ("  - src-tauri/binaries/ottid-mcp/* (keep .gitkeep)        {0,8} MB  deleted" -f $mcpMB) -ForegroundColor Green
+                $reclaimed += $mcpMB
             }
         }
     }

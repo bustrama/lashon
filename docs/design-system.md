@@ -107,7 +107,7 @@ the island shows the approval card
 ([ADR-0048](adr/0048-the-approval-card.md)). So does a coding agent's
 permission request: once the user connects Claude Code in the Hub's **Coding
 agents** section, its permission prompts come here too
-([ADR-0049](adr/0049-claude-code-hooks-bridge.md)).
+([ADR-0050](adr/0050-claude-code-hooks-bridge.md)).
 
 - **The whole request, never cut off.** For `run_command` the card shows the
   command and its folder; for any other tool, every argument. The text is
@@ -313,7 +313,7 @@ ripple, its stretch and the lamp's strength. It also sets the writing speed
 | **Confirm** | `--peach`, steady | Pleading tilt, wide open | Both hands open toward the user ("ok?") | Not entered by the app: a pending approval shows **Needs you** ([ADR-0048](adr/0048-the-approval-card.md)). Creatures still define it. |
 | **Wake** *(event)* | Flash in the mode's colour, then steady | Wide | Startled hop with both hands up, then the listening pose | Wake word heard |
 | **Error** *(event)* | `--state-error`, flash that fades | Sad: lids low, tilted | Flinches and squashes, hands droop | Any failure |
-| **Agent needs you** | `--aqua`, fast pulse | Wide, toward the user | Waves again and again, hopping | An approval waits on the card, Ottid's own or Claude Code's ([ADR-0049](adr/0049-claude-code-hooks-bridge.md)) |
+| **Agent needs you** | `--aqua`, fast pulse | Wide, toward the user | Waves again and again, hopping | An approval waits on the card, Ottid's own or Claude Code's ([ADR-0050](adr/0050-claude-code-hooks-bridge.md)) |
 | **Agent done** *(event)* | `--state-success`, flash that fades | Smiling | Cheers with both hands up and hops | Claude Code finished (Phase C) |
 
 States not designed yet are built from the same vocabulary: a lamp colour from

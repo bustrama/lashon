@@ -95,7 +95,7 @@ pub enum Source {
     /// A step of a recipe.
     Recipe,
     /// A coding agent's tool call, such as Claude Code's through the hooks
-    /// bridge (ADR-0049).
+    /// bridge (ADR-0050).
     Agent,
 }
 
@@ -179,7 +179,7 @@ impl Request {
         }
     }
 
-    /// A coding agent's tool call (ADR-0049). A shell tool's command line
+    /// A coding agent's tool call (ADR-0050). A shell tool's command line
     /// shows on its own, as `run_command`'s does; every other input, the
     /// agent's own description of the command included, goes into
     /// `details`. `cwd` is the folder the agent works in, shown for every

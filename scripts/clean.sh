@@ -11,7 +11,8 @@
 #               node_modules, .svelte-kit, Tauri-side bundled binaries
 #               (regenerated at packaging time).
 #               Cost of recovery: npm install, recreate venv, re-mirror
-#               llama-server binaries from the ggml.llamacpp release.
+#               llama-server binaries from the ggml.llamacpp release,
+#               re-stage ottid-mcp (scripts/stage-ottid-mcp.sh).
 #
 #   aggressive  medium + models/stt + models/local-llm.
 #               Cost of recovery: multi-GB downloads on next run.
@@ -161,7 +162,8 @@ if [[ "$level" == "medium" || "$level" == "aggressive" ]]; then
     for bin_dir in \
         "apps/desktop/src-tauri/binaries/ottid-stt:.gitkeep" \
         "apps/desktop/src-tauri/binaries/ottid-hook:.gitkeep" \
-        "apps/desktop/src-tauri/binaries/llama-server:.gitkeep,README.md"; do
+        "apps/desktop/src-tauri/binaries/llama-server:.gitkeep,README.md" \
+        "apps/desktop/src-tauri/binaries/ottid-mcp:.gitkeep"; do
         path="${bin_dir%%:*}"
         keep="${bin_dir##*:}"
         [[ -d "$path" ]] || continue

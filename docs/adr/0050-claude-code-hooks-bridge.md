@@ -1,4 +1,4 @@
-# 49. The Claude Code hooks bridge
+# 50. The Claude Code hooks bridge
 
 ## Status
 

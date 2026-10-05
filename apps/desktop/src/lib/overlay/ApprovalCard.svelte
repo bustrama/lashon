@@ -85,7 +85,7 @@
 	let lastNudge = untrack(() => seenNudges(nudge, card.id));
 
 	const toolQuestion = $derived($t('approval.question.tool').split('{tool}'));
-	// The agent asking (docs/adr/0049), named in the eyebrow in its own
+	// The agent asking (docs/adr/0050), named in the eyebrow in its own
 	// isolate: a Latin name inside a Hebrew sentence.
 	const agent = $derived(askingAgent(card));
 	const agentEyebrow = $derived($t('approval.eyebrowAgent').split('{agent}'));

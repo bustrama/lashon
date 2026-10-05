@@ -1,5 +1,5 @@
 //! `ottid-hook` — Claude Code's `PermissionRequest` hook for Ottid
-//! (ADR-0049).
+//! (ADR-0050).
 //!
 //! Claude Code runs it when it is about to ask the user for permission,
 //! with the request as JSON on stdin. It hands the request to Ottid's

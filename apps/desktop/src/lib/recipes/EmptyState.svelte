@@ -7,6 +7,7 @@
 -->
 <script lang="ts">
 	import RecipeGlyph from '$lib/design/RecipeGlyph.svelte';
+	import { t } from '$lib/i18n';
 
 	let {
 		onbrowsebundled,
@@ -21,17 +22,17 @@
 	<div class="badge">
 		<RecipeGlyph size={28} />
 	</div>
-	<div class="title he-display">עדיין אין לך מתכונים</div>
+	<div class="title he-display">{$t('hub.recipes.empty.title')}</div>
 	<div class="lead he-sans">
-		פתח את לשונית שרת ה-MCP כדי לכתוב מתכונים דרך Claude Desktop,<br />
-		או דפדף בעשרת המתכונים הראשונים שמצורפים לתוכנה.
+		{$t('hub.recipes.empty.leadGuide')}<br />
+		{$t('hub.recipes.empty.leadBundled')}
 	</div>
 	<div class="cta">
 		<button type="button" class="primary he-sans" onclick={() => onbrowsebundled?.()}>
-			עיין במובנים
+			{$t('hub.recipes.empty.browseBundled')}
 		</button>
 		<button type="button" class="secondary he-sans" onclick={() => onopenmcp?.()}>
-			פתח שרת MCP
+			{$t('hub.recipes.empty.openGuide')}
 		</button>
 	</div>
 </div>

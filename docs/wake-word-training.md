@@ -3,15 +3,21 @@
 Ottid's wake-word detector runs [openWakeWord](https://github.com/dscripka/openWakeWord) —
 a small ONNX classifier that listens for one specific spoken phrase. Each
 phrase needs its own classifier file. To use a custom wake word
-(**"Hey Lashon"**, your own name, anything you like), train one in Google
+(**"Hey Ottid"**, your own name, anything you like), train one in Google
 Colab: about 30–60 minutes, free, all in your browser. The trained file then
 runs locally on your machine — nothing leaves your device at runtime.
+
+> **The built-in wake phrase is still "Hey Lashon".** Ottid used to be called
+> Lashon. A wake-word model is trained on a spoken phrase, so renaming the app
+> doesn't change what it listens for. A "Hey Ottid" model is in the works and
+> will ship in a future update. Until then, say "Hey Lashon", or train your own
+> phrase below.
 
 ## Before you start
 
 - A Google account (Colab's free tier is enough).
 - ~30–60 minutes for the training run.
-- A distinctive phrase, 2–3 syllables. "hey lashon", "okay luna" — good.
+- A distinctive phrase, 2–3 syllables. "hey ottid", "okay luna" — good.
   "hello", "yes", a single word — bad, they'll fire constantly.
 
 That's it. No local Python, no GPU, no big downloads on your machine until the
@@ -53,9 +59,9 @@ Without a GPU the training takes hours. With the free T4 it's ~30–60 minutes.
 
 ### 3. Confirm the target phrase
 
-The notebook is set to `target_word = "hey lashon"` by default. To train a
-different phrase, find that cell near the top and change it — Hebrew phrases
-work too (the underlying TTS includes Hebrew voices).
+The notebook's default is still `target_word = "hey lashon"`. Find that cell
+near the top and change it to `"hey ottid"`, your own name, or anything else —
+Hebrew phrases work too (the underlying TTS includes Hebrew voices).
 
 ### 4. Run all cells
 
@@ -76,7 +82,7 @@ single cell; the training cells show loss curves.
 ### 5. Download the model
 
 When training finishes the notebook produces a file named after your phrase,
-e.g. `hey_lashon.onnx`. In Colab's left sidebar **Files** panel, right-click
+e.g. `hey_ottid.onnx`. In Colab's left sidebar **Files** panel, right-click
 the file and choose **Download**.
 
 ### 6. Install it in Ottid
@@ -89,19 +95,29 @@ Drop the downloaded `.onnx` into Ottid's wake-words folder:
 | **macOS** | `~/Library/Application Support/app.ottid.desktop/models/wakewords/` |
 | **Linux** | `~/.local/share/app.ottid.desktop/models/wakewords/` |
 
+Still on a Lashon 1.x build? Use `dev.lashon.desktop` in place of
+`app.ottid.desktop`. Ottid moves that folder over the first time it starts.
+(Installed release builds do this. A debug build, such as `npm run tauri dev`,
+leaves the old folder alone unless `OTTID_ADOPT_LEGACY=1` is set —
+[ADR-0046](adr/0046-debug-builds-leave-pre-rename-data-alone.md).)
+
 The Hub picker reads filename stems from this folder and turns them into
-friendly names — `hey_lashon.onnx` shows up as **Hey Lashon**, `my_dragon.onnx`
+friendly names — `hey_ottid.onnx` shows up as **Hey Ottid**, `my_dragon.onnx`
 as **My Dragon**, and so on (underscores and hyphens become spaces, each word
 is capitalised).
 
 ### 7. Pick it in the Settings Hub
 
-In Ottid, double-click the tongue → **Settings Hub** → **Wake word**:
+In Ottid, double-click the creature on your screen → **Settings Hub** →
+**Wake word**. (Right-clicking Ottid, or the tray icon, and choosing
+**Settings** opens the same window.)
 - Toggle **Enable** on.
 - Select your model from the dropdown.
 
-The wake worker live-reloads in under a second. Say your phrase — the tongue
-switches to listening and dictation opens.
+The wake worker live-reloads in under a second. Say your phrase — Ottid hops
+and chimes, its lamp lights up gold, and it starts writing on a notepad:
+dictation is open. While the wake word is armed, Ottid's resting lamp is slate
+grey instead of dim peach — the microphone is open.
 
 ## Tips
 

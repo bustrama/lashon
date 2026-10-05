@@ -52,6 +52,40 @@ The installer is built with NSIS `installMode: "both"` — at install time the
 user picks a per-user install (no elevation) or an all-users, machine-wide
 install (elevated). See [ADR-0012](adr/0012-portable-distribution-and-all-users-install.md).
 
+### Editions
+
+One source builds two editions ([ADR-0034](adr/0034-command-mode-editioning.md)).
+The command above builds the **full** one: it bundles everything in
+`tauri.conf.json`'s `bundle.resources`. The **free**, dictation-only edition,
+which the release workflow ships, is built like this:
+
+```sh
+VITE_OTTID_EDITION=free npm run tauri build -- --config src-tauri/tauri.free.conf.json -- --no-default-features
+```
+
+`tauri.free.conf.json` lists the free resources in full (Tauri replaces an
+array when it merges configs), leaving out what only the full edition ships:
+`llama-server`, `ottid-mcp` and the starter recipes
+([ADR-0049](adr/0049-bundle-ottid-mcp-and-the-starters-in-the-full-edition.md)).
+
+Before a **full** build, stage the two binaries it bundles, from the repository
+root:
+
+- `llama-server`: mirror it per
+  [`binaries/llama-server/README.md`](../apps/desktop/src-tauri/binaries/llama-server/README.md)
+  ([ADR-0025](adr/0025-in-process-local-llm.md)).
+- `ottid-mcp`: `bash scripts/stage-ottid-mcp.sh` builds it and copies it to
+  `apps/desktop/src-tauri/binaries/ottid-mcp/`. When signing, run it before the
+  `sign-windows.ps1 -Tree` step in §4.
+
+The starter recipes are bundled straight from `recipes/starters/`; nothing to
+stage. The installed full edition has the MCP server at
+`<install folder>\binaries\ottid-mcp\ottid-mcp.exe`, which is
+`%LOCALAPPDATA%\Programs\Ottid\binaries\ottid-mcp\ottid-mcp.exe` for a
+per-user install. Point an MCP host such as Claude Desktop at that file. It
+finds the starters by itself, so the host's config needs no
+`OTTID_BUNDLED_RECIPES_DIR`.
+
 ## 3. Package the portable zip
 
 The portable artifact is the release `ottid.exe` plus the frozen sidecar
@@ -102,6 +136,10 @@ In the portable zip, sign the staged `ottid.exe` separately. Tauri restores
 - The frozen sidecar under `binaries/` is a build artifact — git-ignored, never
   committed. A fresh checkout cannot `tauri build` until step 1 has produced it.
 - The Hebrew STT model is **not** bundled; the app downloads it on first run.
+- The portable zip in §3 has the free edition's layout. A full-edition zip would
+  also need `binaries/ottid-mcp/` and the starters under
+  `_up_/_up_/_up_/recipes/starters/`
+  ([ADR-0049](adr/0049-bundle-ottid-mcp-and-the-starters-in-the-full-edition.md)).
 - The **MIT-licensed "Hey Lashon" wake classifier** (`models/wake/wakewords/hey_lashon.onnx`)
   is listed in `tauri.conf.json`'s `bundle.resources` and ships with the
   installer. On first launch the Tauri shell stages it into

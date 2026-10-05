@@ -228,7 +228,7 @@ impl ServerHandler for OttidMcpServer {
         // advertised serverInfo says "ottid-mcp" / our version.
         let implementation = Implementation::new(MCP_SERVER_NAME, MCP_SERVER_VERSION)
             .with_title("Ottid")
-            .with_website_url("https://bustrama.github.io/ottid/");
+            .with_website_url("https://bustrama.github.io/ottid/mcp/");
 
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(implementation)

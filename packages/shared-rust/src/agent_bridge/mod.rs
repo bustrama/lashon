@@ -1,5 +1,5 @@
 //! The Claude Code hooks bridge
-//! ([ADR-0049](../../../../docs/adr/0049-claude-code-hooks-bridge.md)).
+//! ([ADR-0050](../../../../docs/adr/0050-claude-code-hooks-bridge.md)).
 //!
 //! Claude Code asks before it runs a tool the user hasn't allowed. Once the
 //! user installs the bridge from the Hub, Claude Code's `PermissionRequest`

@@ -320,7 +320,7 @@ pub fn run() {
         .manage(command_mode::ActiveDispatch::default())
         .manage(approval::Approvals::default());
 
-    // The Claude Code hooks bridge (ADR-0049) — command-mode edition only.
+    // The Claude Code hooks bridge (ADR-0050) — command-mode edition only.
     #[cfg(all(feature = "command-mode", feature = "agent-hooks"))]
     let builder = builder.manage(agent_hooks::AgentBridge::default());
 
@@ -434,6 +434,9 @@ pub fn run() {
             // per-user model directory before the dictation worker can spawn
             // it. In `tauri dev` the resources are absent and this is a no-op.
             configure_sidecar_env(app);
+            // Likewise point the recipe code at the bundled starter recipes.
+            #[cfg(feature = "command-mode")]
+            configure_recipes_env(app);
             configure_stt_device_env(app);
             stage_bundled_audio_models(app);
 
@@ -501,7 +504,7 @@ pub fn run() {
             }
 
             // Answer Claude Code's permission prompts on the approval card,
-            // if the user installed the hook from the Hub (ADR-0049).
+            // if the user installed the hook from the Hub (ADR-0050).
             #[cfg(all(feature = "command-mode", feature = "agent-hooks"))]
             {
                 let app = app.handle().clone();
@@ -514,7 +517,7 @@ pub fn run() {
         .expect("error while building the Ottid application")
         .run(|_app, _event| {
             // Stopping the hooks bridge deletes its file, and the token
-            // with it (ADR-0049).
+            // with it (ADR-0050).
             #[cfg(all(feature = "command-mode", feature = "agent-hooks"))]
             if let tauri::RunEvent::Exit = _event {
                 agent_hooks::stop(_app);
@@ -809,6 +812,46 @@ fn configure_sidecar_env(app: &tauri::App) {
             );
         }
         Err(err) => tracing::error!("could not resolve the app-data directory: {err:#}"),
+    }
+}
+
+/// Point the recipe code at the starter recipes the installer shipped, via
+/// the `OTTID_BUNDLED_RECIPES_DIR` env var (docs/adr/0049). The recipe
+/// runtime and the Hub read the starters through
+/// `ottid_core::mcp::recipe_tools::bundled_recipes_dir`, whose last resort is
+/// a path baked in at compile time: the checkout the build ran in. That path
+/// does not exist on a user's machine, so a packaged build hands over the
+/// resource dir Tauri resolved instead.
+///
+/// Skipped when the variable is already set, so a developer's override wins,
+/// and in a debug build, which keeps reading the live `recipes/starters` of
+/// the checkout: tauri-build copies the starters into `target/debug`, and that
+/// copy goes stale as they are edited.
+#[cfg(feature = "command-mode")]
+fn configure_recipes_env(app: &tauri::App) {
+    use ottid_core::mcp::recipe_tools::{starters_in_resource_dir, BUNDLED_RECIPES_ENV};
+
+    if cfg!(debug_assertions) || std::env::var_os(BUNDLED_RECIPES_ENV).is_some() {
+        return;
+    }
+    let resource_dir = match app.path().resource_dir() {
+        Ok(dir) => dir,
+        Err(err) => {
+            tracing::error!("could not resolve the resource directory: {err:#}");
+            return;
+        }
+    };
+    match starters_in_resource_dir(&resource_dir) {
+        Some(dir) => {
+            std::env::set_var(BUNDLED_RECIPES_ENV, &dir);
+            tracing::info!(path = %dir.display(), "using the bundled starter recipes");
+        }
+        // A full-edition build that bundled none is a packaging bug: the Hub
+        // would list no starters and no starter intent would match.
+        None => tracing::warn!(
+            resource_dir = %resource_dir.display(),
+            "no bundled starter recipes in this build"
+        ),
     }
 }
 

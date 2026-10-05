@@ -153,5 +153,11 @@ say it is unsigned.
   build artifacts — git-ignored, never committed.
 - Only the small installer is uploaded to GitHub; the model and CUDA runtime
   are fetched from Hugging Face and PyPI at first run.
+- The release workflow builds the **free** edition: `--no-default-features`,
+  `VITE_OTTID_EDITION=free`, and `tauri.free.conf.json` merged over
+  `tauri.conf.json`, which leaves out `llama-server`, `ottid-mcp` and the
+  starter recipes. The full edition has no release job yet;
+  [ADR-0049](adr/0049-bundle-ottid-mcp-and-the-starters-in-the-full-edition.md)
+  says what one needs.
 - `tauri dev` is unaffected by any of this — it runs the sidecar from Python
   source.

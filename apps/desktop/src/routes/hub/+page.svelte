@@ -46,7 +46,7 @@
 	// The free (dictation-only) edition compiles out command mode, so its
 	// LLM / Recipes / Voice-corrections / Coding-agents sections have no
 	// backing Tauri commands — drop them from the nav so the surface matches
-	// the binary (docs/adr/0034-command-mode-editioning.md, docs/adr/0049).
+	// the binary (docs/adr/0034-command-mode-editioning.md, docs/adr/0050).
 	const COMMAND_MODE_SECTIONS: Section[] = ['llm', 'recipes', 'voice', 'agents'];
 	const SECTIONS: Section[] = FULL_EDITION
 		? ALL_SECTIONS
@@ -1572,7 +1572,7 @@
 						{/if}
 					</section>
 				{:else if section === 'recipes'}
-					<RecipesSection onopenmcp={() => openExternal('https://bustrama.github.io/ottid/')} />
+					<RecipesSection onopenmcp={() => openExternal('https://bustrama.github.io/ottid/mcp/')} />
 				{:else if section === 'voice'}
 					<VoiceCorrectionsSection />
 				{:else if section === 'agents'}

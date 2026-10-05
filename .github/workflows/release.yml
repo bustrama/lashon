@@ -138,11 +138,15 @@ jobs:
           # The free (dictation-only) edition, Windows-only (ADR-0033,
           # ADR-0039). `--no-default-features` drops command mode (ADR-0034);
           # the frontend free flag is VITE_OTTID_EDITION in the build step env.
-          # The signing arguments are added per run (the `tauri-args` step).
+          # `tauri_config` is merged over tauri.conf.json and swaps in the free
+          # bundle.resources, which leaves out the full edition's llama-server,
+          # ottid-mcp and starter recipes (ADR-0049). A full-edition entry sets
+          # none. The signing arguments are added per run (the `tauri-args` step).
           - os: windows-2022
             sidecar_name: ottid-stt.exe
             bundles: nsis
             cargo_args: --no-default-features
+            tauri_config: tauri.free.conf.json
           # macOS (macos-14 / macos-13 DMGs) and the Linux AppImage are dropped
           # for v1.0.0 — Windows-first (ADR-0033). Re-add the per-arch macOS
           # matrix entries (and the Linux libfuse2 remediation, PRs #50–#52)
@@ -321,7 +325,7 @@ jobs:
           echo "Staged sidecar — listing:"
           ls -la "$TARGET/"
 
-      # ── Claude Code hook client (docs/adr/0049) ──────────────────────────────
+      # ── Claude Code hook client (docs/adr/0050) ──────────────────────────────
       #
       # The command-mode edition ships `ottid-hook`, which Claude Code runs as
       # its PermissionRequest hook once the user installs it from the Hub.
@@ -397,9 +401,10 @@ jobs:
 
       # Every PE image in the staged resources that is not already validly
       # signed (by Microsoft, NVIDIA, …): the sidecar's exe, dlls and pyd
-      # modules, and llama-server when a full-edition build stages it. Tauri
-      # would sign only the exe/dll ones, one process per file, and leave the
-      # pyd modules unsigned — and Smart App Control checks every module.
+      # modules, and llama-server and ottid-mcp when a full-edition build
+      # stages them. Tauri would sign only the exe/dll ones, one process per
+      # file, and leave the pyd modules unsigned — and Smart App Control
+      # checks every module.
       - name: Sign the bundled binaries
         if: runner.os == 'Windows' && needs.signing.outputs.sign == 'true'
         shell: pwsh
@@ -409,17 +414,22 @@ jobs:
       # scripts/sign-windows.ps1 for the app exe, the NSIS plugins, the
       # installer and the uninstaller; the updater .sig follows from the
       # TAURI_SIGNING_* key. Unsigned pre-release: `--no-sign` skips both.
-      # The --config path is absolute because tauri-action and the Tauri CLI
-      # resolve relative ones from different directories.
+      # The --config paths are absolute because tauri-action and the Tauri CLI
+      # resolve relative ones from different directories. The Tauri CLI merges
+      # them in order, so the edition config goes first.
       - name: Choose the Tauri build arguments
         id: tauri-args
         run: |
+          edition=""
+          if [[ -n "${{ matrix.tauri_config }}" ]]; then
+            edition="--config ${GITHUB_WORKSPACE//\\//}/apps/desktop/src-tauri/${{ matrix.tauri_config }}"
+          fi
           if [[ "${{ needs.signing.outputs.sign }}" == true ]]; then
             signing="--config ${GITHUB_WORKSPACE//\\//}/apps/desktop/src-tauri/tauri.signing.conf.json"
           else
             signing="--no-sign"
           fi
-          echo "args=--bundles ${{ matrix.bundles }} $signing -- ${{ matrix.cargo_args }}" >> "$GITHUB_OUTPUT"
+          echo "args=--bundles ${{ matrix.bundles }} $edition $signing -- ${{ matrix.cargo_args }}" >> "$GITHUB_OUTPUT"
 
       # ── Tauri build & release upload ─────────────────────────────────────────
       #

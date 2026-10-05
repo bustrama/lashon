@@ -5,7 +5,7 @@
 //! This module adds what needs Tauri:
 //!
 //! - the reply channel back to each asker, async (command mode, and a coding
-//!   agent through the hooks bridge of ADR-0049) or blocking (the recipe
+//!   agent through the hooks bridge of ADR-0050) or blocking (the recipe
 //!   runtime's synchronous gate);
 //! - the `approval:changed` and `approval:nudge` events the card listens to,
 //!   and the commands it answers with;
@@ -57,7 +57,7 @@ enum Reply {
     Async(oneshot::Sender<Decision>),
     /// A blocking asker parks its thread on it.
     Blocking(mpsc::SyncSender<Decision>),
-    /// A coding agent awaits it through the hooks bridge (ADR-0049). `None`
+    /// A coding agent awaits it through the hooks bridge (ADR-0050). `None`
     /// means nobody answered: the agent asks in its own prompt instead.
     #[cfg(feature = "agent-hooks")]
     Agent(oneshot::Sender<Option<Decision>>),
@@ -163,7 +163,7 @@ pub async fn ask(app: &AppHandle, request: Request) -> Decision {
     decision
 }
 
-/// Ask the user for a coding agent (ADR-0049) and wait for the answer:
+/// Ask the user for a coding agent (ADR-0050) and wait for the answer:
 /// `None` if nobody answered in time. If the caller is dropped first (the
 /// agent's hook went away), the card is taken down.
 #[cfg(feature = "agent-hooks")]

@@ -37,7 +37,7 @@ invariants — never trade them for convenience.
 ## Inbound listeners
 
 The Claude Code hooks bridge is the only thing that connects *to* Ottid
-([ADR-0049](../../docs/adr/0049-claude-code-hooks-bridge.md)). It, and any
+([ADR-0050](../../docs/adr/0050-claude-code-hooks-bridge.md)). It, and any
 listener after it, keeps these invariants.
 
 - **Never a TCP port.** Only a pipe or socket the OS restricts to the user:

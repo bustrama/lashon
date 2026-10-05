@@ -31,8 +31,8 @@
 			},
 			"tongue": {
 				"kicker": "Ottid",
-				"title": "The small mark floating on your screen",
-				"lead": "This is Ottid. It breathes quietly at rest, blooms into sound waves as it listens, and settles to dots while transcribing. Drag it to any corner."
+				"title": "The small creature living on your screen",
+				"lead": "This is Ottid, a dark puddle with two hands and ember eyes. The lamp inside shows what it is doing, and it is always lit while Ottid listens. Drag it to the taskbar or the top edge, or leave it floating."
 			},
 			"hotkey": {
 				"kicker": "How to dictate",
@@ -287,6 +287,13 @@
 			"colSourceAction": "Source · action",
 			"loading": "Loading recipes…",
 			"noMatch": "No recipes match the current filters.",
+			"empty": {
+				"title": "You have no recipes yet",
+				"leadGuide": "Connect Claude Desktop to Ottid through ottid-mcp and write recipes by chatting. The guide on the website shows how.",
+				"leadBundled": "You can also browse the first ten recipes that ship with the app.",
+				"browseBundled": "Browse bundled",
+				"openGuide": "Claude Desktop setup guide"
+			},
 			"footer": {
 				"count": "{n} recipes",
 				"user": "{n} mine",

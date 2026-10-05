@@ -1,4 +1,4 @@
-// The Hub's Claude Code section (docs/adr/0049), kept free of the DOM so it
+// The Hub's Claude Code section (docs/adr/0050), kept free of the DOM so it
 // is unit-tested: what the shell's `agent_hooks_*` commands return, and what
 // the section makes of it.
 

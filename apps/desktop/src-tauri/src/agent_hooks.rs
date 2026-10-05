@@ -1,4 +1,4 @@
-//! The Claude Code hooks bridge in the shell (docs/adr/0049).
+//! The Claude Code hooks bridge in the shell (docs/adr/0050).
 //!
 //! The protocol, the listener and the settings editor are
 //! `ottid_core::agent_bridge`, tested there. This module adds what needs

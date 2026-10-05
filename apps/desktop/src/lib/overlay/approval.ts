@@ -212,7 +212,7 @@ export function askingAgent(card: ApprovalCard): string | null {
 	return card.source === 'agent' && card.agent ? card.agent : null;
 }
 
-/** Who needs the answer: Ottid, or the agent asking (docs/adr/0049). */
+/** Who needs the answer: Ottid, or the agent asking (docs/adr/0050). */
 export function eyebrow(card: ApprovalCard, t: Translate): string {
 	const agent = askingAgent(card);
 	return agent ? fill(t('approval.eyebrowAgent'), { agent }) : t('approval.eyebrow');
@@ -221,7 +221,7 @@ export function eyebrow(card: ApprovalCard, t: Translate): string {
 /**
  * What happens when the card's time runs out, as an i18n key: Ottid's own
  * requests are denied, and an agent's goes back to the agent's own prompt
- * (docs/adr/0049).
+ * (docs/adr/0050).
  */
 export function lapseKey(card: ApprovalCard, kind: 'expires' | 'announce'): string {
 	const agent = card.source === 'agent';
