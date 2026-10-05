@@ -1,7 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "bundle": {
-    "createUpdaterArtifacts": false,
     "resources": [
       "binaries/ottid-stt/**/*",
       "../../../models/wake/wakewords/hey_lashon.onnx",

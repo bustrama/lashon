@@ -1,12 +1,12 @@
 //! `ottid-recipe` — CLI driver for the M9 Phase 1b recipe runtime.
 //!
-//! Locates a recipe by id under either the bundled starters
-//! (`recipes/starters/` in dev / `<install>/recipes/` packaged) or the
-//! per-user dir (`<data-local>/ottid/recipes/`), parses + validates
-//! it, fills slots from `--<key>=<value>` argv flags, and executes via
-//! `ottid_core::recipes::execute_recipe`. Run-shell steps are denied
-//! unless `--allow-shell` is passed (matches the safe default the MCP
-//! `run_recipe` tool will adopt in its follow-up PR).
+//! Locates a recipe by id under either the bundled starters (the
+//! checkout's `recipes/starters/`; this dev tool is not shipped in the
+//! installer) or the per-user dir (`<data-local>/ottid/recipes/`),
+//! parses + validates it, fills slots from `--<key>=<value>` argv flags,
+//! and executes via `ottid_core::recipes::execute_recipe`. Run-shell steps
+//! are denied unless `--allow-shell` is passed (matches the safe default
+//! the MCP `run_recipe` tool will adopt in its follow-up PR).
 //!
 //! Usage:
 //!
