@@ -934,7 +934,7 @@
 			<aside class="sidebar" aria-label={$t('hub.title')}>
 				<!-- Brand block — mark + Hebrew wordmark + version + local badge. -->
 				<div class="sidebar-brand">
-					<Mark size={28} color="var(--ink-text)" />
+				<Mark size={28} />
 					<div class="sidebar-brand-text">
 						<div class="he-display sidebar-brand-name">אוטיד</div>
 						<div class="mono sidebar-brand-meta">

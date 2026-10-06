@@ -50,6 +50,8 @@ released under the old name Lashon. Since then, main has gained:
 - the approval card ([ADR-0048](docs/adr/0048-the-approval-card.md));
 - the Claude Code hooks bridge
   ([ADR-0050](docs/adr/0050-claude-code-hooks-bridge.md));
+- Codex hooks, short activity cards for each session and side docking;
+- opt-in Discord push-to-mute while recording, released automatically;
 - the full edition bundling `ottid-mcp` and the starter recipes
   ([ADR-0049](docs/adr/0049-bundle-ottid-mcp-and-the-starters-in-the-full-edition.md)).
 
