@@ -50,7 +50,7 @@
         {#if message}<p class="he-sans" role="status">{$t(message)}</p>{/if}
         <label class="he-sans"><input type="checkbox" checked={verified} disabled={busy} onchange={(event) => void verify(event.currentTarget.checked)} /> {$t('hub.discord.verified')}</label>
         <div class="activation he-sans">
-            <span id="discord-enable-label">{$t('hub.discord.enable')}</span>
+            <span id="discord-enable-label" dir="auto">{$t('hub.discord.enable')}</span>
             <button class="activation-switch" class:enabled type="button" role="switch" aria-checked={enabled} aria-labelledby="discord-enable-label" aria-describedby="discord-enable-hint" disabled={!verified || busy} onclick={() => void enable(!enabled)}>
                 <span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span>
                 <span>{$t(enabled ? 'hub.discord.active' : 'hub.discord.off')}</span>
@@ -71,7 +71,7 @@
     button:disabled { opacity: .5; cursor: default; }
     button:focus-visible { outline: 2px solid var(--aqua); outline-offset: 2px; }
     .note { color: var(--ink-faint); }
-    .activation { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-block: 16px 8px; font-size: 13px; color: var(--ink-text); }
+    .activation { display: flex; direction: ltr; align-items: center; justify-content: space-between; gap: 16px; margin-block: 16px 8px; font-size: 13px; color: var(--ink-text); }
     .activation-switch { display: flex; align-items: center; gap: 8px; min-width: 104px; flex-shrink: 0; }
     .switch-track { display: flex; align-items: center; justify-content: flex-start; width: 36px; height: 22px; padding: 3px; box-sizing: border-box; border-radius: 12px; background: var(--ink-line-2); }
     .switch-knob { width: 16px; height: 16px; border-radius: 50%; background: var(--ink-text); }
