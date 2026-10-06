@@ -49,7 +49,8 @@
         </div>
         {#if message}<p class="he-sans" role="status">{$t(message)}</p>{/if}
         <label class="he-sans"><input type="checkbox" checked={verified} disabled={busy} onchange={(event) => void verify(event.currentTarget.checked)} /> {$t('hub.discord.verified')}</label>
-        <label class="he-sans"><input type="checkbox" checked={enabled} disabled={!verified || busy} onchange={(event) => void enable(event.currentTarget.checked)} /> {$t('hub.discord.enable')}</label>
+        <label class="he-sans"><input type="checkbox" checked={enabled} disabled={!verified || busy} aria-describedby="discord-enable-hint" onchange={(event) => void enable(event.currentTarget.checked)} /> {$t('hub.discord.enable')}</label>
+        <p id="discord-enable-hint" class="he-sans">{$t('hub.discord.enableHint')}</p>
         <p class="he-sans note">{$t('hub.discord.limit')}</p>
     {:else}<p class="he-sans">{$t('hub.discord.windowsOnly')}</p>{/if}
 </div>

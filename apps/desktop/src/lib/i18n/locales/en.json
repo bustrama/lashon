@@ -152,7 +152,8 @@
 		  "checkResult": "Request sent. Check the result in Discord; Ottid cannot verify its mute state.",
 		  "failed": "The key guard could not run. Automatic suppression remains unverified.",
 		  "verified": "I verified both automatic release and preservation of manual mute",
-		  "enable": "Automatically suppress Discord while using Ottid",
+		  "enable": "Mute me in Discord while dictating",
+		  "enableHint": "Ottid temporarily mutes you from the start of recording until transcription finishes, then releases the temporary mute. If you were manually muted, you stay muted.",
 		  "limit": "No mute acknowledgement is available. Recheck after changing Discord keybinds, input mode or permissions. Other apps remain outside this integration.",
 		  "windowsOnly": "Available for Discord desktop on Windows.",
 		  "captureBlocked": "Discord suppression unavailable — recording did not start."
