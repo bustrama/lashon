@@ -254,6 +254,8 @@ windows = { version = "=0.61.3", features = [
     "Win32_Security_Authorization",
     "Win32_Storage_FileSystem",
     "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_Pipes",
+    "Win32_UI_Shell",
 ] }
 
 # M9 Phase 1d storage-module unit tests need disposable directories under
