@@ -160,7 +160,7 @@
 		{:else}
 			<p class="he-sans state" role="status">{agentText(`hub.agents.state.${hook}`)}</p>
 			{#if hook === 'unreadable'}
-				<p class="he-sans error">{text(errorKey(status.error))}</p>
+				<p class="he-sans error">{agentText(errorKey(status.error))}</p>
 			{/if}
 			{#if hook === 'missing'}
 				<p class="he-sans hint">
@@ -195,7 +195,7 @@
 							onclick={() => void ask('install')}
 							disabled={busy}
 						>
-							{text(hook === 'stale' ? 'hub.agents.reinstall' : 'hub.agents.install')}
+							{agentText(hook === 'stale' ? 'hub.agents.reinstall' : 'hub.agents.install')}
 						</button>
 					{/if}
 					{#if canUninstall(status)}
@@ -247,7 +247,7 @@
 							</p>
 						{/if}
 						<p class="he-sans">
-							{text(preview.data.exists ? 'hub.agents.preview.backup' : 'hub.agents.preview.newFile')}
+							{agentText(preview.data.exists ? 'hub.agents.preview.backup' : 'hub.agents.preview.newFile')}
 						</p>
 						<p class="he-sans">{agentText('hub.agents.preview.nothingElse')}</p>
 					{/if}
@@ -261,7 +261,7 @@
 							>
 								{busy
 									? agentText('hub.agents.preview.applying')
-									: text(
+									: agentText(
 											preview.action === 'install'
 												? 'hub.agents.preview.confirmInstall'
 												: 'hub.agents.preview.confirmUninstall'
