@@ -1,7 +1,9 @@
 # Session titles and project labels
 
 Activity cards show the local Codex thread title instead of a numeric label when
-available. A smaller line identifies the agent and the working-folder basename.
+available. The heading is `project • session title`, with each name isolated for
+mixed Hebrew/English text. Missing project labels omit the bullet; missing titles
+retain the numeric fallback. A smaller line identifies the agent.
 Claude cards also receive the working-folder label; their numeric heading remains.
 
 The Codex hook reads only the last 2 MiB of `session_index.jsonl`, beside its
