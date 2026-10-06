@@ -67,13 +67,12 @@
 		extra?: Snippet;
 	} = $props();
 
-	// One card at a time per kind, in a fixed precedence: the approval card
-	// pre-empts everything, the transcript (it carries Cancel) pre-empts the
-	// progress line, and the live text only shows during a dictation take.
-	const showFlash = $derived(!!commandFlash && !approval);
-	const showTranscript = $derived(!!commandTranscript && !commandFlash && !approval);
+	// Foreground modes keep their own precedence. Agent cards and approvals
+	// are independent: neither replaces the live dictation text.
+	const showFlash = $derived(!!commandFlash);
+	const showTranscript = $derived(!!commandTranscript && !commandFlash);
 	const showProgress = $derived(
-		commandState !== 'idle' && !commandFlash && !approval && !showTranscript
+		commandState !== 'idle' && !commandFlash && !showTranscript
 	);
 	const hasPartialText = $derived(
 		!!partial && (partial.committed.length > 0 || partial.provisional.length > 0)
@@ -82,8 +81,7 @@
 		hasPartialText &&
 			takeMode !== 'command' &&
 			commandState === 'idle' &&
-			!commandFlash &&
-			!approval
+			!commandFlash
 	);
 
 	const progressLabel = $derived(
@@ -190,17 +188,45 @@
 	}
 </script>
 
-<div class="island {side}">
+<div class="island {side}" class:has-sessions={agentSessions.length > 0} class:has-foreground={!!approval || showFlash || showProgress || showTranscript || showPartial}>
 	{#if extra}
 		<div class="card-extra" data-interactive="island" in:cardIn out:cardOut>
 			{@render extra()}
 		</div>
 	{/if}
 
+	{#if agentActivity && !agentSessions.length}
+		<div class="bubble bubble-tool" dir="auto" role="status" aria-live="polite">
+			<span class="he-sans">{agentActivity}</span>
+		</div>
+	{/if}
+	{#if agentSessions.length}
+		<!-- Scrollable region needs keyboard focus so every session remains reachable. -->
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+		<div class="session-stack" class:below={side === 'below'} data-interactive="island" role="region" aria-label={$t('hub.agents.sessions')} tabindex="0" aria-live="polite">
+			{#each agentSessions as session (session.id)}
+				<div class="bubble session-card" dir="auto">
+					<div class="session-heading" dir="auto" title={session.title ?? undefined}>{session.title ?? `${session.agent} · #${session.id}`}</div>
+					{#if session.title || session.project}
+						<div class="session-context"><bdi>{session.agent}</bdi>{#if session.project} · <bdi>{session.project}</bdi>{/if}</div>
+					{/if}
+					<div class="session-status he-sans">{$t(`hub.agents.activity.${session.state}`)}{#if session.tool} · <bdi>{session.tool}</bdi>{/if}</div>
+				</div>
+			{/each}
+		</div>
+	{/if}
+
+
+	{#if approval || showFlash || showProgress || showTranscript || showPartial}
+	<div class="foreground-stack" class:with-approval={!!approval} class:below={side === 'below'}>
 	{#if approval}
 		<!-- The next request in the queue swaps in place: the card opens once. -->
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 		<div
 			class="card-approval"
+			role="region"
+			aria-labelledby={`approval-question-${approval.id}`}
+			tabindex="0"
 			data-interactive="island"
 			in:cardIn
 			out:cardOut
@@ -258,26 +284,6 @@
 					<div class="bubble-tool-summary he-sans italic">{progressLabel}</div>
 				{/if}
 			</div>
-		</div>
-	{/if}
-	{#if agentActivity && !approval && !showFlash && !showProgress && !showTranscript && !showPartial && !listening}
-		<div class="bubble bubble-tool" dir="auto" role="status" aria-live="polite">
-			<span class="he-sans">{agentActivity}</span>
-		</div>
-	{/if}
-	{#if agentSessions.length && !approval && !showFlash && !showProgress && !showTranscript && !showPartial && !listening}
-		<!-- Scrollable region needs keyboard focus so every session remains reachable. -->
-		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-		<div class="session-stack" class:below={side === 'below'} data-interactive="island" role="region" aria-label={$t('hub.agents.sessions')} tabindex="0" aria-live="polite">
-			{#each agentSessions as session (session.id)}
-				<div class="bubble session-card" dir="auto">
-					<div class="session-heading" dir="auto" title={session.title ?? undefined}>{session.title ?? `${session.agent} · #${session.id}`}</div>
-					{#if session.title || session.project}
-						<div class="session-context"><bdi>{session.agent}</bdi>{#if session.project} · <bdi>{session.project}</bdi>{/if}</div>
-					{/if}
-					<div class="session-status he-sans">{$t(`hub.agents.activity.${session.state}`)}{#if session.tool} · <bdi>{session.tool}</bdi>{/if}</div>
-				</div>
-			{/each}
 		</div>
 	{/if}
 
@@ -343,6 +349,9 @@
 		</div>
 	{/if}
 
+	</div>
+	{/if}
+
 	{#if showPartial && partial?.committed}
 		<span class="sr-only" aria-live="polite" aria-atomic="true">{partial.committed}</span>
 	{/if}
@@ -362,6 +371,7 @@
 		gap: 8px;
 		max-height: var(--island-max-h, 100%);
 		pointer-events: none;
+		--foreground-max-h: var(--island-max-h, 480px);
 	}
 	.island.above {
 		flex-direction: column;
@@ -370,10 +380,32 @@
 		flex-direction: column-reverse;
 	}
 
+	.island.has-sessions.has-foreground {
+		--foreground-max-h: calc(var(--island-max-h, 480px) * 0.6 - 8px);
+	}
+	.foreground-stack {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 8px;
+		min-height: 0;
+		max-height: var(--foreground-max-h);
+		/* ApprovalCard inherits its own available height, not the whole island. */
+		--island-max-h: var(--foreground-max-h);
+	}
+	.foreground-stack.below { flex-direction: column-reverse; }
+	.foreground-stack > .bubble { flex: 0 0 auto; }
+	.has-foreground .session-stack {
+		max-height: min(180px, calc(var(--island-max-h, 480px) * 0.4));
+	}
+	.foreground-stack.with-approval .partial-text {
+		max-height: min(7.5em, calc(var(--foreground-max-h) * 0.35));
+	}
+
 	.card-extra {
 		pointer-events: auto;
 	}
-	.session-stack { display: flex; flex-direction: column; gap: 8px; width: min(360px, calc(100vw - 16px)); max-height: var(--island-max-h, 100%); box-sizing: border-box; padding: 4px; overflow-y: auto; overflow-x: hidden; pointer-events: auto; scrollbar-width: thin; }
+	.session-stack { display: flex; flex-direction: column; gap: 8px; flex: 0 1 auto; min-height: 0; width: min(360px, calc(100vw - 16px)); max-height: var(--island-max-h, 100%); box-sizing: border-box; padding: 4px; overflow-y: auto; overflow-x: hidden; pointer-events: auto; scrollbar-width: thin; }
 	.session-stack.below { flex-direction: column-reverse; }
 	.session-stack:focus-visible { outline: 2px solid var(--aqua); outline-offset: -2px; border-radius: 14px; }
 	.session-card { flex: 0 0 auto; box-sizing: border-box; padding: 8px 12px; }
@@ -438,6 +470,8 @@
 	.bubble-text {
 		flex: 1;
 		margin: 0;
+		max-height: min(7.5em, calc(var(--foreground-max-h) - 24px));
+		overflow-y: auto;
 		font-family: var(--font-he-sans);
 		font-size: 14px;
 		color: var(--ink-text);
@@ -457,7 +491,7 @@
 		line-height: 1.5;
 		word-break: break-word;
 		/* About five lines, pinned to the newest one. */
-		max-height: 7.5em;
+		max-height: min(7.5em, calc(var(--foreground-max-h) - 24px));
 		overflow: hidden;
 	}
 	.partial-text.prompter-fade {
@@ -551,8 +585,10 @@
 	/* ─── Approval card ─── */
 	.card-approval {
 		display: flex;
+		flex: 1 1 auto;
 		min-height: 0;
-		max-height: var(--island-max-h, none);
+		max-height: var(--foreground-max-h);
+		overflow: auto;
 		pointer-events: auto;
 	}
 

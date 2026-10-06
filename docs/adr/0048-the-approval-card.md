@@ -270,3 +270,14 @@ capability `global-shortcut:allow-unregister-all` is replaced by
   the creature data model, because user-made creatures
   ([ADR-0041](0041-user-authored-creatures-are-data.md)) define a pose for
   every state.
+
+## Display amendment — 2026-10-06
+
+The user needs to keep seeing live dictation when agent activity or an approval
+arrives. Approval visibility no longer pre-empts the transcript. Foreground
+cards share a bounded group nearest Ottid, while independent session cards
+occupy a separate scrollable group farther from him. Approval content scrolls
+inside its own region when space is limited. The broker, timeout, read/arming
+checks, permission decisions and focus behavior remain the same. See
+[activity-with-dictation](../stories/activity-with-dictation.md) for the layout
+budget and simultaneous-card regression checks.
