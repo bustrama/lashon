@@ -90,6 +90,28 @@ where
         cwd: request.cwd,
     })
     .map_err(|_| Fallback::TooLarge)?;
+    send(&body, options, cancelled).await
+}
+
+pub async fn notify(
+    activity: super::activity::Activity,
+    options: &Options,
+) -> Result<Verdict, Fallback> {
+    let body = serde_json::to_vec(&Ask {
+        agent: options.agent,
+        tool: super::activity::TOOL.into(),
+        input: serde_json::to_value(activity).map_err(|_| Fallback::TooLarge)?,
+        cwd: None,
+    })
+    .map_err(|_| Fallback::TooLarge)?;
+    send(&body, options, std::future::pending()).await
+}
+
+async fn send<C: Future<Output = ()>>(
+    body: &[u8],
+    options: &Options,
+    cancelled: C,
+) -> Result<Verdict, Fallback> {
     if MAC_LEN + body.len() > MAX_ASK {
         return Err(Fallback::TooLarge);
     }
@@ -104,7 +126,7 @@ where
     .await
     .map_err(|_| Fallback::Connect)?
     .map_err(|_| Fallback::Connect)?;
-    exchange(stream, &bridge.token, &body, options, cancelled).await
+    exchange(stream, &bridge.token, body, options, cancelled).await
 }
 
 /// The exchange itself, over any stream: hello, challenge, request, answer.

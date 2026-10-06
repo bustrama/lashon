@@ -37,6 +37,7 @@
 //!   settings.
 
 pub mod auth;
+pub mod activity;
 pub mod claude_settings;
 pub mod codex_settings;
 pub mod runner;

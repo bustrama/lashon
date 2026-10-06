@@ -22,7 +22,7 @@ use ottid_core::agent_bridge::{
 };
 use ottid_core::approval::{Decision, Request};
 use serde::Serialize;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::approval;
 
@@ -34,7 +34,21 @@ const HUB: &str = "hub";
 
 /// Tauri-managed state: the running listener, if any.
 #[derive(Default)]
-pub struct AgentBridge(Mutex<Option<Bridge>>);
+pub struct AgentBridge(
+    Mutex<Option<Bridge>>,
+    Mutex<ottid_core::agent_bridge::activity::Tracker>,
+);
+
+#[tauri::command]
+pub fn agent_activity_current(
+    app: AppHandle,
+) -> Option<ottid_core::agent_bridge::activity::Summary> {
+    app.state::<AgentBridge>()
+        .1
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .summary(std::time::Instant::now())
+}
 
 fn lock(state: &AgentBridge) -> MutexGuard<'_, Option<Bridge>> {
     state
@@ -115,6 +129,22 @@ fn asker(app: AppHandle) -> AskFn {
             if !installed(ask.agent) {
                 return Verdict::Ask;
             }
+            if ask.tool == ottid_core::agent_bridge::activity::TOOL {
+                if let Ok(activity) = serde_json::from_value::<
+                    ottid_core::agent_bridge::activity::Activity,
+                >(ask.input)
+                {
+                    if activity.valid() {
+                        app.state::<AgentBridge>()
+                            .1
+                            .lock()
+                            .unwrap_or_else(|p| p.into_inner())
+                            .update(ask.agent, activity, std::time::Instant::now());
+                        let _ = app.emit("agent:activity", agent_activity_current(app.clone()));
+                    }
+                }
+                return Verdict::Ask;
+            }
             let request =
                 Request::for_agent(ask.agent.name(), &ask.tool, &ask.input, ask.cwd.as_deref());
             match approval::ask_agent(&app, request).await {
@@ -183,19 +213,21 @@ fn install_plan(
     current: Option<&str>,
     exe: &str,
 ) -> Result<claude_settings::Plan, claude_settings::SettingsError> {
-    match agent {
+    let plan = match agent {
         Agent::Claude => claude_settings::plan_install(current, exe),
         Agent::Codex => codex_settings::plan_install(current, exe),
-    }
+    }?;
+    ottid_core::agent_bridge::activity::plan_hooks(plan, exe, agent, true)
 }
 fn uninstall_plan(
     agent: Agent,
     current: Option<&str>,
 ) -> Result<claude_settings::Plan, claude_settings::SettingsError> {
-    match agent {
+    let plan = match agent {
         Agent::Claude => claude_settings::plan_uninstall(current),
         Agent::Codex => codex_settings::plan_uninstall(current),
-    }
+    }?;
+    ottid_core::agent_bridge::activity::plan_hooks(plan, "", agent, false)
 }
 
 /// What the Hub shows.
@@ -233,14 +265,10 @@ pub async fn agent_hooks_status(app: AppHandle, agent: Option<String>) -> Result
             settings_path: path.to_string_lossy().into_owned(),
             installed: !found.commands.is_empty(),
             current: hook.as_ref().is_some_and(|exe| {
-                found.commands.iter().any(|command| {
-                    command
-                        == &if agent == Agent::Codex {
-                            codex_settings::command(exe)
-                        } else {
-                            exe.clone()
-                        }
-                })
+                claude_settings::read(&path)
+                    .ok()
+                    .and_then(|current| install_plan(agent, current.as_deref(), exe).ok())
+                    .is_some_and(|plan| !plan.changes)
             }),
             hooks_disabled: found.hooks_disabled,
             hook_exe: hook,

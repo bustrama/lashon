@@ -33,6 +33,7 @@
 		commandTranscript,
 		commandCancellable,
 		commandFlash,
+		agentActivity = null,
 		approval,
 		approvalNudge,
 		onApprovalArmed,
@@ -51,6 +52,7 @@
 		commandTranscript: string | null;
 		commandCancellable: boolean;
 		commandFlash: string | null;
+		agentActivity?: string | null;
 		/** The request the approval broker shows (docs/adr/0048). */
 		approval: ApprovalCard | null;
 		/** The latest early press of the Allow hotkey. */
@@ -253,6 +255,11 @@
 					<div class="bubble-tool-summary he-sans italic">{progressLabel}</div>
 				{/if}
 			</div>
+		</div>
+	{/if}
+	{#if agentActivity && !approval && !showFlash && !showProgress && !showTranscript && !showPartial && !listening}
+		<div class="bubble bubble-tool" dir="auto" role="status" aria-live="polite">
+			<span class="he-sans">{agentActivity}</span>
 		</div>
 	{/if}
 

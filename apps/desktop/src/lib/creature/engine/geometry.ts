@@ -131,7 +131,7 @@ export function anchor(
 	hop: number,
 	bob: number
 ): Anchor {
-	const ax = w / 2;
+    const ax = g.placement === 'left' ? g.rx * unit + 4 : g.placement === 'right' ? w - g.rx * unit - 4 : w / 2;
 	if (g.hang) return { ax, ay: 0, anchorY: g.ceil };
 	if (g.flat !== null) return { ax, ay: h + Math.min(0, hop) * unit, anchorY: g.flat };
 	return { ax, ay: h * FLOAT_Y + (bob + hop) * unit, anchorY: 0 };

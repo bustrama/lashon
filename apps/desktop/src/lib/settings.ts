@@ -10,6 +10,7 @@ import type { Placement } from '$lib/creature/types';
 
 export interface Settings {
 	'ui.language': Lang;
+	'ui.agentActivity': boolean;
 	'hotkeys.dictation': string;
 	// M8 Command-mode hotkey (docs/adr/0024). Press, speak a command, the
 	// LLM picks tools to fulfil it. Defaults to a chord that does not
@@ -73,6 +74,7 @@ export interface Settings {
 
 export const DEFAULTS: Settings = {
 	'ui.language': 'he',
+	'ui.agentActivity': true,
 	'hotkeys.dictation': 'Control+Space',
 	// Cross-platform default — `CommandOrControl+Backquote` resolves to
 	// Ctrl+` on Win/Linux and Cmd+` on macOS. Left-pinky reachable, doesn't

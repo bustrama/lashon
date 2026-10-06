@@ -35,6 +35,15 @@ pub fn run(agent: super::Agent) {
             return;
         }
     };
+    if let Some(activity) = super::activity::Activity::parse(&stdin) {
+        options.wait = std::time::Duration::from_secs(1);
+        options.connect_timeout = std::time::Duration::from_millis(200);
+        options.handshake_timeout = std::time::Duration::from_millis(200);
+        let _ = runtime.block_on(client::notify(activity, &options));
+        // Informational only: never returns a permission or continuation decision.
+        println!("{{}}");
+        return;
+    }
     let verdict = runtime.block_on(client::ask(&stdin, &options, client::parent_gone()));
     match verdict.map(hook::output) {
         Ok(Some(decision)) => {

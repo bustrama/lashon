@@ -10,6 +10,8 @@
 -->
 <script lang="ts">
 	import { invoke } from '@tauri-apps/api/core';
+	import { emit } from '@tauri-apps/api/event';
+	import { getSetting, setSetting } from '$lib/settings';
 	import { onMount, tick } from 'svelte';
 	import { t } from '$lib/i18n';
 	import { fill, pieces } from '$lib/overlay/approval';
@@ -37,6 +39,12 @@
 
 	let status = $state<AgentHooksStatus | null>(null);
 	let loading = $state(true);
+	let showActivity = $state(true);
+	async function toggleActivity(value: boolean) {
+		showActivity = value;
+		await setSetting('ui.agentActivity', value);
+		await emit('settings:changed', { key: 'ui.agentActivity' });
+	}
 	let loadError = $state<string | null>(null);
 	let preview = $state<{ action: HookAction; data: AgentHooksPreview } | null>(null);
 	let busy = $state(false);
@@ -56,6 +64,7 @@
 	}
 
 	onMount(() => {
+		void getSetting('ui.agentActivity').then((value) => (showActivity = value));
 		void load();
 		return () => {
 			if (toastTimer) clearTimeout(toastTimer);
@@ -142,6 +151,9 @@
 		<span class="section-en lat">· Coding agents</span>
 	</h2>
 	<p class="he-sans intro" dir="auto">{agentText('hub.agents.intro')}</p>
+	{#if agent === 'claude'}
+		<label class="he-sans intro"><input type="checkbox" checked={showActivity} onchange={(event) => void toggleActivity(event.currentTarget.checked)} /> {$t('hub.agents.showActivity')}</label>
+	{/if}
 
 	<div class="agent">
 		<div class="agent-head">
@@ -230,7 +242,7 @@
 						{#if preview.data.added !== null}
 							<p class="he-sans">
 								{agentText('hub.agents.preview.where')}
-								<code class="mono" dir="ltr">hooks.PermissionRequest</code>:
+								<code class="mono" dir="ltr">hooks</code>:
 							</p>
 							<pre class="mono added" dir="ltr">{@render text(preview.data.added)}</pre>
 						{/if}
