@@ -182,6 +182,35 @@ impl Tracker {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn informational_events_cross_the_authenticated_bridge_without_a_decision() {
+        use super::super::{client, endpoint, Bridge, Verdict};
+        let dir = tempfile::tempdir().unwrap();
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let recorded = seen.clone();
+        let _bridge = Bridge::start(
+            dir.path(),
+            std::sync::Arc::new(move |ask| {
+                assert_eq!(ask.tool, TOOL);
+                let event: Activity = serde_json::from_value(ask.input).unwrap();
+                assert!(event.valid());
+                recorded.lock().unwrap().push(ask.agent);
+                Box::pin(async { Verdict::Ask })
+            }),
+        )
+        .unwrap();
+        let mut options = client::Options::new(dir.path().join(endpoint::BRIDGE_FILE));
+        for agent in [Agent::Claude, Agent::Codex] {
+            options.agent = agent;
+            let event = Activity {
+                session: "smoke".into(),
+                event: "PreToolUse".into(),
+                tool: Some("Bash".into()),
+            };
+            assert_eq!(client::notify(event, &options).await.unwrap(), Verdict::Ask);
+        }
+        assert_eq!(*seen.lock().unwrap(), vec![Agent::Claude, Agent::Codex]);
+    }
     #[test]
     fn lifecycle_install_is_previewed_idempotent_and_preserves_unrelated_hooks() {
         use super::super::{claude_settings, codex_settings};
