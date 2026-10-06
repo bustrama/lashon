@@ -111,7 +111,15 @@ pub struct Summary {
     pub tool: Option<String>,
     pub count: usize,
 }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SessionSummary {
+    pub id: u64,
+    pub agent: &'static str,
+    pub state: &'static str,
+    pub tool: Option<String>,
+}
 struct Entry {
+    id: u64,
     agent: Agent,
     session: String,
     state: &'static str,
@@ -121,17 +129,27 @@ struct Entry {
 #[derive(Default)]
 pub struct Tracker {
     entries: Vec<Entry>,
+    next_id: u64,
 }
 impl Tracker {
     pub fn update(&mut self, agent: Agent, activity: Activity, now: Instant) {
         if !activity.valid() {
             return;
         }
+        let previous_id = self
+            .entries
+            .iter()
+            .find(|e| e.agent == agent && e.session == activity.session)
+            .map(|e| e.id);
         self.entries
             .retain(|e| !(e.agent == agent && e.session == activity.session));
         if activity.event == "SessionEnd" {
             return;
         }
+        let id = previous_id.unwrap_or_else(|| {
+            self.next_id += 1;
+            self.next_id
+        });
         let state = match activity.event.as_str() {
             "PreToolUse" => "tool",
             "Stop" => "done",
@@ -140,6 +158,7 @@ impl Tracker {
             _ => "working",
         };
         self.entries.push(Entry {
+            id,
             agent,
             session: activity.session,
             state,
@@ -151,14 +170,7 @@ impl Tracker {
         }
     }
     pub fn summary(&mut self, now: Instant) -> Option<Summary> {
-        self.entries.retain(|e| {
-            now.saturating_duration_since(e.at)
-                < if matches!(e.state, "done" | "stopped" | "error") {
-                    Duration::from_secs(4)
-                } else {
-                    Duration::from_secs(600)
-                }
-        });
+        self.expire(now);
         let active = self
             .entries
             .iter()
@@ -177,11 +189,72 @@ impl Tracker {
             count: active.max(1),
         })
     }
+    pub fn sessions(&mut self, now: Instant) -> Vec<SessionSummary> {
+        self.expire(now);
+        let mut sessions: Vec<_> = self
+            .entries
+            .iter()
+            .map(|e| SessionSummary {
+                id: e.id,
+                agent: e.agent.name(),
+                state: e.state,
+                tool: e.tool.clone(),
+            })
+            .collect();
+        sessions.sort_by_key(|e| e.id);
+        sessions
+    }
+    fn expire(&mut self, now: Instant) {
+        self.entries.retain(|e| {
+            now.saturating_duration_since(e.at)
+                < if matches!(e.state, "done" | "stopped" | "error") {
+                    Duration::from_secs(4)
+                } else {
+                    Duration::from_secs(600)
+                }
+        });
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn session_cards_keep_identity_across_interleaved_agents_and_expire_independently() {
+        let now = Instant::now();
+        let mut tracker = Tracker::default();
+        let event = |name: &str| Activity {
+            session: "private-session-id".into(),
+            event: name.into(),
+            tool: Some("Bash".into()),
+        };
+        tracker.update(Agent::Codex, event("UserPromptSubmit"), now);
+        tracker.update(Agent::Claude, event("UserPromptSubmit"), now);
+        let first = tracker.sessions(now);
+        assert_eq!(first.len(), 2);
+        assert_ne!(first[0].id, first[1].id);
+        assert!(!serde_json::to_string(&first)
+            .unwrap()
+            .contains("private-session-id"));
+        tracker.update(Agent::Codex, event("PreToolUse"), now);
+        tracker.update(Agent::Claude, event("Stop"), now);
+        let next = tracker.sessions(now);
+        assert_eq!(
+            next.iter().map(|s| s.id).collect::<Vec<_>>(),
+            first.iter().map(|s| s.id).collect::<Vec<_>>()
+        );
+        assert_eq!(next[0].tool.as_deref(), Some("Bash"));
+        assert_eq!(next[1].state, "done");
+        let later = tracker.sessions(now + Duration::from_secs(5));
+        assert_eq!(later.len(), 1);
+        assert_eq!(later[0].id, first[0].id);
+        tracker.update(
+            Agent::Codex,
+            event("SessionEnd"),
+            now + Duration::from_secs(6),
+        );
+        assert!(tracker.sessions(now + Duration::from_secs(6)).is_empty());
+    }
     #[tokio::test]
     async fn informational_events_cross_the_authenticated_bridge_without_a_decision() {
         use super::super::{client, endpoint, Bridge, Verdict};

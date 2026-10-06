@@ -19,6 +19,7 @@
 	import RecipesSection from '$lib/recipes/RecipesSection.svelte';
 	import VoiceCorrectionsSection from '$lib/voice/VoiceCorrectionsSection.svelte';
 	import ClaudeCodeSection from '$lib/agent/ClaudeCodeSection.svelte';
+	import DiscordMuteSection from '$lib/agent/DiscordMuteSection.svelte';
 	import { FULL_EDITION } from '$lib/edition';
 	import { PLACEMENTS, type Placement } from '$lib/creature/types';
 
@@ -999,6 +1000,7 @@
 								{/each}
 							</div>
 						</div>
+						<DiscordMuteSection />
 					</section>
 				{:else if section === 'shortcuts'}
 					<section aria-live="polite">

@@ -98,10 +98,11 @@
 	// when none waits. The answer goes back to the broker, which also takes
 	// it from the hotkeys and denies the request when its time runs out.
 	let approval = $state<ApprovalCard | null>(null);
-	let agentActivity = $state<AgentActivity | null>(null);
+	let agentActivities = $state<AgentActivity[]>([]);
 	let showAgentActivity = $state(true);
-	const activity = $derived(showAgentActivity ? agentActivity : null);
-	const activityLabel = $derived(activity ? `${activity.agent} · ${$t(`hub.agents.activity.${activity.state}`)}${activity.tool ? ` · ${activity.tool}` : ''}${activity.count > 1 ? ` (+${activity.count - 1})` : ''}` : null);
+	let discordError = $state(false);
+	const activities = $derived(showAgentActivity ? agentActivities : []);
+	const activity = $derived(activities.find((item) => item.state === 'working' || item.state === 'tool') ?? activities.at(-1));
 	// An early press of the Allow hotkey, for the card to explain.
 	let approvalNudge = $state<ApprovalNudge | null>(null);
 
@@ -342,9 +343,15 @@
 	}
 
 	onMount(() => {
+		let discordErrorTimer: ReturnType<typeof setTimeout> | undefined;
+		const discordErrorUnlisten = listen('discord:suppression-error', () => {
+			discordError = true;
+			clearTimeout(discordErrorTimer);
+			discordErrorTimer = setTimeout(() => (discordError = false), 8000);
+		});
 		void getSetting('ui.agentActivity').then((value) => (showAgentActivity = value));
-		const activityUnlisten = listen<AgentActivity | null>('agent:activity', (event) => (agentActivity = event.payload));
-		const refreshActivity = () => invoke<AgentActivity | null>('agent_activity_current').then((value) => (agentActivity = value)).catch(() => {});
+		const activityUnlisten = listen<AgentActivity[]>('agent:activity', (event) => (agentActivities = event.payload));
+		const refreshActivity = () => invoke<AgentActivity[]>('agent_activity_sessions').then((value) => (agentActivities = value)).catch(() => {});
 		void activityUnlisten.then(refreshActivity);
 		const activityTimer = FULL_EDITION ? setInterval(() => void refreshActivity(), 1000) : null;
 		// The Rust dictation worker drives the creature's listening states.
@@ -473,6 +480,8 @@
 		});
 
 		return () => {
+			clearTimeout(discordErrorTimer);
+			void discordErrorUnlisten.then((stop) => stop());
 			if (activityTimer) clearInterval(activityTimer);
 			void activityUnlisten.then((stop) => stop());
 			clearTimeout(commandToolTimer);
@@ -519,7 +528,8 @@
 		commandTranscript,
 		commandCancellable,
 		commandFlash,
-		agentActivity: activityLabel,
+		agentActivity: discordError ? $t('hub.discord.captureBlocked') : null,
+		agentSessions: discordError ? [] : activities,
 		approval,
 		approvalNudge,
 		onApprovalArmed: armApproval,

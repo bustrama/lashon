@@ -15,12 +15,24 @@ return `{}` regardless of bridge success and never return permission or continua
 decisions. Their connection/handshake limits are short; the acknowledgement wait is
 one second. Approval hooks retain their existing native fallback behavior.
 
-The core tracker keeps at most 64 sessions. It prefers active sessions over finished
-ones, shows a small count for concurrent sessions, expires terminal status after
+Codex approval cards are now opt-in (`agents.codexApprovalCards`, default false).
+Codex runs PermissionRequest before user or automatic review, and its hook input
+does not expose `approvals_reviewer`; permission_mode does not distinguish the two.
+With cards off, Ottid immediately returns Ask (no hook decision), so Codex retains
+its normal approval/reviewer flow. Lifecycle activity still reaches the tracker.
+The Hub explains that cards should stay off for Approve for me. Claude cards keep
+their existing behavior. The setting does not change any Codex configuration or
+automatically allow a request. Store read failure also leaves review with Codex.
+
+The core tracker keeps at most 64 sessions. Each session now gets its own compact
+card with an agent name and stable local number instead of a +N aggregate. Updates
+retain the card identity and order; raw session IDs do not leave the tracker.
+The stack fits the available island space and scrolls when needed, including
+side docking and ceiling placement. Terminal status expires after
 four seconds and drops silent sessions after ten minutes. A dropped session is not
 claimed to have completed. The Hub's single `ui.agentActivity` toggle hides both
 the bubble and activity pose immediately and persists across launches. Approval,
-dictation and command feedback have priority. No expanded activity list is added.
+dictation and command feedback have priority. Cards retain short status text only.
 
 Existing connections show as needing reinstall so the user previews all added hook
 definitions. Codex definitions require renewed native trust through `/hooks`.

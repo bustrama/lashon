@@ -23,6 +23,7 @@ use ottid_core::agent_bridge::{
 use ottid_core::approval::{Decision, Request};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_store::StoreExt;
 
 use crate::approval;
 
@@ -48,6 +49,16 @@ pub fn agent_activity_current(
         .lock()
         .unwrap_or_else(|p| p.into_inner())
         .summary(std::time::Instant::now())
+}
+#[tauri::command]
+pub fn agent_activity_sessions(
+    app: AppHandle,
+) -> Vec<ottid_core::agent_bridge::activity::SessionSummary> {
+    app.state::<AgentBridge>()
+        .1
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .sessions(std::time::Instant::now())
 }
 
 fn lock(state: &AgentBridge) -> MutexGuard<'_, Option<Bridge>> {
@@ -140,9 +151,22 @@ fn asker(app: AppHandle) -> AskFn {
                             .lock()
                             .unwrap_or_else(|p| p.into_inner())
                             .update(ask.agent, activity, std::time::Instant::now());
-                        let _ = app.emit("agent:activity", agent_activity_current(app.clone()));
+                        let _ = app.emit("agent:activity", agent_activity_sessions(app.clone()));
                     }
                 }
+                return Verdict::Ask;
+            }
+            // Codex fires PermissionRequest before automatic review too, but
+            // the hook payload does not identify the reviewer. Opt in to cards
+            // explicitly; otherwise leave the native review flow untouched.
+            if ask.agent == Agent::Codex
+                && !app
+                    .store("settings.json")
+                    .ok()
+                    .and_then(|store| store.get("agents.codexApprovalCards"))
+                    .and_then(|value| value.as_bool())
+                    .unwrap_or(false)
+            {
                 return Verdict::Ask;
             }
             let request =
