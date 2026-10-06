@@ -206,9 +206,11 @@
 		<div class="session-stack" class:below={side === 'below'} data-interactive="island" role="region" aria-label={$t('hub.agents.sessions')} tabindex="0" aria-live="polite">
 			{#each agentSessions as session (session.id)}
 				<div class="bubble session-card" dir="auto">
-					<div class="session-heading" dir="auto" title={session.title ?? undefined}>{session.title ?? `${session.agent} · #${session.id}`}</div>
+					<div class="session-heading" dir="auto" title={[session.project, session.title ?? `${session.agent} · #${session.id}`].filter(Boolean).join(' • ')}>
+						{#if session.project}<bdi>{session.project}</bdi> • {/if}<bdi>{session.title ?? `${session.agent} · #${session.id}`}</bdi>
+					</div>
 					{#if session.title || session.project}
-						<div class="session-context"><bdi>{session.agent}</bdi>{#if session.project} · <bdi>{session.project}</bdi>{/if}</div>
+						<div class="session-context"><bdi>{session.agent}</bdi></div>
 					{/if}
 					<div class="session-status he-sans">{$t(`hub.agents.activity.${session.state}`)}{#if session.tool} · <bdi>{session.tool}</bdi>{/if}</div>
 				</div>
