@@ -20,12 +20,20 @@ The creature itself is
 creatures are [ADR-0041](adr/0041-user-authored-creatures-are-data.md).
 
 The visual reference is two self-contained prototypes that open in any browser.
-They are the spec until Phase B ports them into the app:
+They document the form and animation states implemented in the app:
 
 - [`design/ottid/puddle.html`](design/ottid/puddle.html) shows the base form and
   the three placements.
 - [`design/ottid/states.html`](design/ottid/states.html) shows all twelve states,
   rendered with WebGL, in both OS themes.
+
+The static brand mark is `apps/desktop/static/ottid-mark.svg`: the same puddle,
+hands, peach eyes and inner lamp. `Mark.svelte` imports that asset directly;
+only the lamp inherits its mode colour. Generate desktop icons with
+`npm run tauri -- icon static/ottid-mark.svg` from `apps/desktop`, then copy
+`src-tauri/icons/32x32.png` to `src-tauri/icons/tray.png`. The public site uses
+the same SVG on `gh-pages`. The old Illustrator file in `icon/` is historical
+source art, not the current icon source.
 
 ## Color tokens
 
