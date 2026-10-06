@@ -33,6 +33,8 @@
 		if (agent === 'codex' && key === 'hub.agents.requirements') return $t('hub.agents.codexRequirements');
 		if (agent === 'codex' && key === 'hub.agents.scope') return $t('hub.agents.codexScope');
 		if (agent === 'codex' && key === 'hub.agents.hooksDisabled') return $t('hub.agents.codexDisabled');
+		if (agent === 'codex' && key === 'hub.agents.intro') return $t('hub.agents.codexIntro');
+		if (agent === 'codex' && key === 'hub.agents.state.on' && !codexApprovalCards) return $t('hub.agents.codexInfoConnected');
 		const value = $t(key);
 		return agent === 'codex' ? value.replaceAll('Claude Code', 'Codex') : value;
 	}
@@ -40,6 +42,11 @@
 	let status = $state<AgentHooksStatus | null>(null);
 	let loading = $state(true);
 	let showActivity = $state(true);
+	let codexApprovalCards = $state(false);
+	async function toggleCodexApprovalCards(value: boolean) {
+		await setSetting('agents.codexApprovalCards', value);
+		codexApprovalCards = value;
+	}
 	async function toggleActivity(value: boolean) {
 		showActivity = value;
 		await setSetting('ui.agentActivity', value);
@@ -65,6 +72,7 @@
 
 	onMount(() => {
 		void getSetting('ui.agentActivity').then((value) => (showActivity = value));
+		void getSetting('agents.codexApprovalCards').then((value) => (codexApprovalCards = value));
 		void load();
 		return () => {
 			if (toastTimer) clearTimeout(toastTimer);
@@ -171,6 +179,10 @@
 			<p class="he-sans error" role="alert">{agentText(loadError ?? 'hub.agents.error.other')}</p>
 		{:else}
 			<p class="he-sans state" role="status">{agentText(`hub.agents.state.${hook}`)}</p>
+			{#if agent === 'codex'}
+				<label class="he-sans intro"><input type="checkbox" checked={codexApprovalCards} aria-describedby="codex-approval-hint" onchange={(event) => void toggleCodexApprovalCards(event.currentTarget.checked)} /> {$t('hub.agents.codexApprovalCards')}</label>
+				<p id="codex-approval-hint" class="he-sans hint">{$t('hub.agents.codexApprovalHint')}</p>
+			{/if}
 			{#if hook === 'unreadable'}
 				<p class="he-sans error">{agentText(errorKey(status.error))}</p>
 			{/if}

@@ -11,6 +11,7 @@ import type { Placement } from '$lib/creature/types';
 export interface Settings {
 	'ui.language': Lang;
 	'ui.agentActivity': boolean;
+	'agents.codexApprovalCards': boolean;
 	'discordMute.enabled': boolean;
 	'discordMute.verified': boolean;
 	'hotkeys.dictation': string;
@@ -77,6 +78,7 @@ export interface Settings {
 export const DEFAULTS: Settings = {
 	'ui.language': 'he',
 	'ui.agentActivity': true,
+	'agents.codexApprovalCards': false,
 	'discordMute.enabled': false,
 	'discordMute.verified': false,
 	'hotkeys.dictation': 'Control+Space',

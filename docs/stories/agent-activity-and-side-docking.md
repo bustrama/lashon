@@ -15,6 +15,15 @@ return `{}` regardless of bridge success and never return permission or continua
 decisions. Their connection/handshake limits are short; the acknowledgement wait is
 one second. Approval hooks retain their existing native fallback behavior.
 
+Codex approval cards are now opt-in (`agents.codexApprovalCards`, default false).
+Codex runs PermissionRequest before user or automatic review, and its hook input
+does not expose `approvals_reviewer`; permission_mode does not distinguish the two.
+With cards off, Ottid immediately returns Ask (no hook decision), so Codex retains
+its normal approval/reviewer flow. Lifecycle activity still reaches the tracker.
+The Hub explains that cards should stay off for Approve for me. Claude cards keep
+their existing behavior. The setting does not change any Codex configuration or
+automatically allow a request. Store read failure also leaves review with Codex.
+
 The core tracker keeps at most 64 sessions. It prefers active sessions over finished
 ones, shows a small count for concurrent sessions, expires terminal status after
 four seconds and drops silent sessions after ten minutes. A dropped session is not
