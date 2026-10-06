@@ -52,7 +52,15 @@ pub fn default_dir() -> Option<PathBuf> {
 
 #[cfg(windows)]
 fn base_dir() -> Option<PathBuf> {
-    std::env::var_os("LOCALAPPDATA").map(PathBuf::from)
+    use windows::Win32::System::Com::CoTaskMemFree;
+    use windows::Win32::UI::Shell::{FOLDERID_LocalAppData, SHGetKnownFolderPath, KF_FLAG_DEFAULT};
+    // SAFETY: the returned string is owned by the caller and freed with CoTaskMemFree.
+    unsafe {
+        let text = SHGetKnownFolderPath(&FOLDERID_LocalAppData, KF_FLAG_DEFAULT, None).ok()?;
+        let result = text.to_string().ok().map(PathBuf::from);
+        CoTaskMemFree(Some(text.0.cast()));
+        result
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -101,6 +109,7 @@ impl BridgeFile {
             }
             Err(_) => return Err(BridgeFileError::Invalid),
         };
+        check_bridge_file(&file).map_err(|_| BridgeFileError::Invalid)?;
         let mut text = Vec::new();
         file.take(MAX_BRIDGE_FILE + 1)
             .read_to_end(&mut text)
@@ -167,12 +176,26 @@ fn remove_if_present(path: &Path) -> io::Result<()> {
 pub use self::windows_impl::{connect, create_user_only, prepare_dir, Listener, Stream};
 
 #[cfg(windows)]
+use self::windows_impl::check_bridge_file;
+
+#[cfg(unix)]
+fn check_bridge_file(file: &fs::File) -> io::Result<()> {
+    use std::os::unix::fs::MetadataExt;
+    let meta = file.metadata()?;
+    // SAFETY: geteuid has no preconditions.
+    if !meta.is_file() || meta.uid() != unsafe { libc::geteuid() } || meta.mode() & 0o077 != 0 {
+        return Err(io::Error::other("bridge file is not private to this user"));
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
 mod windows_impl {
     use std::ffi::c_void;
     use std::fs;
     use std::io;
     use std::os::windows::ffi::OsStrExt;
-    use std::os::windows::io::{FromRawHandle, RawHandle};
+    use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
     use std::path::Path;
     use std::time::Duration;
 
@@ -185,16 +208,19 @@ mod windows_impl {
     };
     use windows::Win32::Security::Authorization::{
         ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW,
-        SDDL_REVISION_1,
+        GetSecurityInfo, SDDL_REVISION_1, SE_FILE_OBJECT,
     };
     use windows::Win32::Security::{
-        GetTokenInformation, TokenUser, PSECURITY_DESCRIPTOR, SECURITY_ATTRIBUTES, TOKEN_QUERY,
-        TOKEN_USER,
+        GetTokenInformation, TokenUser, OWNER_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR, PSID,
+        SECURITY_ATTRIBUTES, TOKEN_QUERY, TOKEN_USER,
     };
     use windows::Win32::Storage::FileSystem::{
         CreateFileW, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_MODE,
     };
-    use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+    use windows::Win32::System::Pipes::GetNamedPipeServerProcessId;
+    use windows::Win32::System::Threading::{
+        GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
 
     use crate::agent_bridge::auth::Token;
 
@@ -217,13 +243,16 @@ mod windows_impl {
 
     /// The SID of the user this process runs as, e.g. `S-1-5-21-…-1001`.
     pub fn current_user_sid() -> io::Result<String> {
+        process_user_sid(unsafe { GetCurrentProcess() })
+    }
+
+    fn process_user_sid(process: HANDLE) -> io::Result<String> {
         // SAFETY: the token handle is closed below; the buffer is sized by
         // the first call and u64-aligned for TOKEN_USER; the string the SID
         // is converted to is freed with LocalFree.
         unsafe {
             let mut token = HANDLE::default();
-            OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token)
-                .map_err(io::Error::other)?;
+            OpenProcessToken(process, TOKEN_QUERY, &mut token).map_err(io::Error::other)?;
             let mut len = 0u32;
             let _ = GetTokenInformation(token, TokenUser, None, 0, &mut len);
             let mut buffer = vec![0u64; (len as usize).div_ceil(8).max(1)];
@@ -245,12 +274,65 @@ mod windows_impl {
         }
     }
 
+    pub(super) fn check_bridge_file(file: &fs::File) -> io::Result<()> {
+        if !file.metadata()?.is_file() {
+            return Err(io::Error::other("not a bridge file"));
+        }
+        let mut owner = PSID::default();
+        let mut descriptor = PSECURITY_DESCRIPTOR::default();
+        // SAFETY: the file handle is live; the owner points inside the returned descriptor.
+        unsafe {
+            GetSecurityInfo(
+                HANDLE(file.as_raw_handle()),
+                SE_FILE_OBJECT,
+                OWNER_SECURITY_INFORMATION,
+                Some(&mut owner),
+                None,
+                None,
+                None,
+                Some(&mut descriptor),
+            )
+            .ok()
+            .map_err(io::Error::other)?;
+            let mut text = PWSTR::null();
+            let result = ConvertSidToStringSidW(owner, &mut text)
+                .map_err(io::Error::other)
+                .and_then(|()| text.to_string().map_err(io::Error::other));
+            if !text.is_null() {
+                let _ = LocalFree(Some(HLOCAL(text.0.cast())));
+            }
+            let _ = LocalFree(Some(HLOCAL(descriptor.0)));
+            if result? != current_user_sid()? {
+                return Err(io::Error::other("bridge file belongs to another user"));
+            }
+        }
+        Ok(())
+    }
+
+    fn check_server(client: &NamedPipeClient) -> io::Result<()> {
+        // SAFETY: a live pipe handle and out-parameter, then a process handle closed below.
+        unsafe {
+            let mut pid = 0;
+            GetNamedPipeServerProcessId(HANDLE(client.as_raw_handle()), &mut pid)
+                .map_err(io::Error::other)?;
+            let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
+                .map_err(io::Error::other)?;
+            let sid = process_user_sid(process);
+            let _ = CloseHandle(process);
+            if sid? != current_user_sid()? {
+                return Err(io::Error::other("pipe server belongs to another user"));
+            }
+        }
+        Ok(())
+    }
+
     /// A security descriptor built from SDDL, freed on drop.
     struct Descriptor(PSECURITY_DESCRIPTOR);
 
     impl Descriptor {
         fn user_only(rights: &str) -> io::Result<Self> {
-            let sddl = wide(&user_only_sddl(&current_user_sid()?, rights));
+            let sid = current_user_sid()?;
+            let sddl = wide(&format!("O:{sid}{}", user_only_sddl(&sid, rights)));
             let mut descriptor = PSECURITY_DESCRIPTOR::default();
             // SAFETY: a NUL-terminated SDDL string and an out-parameter.
             unsafe {
@@ -297,7 +379,7 @@ mod windows_impl {
         let handle = unsafe {
             CreateFileW(
                 PCWSTR(name.as_ptr()),
-                GENERIC_READ.0 | GENERIC_WRITE.0,
+                GENERIC_READ.0 | GENERIC_WRITE.0 | 0x00040000, // WRITE_DAC for settings permission copying.
                 FILE_SHARE_MODE(0),
                 Some(&attributes),
                 CREATE_NEW,
@@ -390,7 +472,10 @@ mod windows_impl {
         }
         loop {
             match ClientOptions::new().open(endpoint) {
-                Ok(client) => return Ok(client),
+                Ok(client) => {
+                    check_server(&client)?;
+                    return Ok(client);
+                }
                 Err(err) if err.raw_os_error() == Some(ERROR_PIPE_BUSY.0 as i32) => {}
                 Err(err) => return Err(err),
             }
@@ -508,7 +593,12 @@ mod unix_impl {
         if expected.as_deref() != Some(path) {
             return Err(io::Error::other("not the bridge socket"));
         }
-        UnixStream::connect(path).await
+        let stream = UnixStream::connect(path).await?;
+        // SAFETY: geteuid has no preconditions. peer_cred comes from the kernel.
+        if stream.peer_cred()?.uid() != unsafe { libc::geteuid() } {
+            return Err(io::Error::other("socket server belongs to another user"));
+        }
+        Ok(stream)
     }
 }
 
@@ -570,6 +660,19 @@ mod tests {
         if let Some(dir) = default_dir() {
             assert!(dir.ends_with(Path::new(IDENTIFIER).join("agent-bridge")));
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_bridge_file_readable_by_other_users_is_refused() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = write_bridge_file(dir.path(), "endpoint", &Token::generate().unwrap()).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+        assert_eq!(
+            BridgeFile::read(&path).unwrap_err(),
+            BridgeFileError::Invalid
+        );
     }
 
     #[cfg(windows)]

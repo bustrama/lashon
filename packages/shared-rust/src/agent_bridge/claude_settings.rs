@@ -565,12 +565,109 @@ impl ApplyError {
 
 /// The file as it is now: its text, or `None` when there is none.
 pub fn read(path: &Path) -> Result<Option<String>, ApplyError> {
+    refuse_symlink(path)?;
     match fs::read(path) {
         Ok(bytes) => String::from_utf8(bytes)
             .map(Some)
             .map_err(|_| ApplyError::NotText),
         Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(None),
         Err(err) => Err(ApplyError::Io(err)),
+    }
+}
+
+fn refuse_symlink(path: &Path) -> io::Result<()> {
+    match fs::symlink_metadata(path) {
+        Ok(meta) if meta.file_type().is_symlink() => {
+            Err(io::Error::other("symlinked settings are not supported"))
+        }
+        Ok(_) => Ok(()),
+        Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(err),
+    }
+}
+
+fn create_settings_file(path: &Path, original: &Path) -> io::Result<fs::File> {
+    #[cfg(not(windows))]
+    let file = {
+        let mut options = fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        options.open(path)?
+    };
+    #[cfg(windows)]
+    let file = super::endpoint::create_user_only(path)?;
+    let metadata = match fs::metadata(original) {
+        Ok(meta) => Some(meta),
+        Err(err) if err.kind() == io::ErrorKind::NotFound => None,
+        Err(err) => return Err(err),
+    };
+    if let Some(meta) = metadata {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::{MetadataExt, PermissionsExt};
+            // Preserve stricter owner permissions, never expose settings to groups/others.
+            file.set_permissions(fs::Permissions::from_mode(meta.mode() & 0o600))?;
+        }
+        #[cfg(not(unix))]
+        file.set_permissions(meta.permissions())?;
+        #[cfg(windows)]
+        copy_windows_dacl(original, &file)?;
+    }
+    Ok(file)
+}
+
+#[cfg(windows)]
+fn copy_windows_dacl(original: &Path, target: &fs::File) -> io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    use std::os::windows::io::AsRawHandle;
+    use windows::core::PCWSTR;
+    use windows::Win32::Foundation::{LocalFree, HANDLE, HLOCAL};
+    use windows::Win32::Security::Authorization::{
+        GetNamedSecurityInfoW, SetSecurityInfo, SE_FILE_OBJECT,
+    };
+    use windows::Win32::Security::{
+        DACL_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR,
+    };
+    let wide = |path: &Path| {
+        path.as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect::<Vec<_>>()
+    };
+    let source = wide(original);
+    let mut dacl = std::ptr::null_mut();
+    let mut descriptor = PSECURITY_DESCRIPTOR::default();
+    // SAFETY: paths are NUL-terminated; the DACL remains in the live descriptor until copied.
+    unsafe {
+        GetNamedSecurityInfoW(
+            PCWSTR(source.as_ptr()),
+            SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION,
+            None,
+            None,
+            Some(&mut dacl),
+            None,
+            &mut descriptor,
+        )
+        .ok()
+        .map_err(io::Error::other)?;
+        let result = SetSecurityInfo(
+            HANDLE(target.as_raw_handle()),
+            SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+            None,
+            None,
+            Some(dacl),
+            None,
+        )
+        .ok()
+        .map_err(io::Error::other);
+        let _ = LocalFree(Some(HLOCAL(descriptor.0)));
+        result
     }
 }
 
@@ -607,9 +704,16 @@ pub fn apply(
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
     }
-    let staging = path.with_extension("json.ottid-tmp");
-    fs::write(&staging, plan.text.as_bytes())?;
-    if let Err(err) = fs::rename(&staging, path) {
+    let staging = path.with_extension(format!("json.ottid-{}.tmp", std::process::id()));
+    let mut file = create_settings_file(&staging, path)?;
+    let written =
+        io::Write::write_all(&mut file, plan.text.as_bytes()).and_then(|()| file.sync_all());
+    drop(file);
+    let replace = written.and_then(|()| {
+        refuse_symlink(path)?;
+        fs::rename(&staging, path)
+    });
+    if let Err(err) = replace {
         let _ = fs::remove_file(&staging);
         return Err(ApplyError::Io(err));
     }
@@ -637,11 +741,7 @@ fn back_up(path: &Path) -> io::Result<PathBuf> {
             format!("-{n}")
         };
         let backup = path.with_file_name(format!("{name}.ottid-backup-{seconds}{suffix}"));
-        match fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&backup)
-        {
+        match create_settings_file(&backup, path) {
             Ok(mut file) => {
                 let bytes = fs::read(path)?;
                 io::Write::write_all(&mut file, &bytes)?;
@@ -1021,6 +1121,114 @@ mod tests {
         assert_eq!(
             groups(&fs::read_to_string(&path).unwrap()),
             vec![entry(EXE)]
+        );
+    }
+
+    #[test]
+    fn an_existing_staging_file_is_never_overwritten() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        let staging = path.with_extension(format!("json.ottid-{}.tmp", std::process::id()));
+        fs::write(&staging, "leave me alone").unwrap();
+        assert!(apply(&path, "absent", |current| plan_install(current, EXE)).is_err());
+        assert_eq!(fs::read_to_string(staging).unwrap(), "leave me alone");
+        assert!(!path.exists());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn replacement_and_backup_preserve_the_windows_dacl() {
+        use std::os::windows::io::AsRawHandle;
+        use windows::core::PWSTR;
+        use windows::Win32::Foundation::{LocalFree, HANDLE, HLOCAL};
+        use windows::Win32::Security::Authorization::{
+            ConvertSecurityDescriptorToStringSecurityDescriptorW, GetSecurityInfo, SDDL_REVISION_1,
+            SE_FILE_OBJECT,
+        };
+        use windows::Win32::Security::{DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR};
+        fn dacl(path: &Path) -> String {
+            let file = fs::File::open(path).unwrap();
+            let mut descriptor = PSECURITY_DESCRIPTOR::default();
+            let mut text = PWSTR::null();
+            // SAFETY: live handle, valid out-parameters, both allocations freed below.
+            unsafe {
+                GetSecurityInfo(
+                    HANDLE(file.as_raw_handle()),
+                    SE_FILE_OBJECT,
+                    DACL_SECURITY_INFORMATION,
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(&mut descriptor),
+                )
+                .ok()
+                .unwrap();
+                ConvertSecurityDescriptorToStringSecurityDescriptorW(
+                    descriptor,
+                    SDDL_REVISION_1,
+                    DACL_SECURITY_INFORMATION,
+                    &mut text,
+                    None,
+                )
+                .unwrap();
+                // SetSecurityInfo marks inheritance as processed (AI), even
+                // for a protected DACL with the same explicit entries.
+                let result = text.to_string().unwrap().replacen("D:PAI", "D:P", 1);
+                let _ = LocalFree(Some(HLOCAL(text.0.cast())));
+                let _ = LocalFree(Some(HLOCAL(descriptor.0)));
+                result
+            }
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        let mut file = super::super::endpoint::create_user_only(&path).unwrap();
+        io::Write::write_all(&mut file, USER.as_bytes()).unwrap();
+        drop(file);
+        let original = dacl(&path);
+        let applied = apply(&path, &fingerprint(Some(USER.as_bytes())), |current| {
+            plan_install(current, EXE)
+        })
+        .unwrap();
+        assert_eq!(dacl(&path), original);
+        assert_eq!(dacl(&applied.backup.unwrap()), original);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlinked_settings_including_dangling_links_are_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("target.json");
+        let path = dir.path().join("settings.json");
+        std::os::unix::fs::symlink(&target, &path).unwrap();
+        assert!(read(&path).is_err());
+        assert!(apply(&path, "absent", |current| plan_install(current, EXE)).is_err());
+        fs::write(&target, USER).unwrap();
+        assert!(
+            apply(&path, &fingerprint(Some(USER.as_bytes())), |current| {
+                plan_install(current, EXE)
+            })
+            .is_err()
+        );
+        assert_eq!(fs::read_to_string(target).unwrap(), USER);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn replacement_and_backup_keep_settings_private() {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        fs::write(&path, USER).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o640)).unwrap();
+        let applied = apply(&path, &fingerprint(Some(USER.as_bytes())), |current| {
+            plan_install(current, EXE)
+        })
+        .unwrap();
+        assert_eq!(fs::metadata(&path).unwrap().mode() & 0o777, 0o600);
+        assert_eq!(
+            fs::metadata(applied.backup.unwrap()).unwrap().mode() & 0o777,
+            0o600
         );
     }
 }

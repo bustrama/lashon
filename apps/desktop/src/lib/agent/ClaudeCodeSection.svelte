@@ -171,6 +171,7 @@
 			</dl>
 			<ul class="notes he-sans">
 				<li>{$t('hub.agents.scope')}</li>
+				<li>{$t('hub.agents.requirements')}</li>
 				<li>{$t('hub.agents.once')}</li>
 				<li>{$t('hub.agents.privacy')}</li>
 			</ul>

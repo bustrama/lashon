@@ -34,6 +34,10 @@ The owner set two hard requirements:
 
 ### The hook: `PermissionRequest`
 
+Requires **Claude Code 2.1.139 or newer**: this version introduced the
+`args` exec form ([upstream changelog](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md#21139)).
+The Hub states the requirement; it does not execute Claude Code to detect its version.
+
 Claude Code runs hooks as commands at documented events
 (<https://code.claude.com/docs/en/hooks>). `PermissionRequest` fires only when
 Claude Code is about to show a permission prompt, and gets the tool's name,
@@ -108,13 +112,18 @@ listener.
 - **Removing it.** Stopping removes it, but only if it still names this
   process's endpoint.
 - **Where it is.**
-  - Windows: `%LOCALAPPDATA%\app.ottid.desktop\agent-bridge`.
+  - Windows: the OS known folder `FOLDERID_LocalAppData`, then
+    `app.ottid.desktop\agent-bridge`; environment overrides are ignored.
   - macOS: `~/Library/Application Support/app.ottid.desktop/agent-bridge`.
   - Linux: `$XDG_RUNTIME_DIR/app.ottid.desktop/agent-bridge`, else the data
     folder.
 
 **Client checks.** The client connects only to an endpoint of that form: a
 local pipe with Ottid's prefix, or the socket next to the bridge file.
+The opened bridge file must belong to the current user (Unix also requires
+0600 or stricter). Before any handshake, the connected server's user is
+checked using the named-pipe server PID and process token on Windows, or
+kernel peer credentials on Unix. A failure stands aside.
 
 **Limits.**
 
@@ -224,6 +233,14 @@ now. Only the Hub window can apply a change.
 - Before any write, the file is copied to `settings.json.ottid-backup-<unix
   secs>` beside it. The new file goes to a temporary name and is renamed.
 
+The new file is created exclusively and synced before replacement. Symlinked
+`settings.json` files are refused, including dangling links. On Unix, backups
+and replacements preserve owner read/write permissions with group/other access
+removed (new files are 0600).
+On Windows, both files preserve the original DACL with inheritance disabled;
+new settings files start with the user-only DACL. Bridge files explicitly name
+the current user as owner, including when the process is elevated.
+
 **Whose entry it is.** A handler is Ottid's if its command's file stem is
 `ottid-hook`.
 
@@ -234,6 +251,10 @@ now. Only the Hub window can apply a change.
 
 **Scope: user settings.** That is `~/.claude/settings.json`, or the folder
 `CLAUDE_CONFIG_DIR` points to.
+
+This is the environment of **Ottid**, which may differ from Claude Code's.
+The Hub explains that connected means an entry exists in the displayed file,
+not that a Claude Code session using another configuration folder runs it.
 
 - **Why user scope.** The listener and the hook binary belong to the user,
   not to a project.
