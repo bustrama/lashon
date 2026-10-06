@@ -35,7 +35,12 @@ pub fn run(agent: super::Agent) {
             return;
         }
     };
-    if let Some(activity) = super::activity::Activity::parse(&stdin) {
+    if let Some(mut activity) = super::activity::Activity::parse(&stdin) {
+        if agent == super::Agent::Codex {
+            activity.title = super::codex_settings::user_settings_path()
+                .and_then(|path| path.parent().map(|dir| dir.join("session_index.jsonl")))
+                .and_then(|path| super::activity::codex_title(&path, &activity.session));
+        }
         options.wait = std::time::Duration::from_secs(1);
         options.connect_timeout = std::time::Duration::from_millis(200);
         options.handshake_timeout = std::time::Duration::from_millis(200);

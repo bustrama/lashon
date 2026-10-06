@@ -4,6 +4,49 @@ use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 
 pub const TOOL: &str = "OttidActivity";
+
+fn valid_label(value: &str) -> bool {
+    !value.trim().is_empty()
+        && value.len() <= 512
+        && !value.chars().any(|c| {
+            c.is_control() || matches!(c, '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
+        })
+}
+
+fn project_name(cwd: &str) -> Option<String> {
+    let name = cwd
+        .trim_end_matches(['/', '\\'])
+        .rsplit(['/', '\\'])
+        .next()?;
+    (name != "." && name != ".." && !name.ends_with(':') && valid_label(name))
+        .then(|| name.to_owned())
+}
+
+/// Read only the bounded tail of Codex's title index, never a rollout/transcript.
+/// An index rename or partial append simply leaves the previous display label.
+pub fn codex_title(path: &std::path::Path, session: &str) -> Option<String> {
+    use std::io::{Read, Seek, SeekFrom};
+    const LIMIT: u64 = 2 << 20;
+    let mut file = std::fs::File::open(path).ok()?;
+    let len = file.metadata().ok()?.len();
+    let start = len.saturating_sub(LIMIT);
+    file.seek(SeekFrom::Start(start)).ok()?;
+    let mut bytes = Vec::new();
+    file.take(LIMIT).read_to_end(&mut bytes).ok()?;
+    let bytes = if start > 0 {
+        &bytes[bytes.iter().position(|b| *b == b'\n')? + 1..]
+    } else {
+        &bytes[..]
+    };
+    bytes.split(|b| *b == b'\n').rev().find_map(|line| {
+        let value: serde_json::Value = serde_json::from_slice(line).ok()?;
+        if value.get("id")?.as_str()? != session {
+            return None;
+        }
+        let title = value.get("thread_name")?.as_str()?.trim();
+        valid_label(title).then(|| title.to_owned())
+    })
+}
 pub const EVENTS: &[&str] = &[
     "UserPromptSubmit",
     "PreToolUse",
@@ -77,12 +120,21 @@ pub struct Activity {
     pub session: String,
     pub event: String,
     pub tool: Option<String>,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub project: Option<String>,
 }
 impl Activity {
     pub fn parse(stdin: &[u8]) -> Option<Self> {
         let value: serde_json::Value = serde_json::from_slice(stdin).ok()?;
         let activity = Self {
             session: value.get("session_id")?.as_str()?.into(),
+            title: None,
+            project: value
+                .get("cwd")
+                .and_then(|v| v.as_str())
+                .and_then(project_name),
             event: value.get("hook_event_name")?.as_str()?.into(),
             tool: value
                 .get("tool_name")
@@ -101,6 +153,8 @@ impl Activity {
                     "Interrupt" | "PostToolUseFailure" | "StopFailure"
                 ))
             && self.tool.as_deref().is_none_or(valid_tool_name)
+            && self.title.as_deref().is_none_or(valid_label)
+            && self.project.as_deref().is_none_or(valid_label)
     }
 }
 
@@ -113,12 +167,16 @@ pub struct Summary {
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SessionSummary {
+    pub title: Option<String>,
+    pub project: Option<String>,
     pub id: u64,
     pub agent: &'static str,
     pub state: &'static str,
     pub tool: Option<String>,
 }
 struct Entry {
+    title: Option<String>,
+    project: Option<String>,
     id: u64,
     agent: Agent,
     session: String,
@@ -136,17 +194,23 @@ impl Tracker {
         if !activity.valid() {
             return;
         }
-        let previous_id = self
+        let previous = self
             .entries
             .iter()
             .find(|e| e.agent == agent && e.session == activity.session)
-            .map(|e| e.id);
+            .map(|e| (e.id, e.title.clone(), e.project.clone()));
         self.entries
             .retain(|e| !(e.agent == agent && e.session == activity.session));
         if activity.event == "SessionEnd" {
             return;
         }
-        let id = previous_id.unwrap_or_else(|| {
+        let title = activity
+            .title
+            .or_else(|| previous.as_ref().and_then(|e| e.1.clone()));
+        let project = activity
+            .project
+            .or_else(|| previous.as_ref().and_then(|e| e.2.clone()));
+        let id = previous.map(|e| e.0).unwrap_or_else(|| {
             self.next_id += 1;
             self.next_id
         });
@@ -158,6 +222,8 @@ impl Tracker {
             _ => "working",
         };
         self.entries.push(Entry {
+            title,
+            project,
             id,
             agent,
             session: activity.session,
@@ -195,6 +261,8 @@ impl Tracker {
             .entries
             .iter()
             .map(|e| SessionSummary {
+                title: e.title.clone(),
+                project: e.project.clone(),
                 id: e.id,
                 agent: e.agent.name(),
                 state: e.state,
@@ -220,11 +288,63 @@ impl Tracker {
 mod tests {
     use super::*;
     #[test]
+    fn titles_use_latest_matching_metadata_and_ignore_partial_appends() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("session_index.jsonl");
+        std::fs::write(
+            &path,
+            concat!(
+                "{\"id\":\"a\",\"thread_name\":\"old\"}\n",
+                "{\"id\":\"other\",\"thread_name\":\"unrelated\"}\n",
+                "{\"id\":\"a\",\"thread_name\":\"כותרת חדשה\"}\n",
+                "{\"id\":\"a\","
+            ),
+        )
+        .unwrap();
+        assert_eq!(codex_title(&path, "a").as_deref(), Some("כותרת חדשה"));
+        assert_eq!(codex_title(&path, "missing"), None);
+        assert_eq!(
+            project_name("E:\\workspace\\ottid\\").as_deref(),
+            Some("ottid")
+        );
+        assert_eq!(
+            project_name("/home/user/project/").as_deref(),
+            Some("project")
+        );
+        assert_eq!(project_name("C:\\"), None);
+        assert!(!valid_label("unsafe\u{202e}label"));
+        assert!(!valid_label(&"x".repeat(513)));
+    }
+
+    #[test]
+    fn session_labels_refresh_without_changing_identity_and_survive_missing_metadata() {
+        let now = Instant::now();
+        let mut tracker = Tracker::default();
+        let mut activity = Activity::parse(
+            br#"{"session_id":"a","hook_event_name":"PreToolUse","cwd":"/work/ottid"}"#,
+        )
+        .unwrap();
+        activity.title = Some("first".into());
+        tracker.update(Agent::Codex, activity.clone(), now);
+        let id = tracker.sessions(now)[0].id;
+        activity.title = Some("renamed".into());
+        tracker.update(Agent::Codex, activity.clone(), now);
+        activity.title = None;
+        activity.project = None;
+        tracker.update(Agent::Codex, activity, now);
+        let sessions = tracker.sessions(now);
+        assert_eq!(sessions[0].id, id);
+        assert_eq!(sessions[0].title.as_deref(), Some("renamed"));
+        assert_eq!(sessions[0].project.as_deref(), Some("ottid"));
+    }
+    #[test]
     fn session_cards_keep_identity_across_interleaved_agents_and_expire_independently() {
         let now = Instant::now();
         let mut tracker = Tracker::default();
         let event = |name: &str| Activity {
             session: "private-session-id".into(),
+            title: None,
+            project: None,
             event: name.into(),
             tool: Some("Bash".into()),
         };
@@ -277,6 +397,8 @@ mod tests {
             options.agent = agent;
             let event = Activity {
                 session: "smoke".into(),
+                title: None,
+                project: None,
                 event: "PreToolUse".into(),
                 tool: Some("Bash".into()),
             };
@@ -333,6 +455,8 @@ mod tests {
             Agent::Claude,
             Activity {
                 session: "b".into(),
+                title: None,
+                project: None,
                 event: "UserPromptSubmit".into(),
                 tool: None,
             },
@@ -343,6 +467,8 @@ mod tests {
             Agent::Claude,
             Activity {
                 session: "b".into(),
+                title: None,
+                project: None,
                 event: "Stop".into(),
                 tool: None,
             },
