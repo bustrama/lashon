@@ -23,6 +23,7 @@ use super::{CLIENT_WAIT, CONNECT_TIMEOUT, HANDSHAKE_TIMEOUT, VERSION};
 /// Where the client looks and how long it waits.
 #[derive(Debug, Clone)]
 pub struct Options {
+    pub agent: super::Agent,
     pub bridge_file: PathBuf,
     pub connect_timeout: Duration,
     pub handshake_timeout: Duration,
@@ -33,6 +34,7 @@ pub struct Options {
 impl Options {
     pub fn new(bridge_file: PathBuf) -> Self {
         Self {
+            agent: super::Agent::Claude,
             bridge_file,
             connect_timeout: CONNECT_TIMEOUT,
             handshake_timeout: HANDSHAKE_TIMEOUT,
@@ -82,6 +84,7 @@ where
 {
     let request = hook::parse(stdin).map_err(Fallback::Input)?;
     let body = serde_json::to_vec(&Ask {
+        agent: options.agent,
         tool: request.tool,
         input: request.input,
         cwd: request.cwd,
@@ -347,6 +350,7 @@ mod tests {
 
     fn options() -> Options {
         Options {
+            agent: super::super::Agent::Claude,
             bridge_file: PathBuf::from("unused"),
             connect_timeout: Duration::from_millis(200),
             handshake_timeout: Duration::from_millis(300),

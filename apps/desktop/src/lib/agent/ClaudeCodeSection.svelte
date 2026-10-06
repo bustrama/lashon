@@ -24,7 +24,16 @@
 		type HookAction
 	} from './claudeCode';
 
-	const BUILD_HOOK = 'cargo build -p ottid-core --bin ottid-hook';
+	let { agent = 'claude' }: { agent?: 'claude' | 'codex' } = $props();
+	const agentName = $derived(agent === 'codex' ? 'Codex' : 'Claude Code');
+	const BUILD_HOOK = $derived(`cargo build -p ottid-core --bin ${agent === 'codex' ? 'ottid-codex-hook' : 'ottid-hook'}`);
+	function agentText(key: string): string {
+		if (agent === 'codex' && key === 'hub.agents.requirements') return $t('hub.agents.codexRequirements');
+		if (agent === 'codex' && key === 'hub.agents.scope') return $t('hub.agents.codexScope');
+		if (agent === 'codex' && key === 'hub.agents.hooksDisabled') return $t('hub.agents.codexDisabled');
+		const value = $t(key);
+		return agent === 'codex' ? value.replaceAll('Claude Code', 'Codex') : value;
+	}
 
 	let status = $state<AgentHooksStatus | null>(null);
 	let loading = $state(true);
@@ -56,7 +65,7 @@
 	async function load() {
 		loadError = null;
 		try {
-			status = await invoke<AgentHooksStatus>('agent_hooks_status');
+			status = await invoke<AgentHooksStatus>('agent_hooks_status', { agent });
 		} catch (err) {
 			loadError = errorKey(err);
 		} finally {
@@ -68,7 +77,7 @@
 		busy = true;
 		actionError = null;
 		try {
-			const data = await invoke<AgentHooksPreview>('agent_hooks_preview', { action });
+			const data = await invoke<AgentHooksPreview>('agent_hooks_preview', { action, agent });
 			preview = { action, data };
 			await tick();
 			previewHeading?.focus();
@@ -87,12 +96,13 @@
 		let done = false;
 		try {
 			const applied = await invoke<AgentHooksApplied>('agent_hooks_apply', {
+				agent,
 				action,
 				fingerprint: data.fingerprint
 			});
 			preview = null;
-			const lines = [$t(`hub.agents.toast.${action === 'install' ? 'installed' : 'uninstalled'}`)];
-			if (applied.backup) lines.push(fill($t('hub.agents.toast.backup'), { path: applied.backup }));
+			const lines = [agentText(`hub.agents.toast.${action === 'install' ? 'installed' : 'uninstalled'}`)];
+			if (applied.backup) lines.push(fill(agentText('hub.agents.toast.backup'), { path: applied.backup }));
 			flashToast('success', lines);
 			await load();
 			done = true;
@@ -124,14 +134,14 @@
 
 <!-- Paths and the added entry read left to right, each non-ASCII word in
      its own isolate, hidden characters by code point (`pieces`). -->
-{#snippet text(value: string)}{#each pieces(value) as piece, i (i)}{#if piece.kind === 'text'}{piece.text}{:else if piece.kind === 'isolate'}<bdi>{piece.text}</bdi>{:else}<span class="hidden-char" title={fill($t('approval.hiddenCharTitle'), { code: piece.code })}>{piece.code}</span>{/if}{/each}{/snippet}
+{#snippet text(value: string)}{#each pieces(value) as piece, i (i)}{#if piece.kind === 'text'}{piece.text}{:else if piece.kind === 'isolate'}<bdi>{piece.text}</bdi>{:else}<span class="hidden-char" title={fill(agentText('approval.hiddenCharTitle'), { code: piece.code })}>{piece.code}</span>{/if}{/each}{/snippet}
 
 <section>
 	<h2 class="section-head">
-		<span class="section-title he-display">{$t('hub.agents.title')}</span>
+		<span class="section-title he-display">{agentText('hub.agents.title')}</span>
 		<span class="section-en lat">· Coding agents</span>
 	</h2>
-	<p class="he-sans intro" dir="auto">{$t('hub.agents.intro')}</p>
+	<p class="he-sans intro" dir="auto">{agentText('hub.agents.intro')}</p>
 
 	<div class="agent">
 		<div class="agent-head">
@@ -140,40 +150,40 @@
 				class:live={hook === 'on' && status?.listening}
 				aria-hidden="true"
 			></span>
-			<span class="agent-name lat">Claude Code</span>
+			<span class="agent-name lat">{agentName}</span>
 		</div>
 
 		{#if loading}
-			<p class="he-sans muted">{$t('hub.agents.loading')}</p>
+			<p class="he-sans muted">{agentText('hub.agents.loading')}</p>
 		{:else if loadError || !status || !hook}
-			<p class="he-sans error" role="alert">{$t(loadError ?? 'hub.agents.error.other')}</p>
+			<p class="he-sans error" role="alert">{agentText(loadError ?? 'hub.agents.error.other')}</p>
 		{:else}
-			<p class="he-sans state" role="status">{$t(`hub.agents.state.${hook}`)}</p>
+			<p class="he-sans state" role="status">{agentText(`hub.agents.state.${hook}`)}</p>
 			{#if hook === 'unreadable'}
-				<p class="he-sans error">{$t(errorKey(status.error))}</p>
+				<p class="he-sans error">{agentText(errorKey(status.error))}</p>
 			{/if}
 			{#if hook === 'missing'}
 				<p class="he-sans hint">
-					{$t('hub.agents.missingHint')}
+					{agentText('hub.agents.missingHint')}
 					<code class="mono" dir="ltr">{BUILD_HOOK}</code>
 				</p>
 			{/if}
 			{#if hook === 'on' && !status.listening}
-				<p class="he-sans warn">{$t('hub.agents.notListening')}</p>
+				<p class="he-sans warn">{agentText('hub.agents.notListening')}</p>
 			{/if}
 			{#if status.hooks_disabled}
-				<p class="he-sans warn">{$t('hub.agents.hooksDisabled')}</p>
+				<p class="he-sans warn">{agentText('hub.agents.hooksDisabled')}</p>
 			{/if}
 
 			<dl class="facts">
-				<dt class="he-sans">{$t('hub.agents.settingsFile')}</dt>
+				<dt class="he-sans">{agentText('hub.agents.settingsFile')}</dt>
 				<dd><code class="mono path" dir="ltr">{@render text(status.settings_path)}</code></dd>
 			</dl>
 			<ul class="notes he-sans">
-				<li>{$t('hub.agents.scope')}</li>
-				<li>{$t('hub.agents.requirements')}</li>
-				<li>{$t('hub.agents.once')}</li>
-				<li>{$t('hub.agents.privacy')}</li>
+				<li>{agentText('hub.agents.scope')}</li>
+				<li>{agentText('hub.agents.requirements')}</li>
+				<li>{agentText('hub.agents.once')}</li>
+				<li>{agentText('hub.agents.privacy')}</li>
 			</ul>
 
 			{#if !preview}
@@ -185,7 +195,7 @@
 							onclick={() => void ask('install')}
 							disabled={busy}
 						>
-							{$t(hook === 'stale' ? 'hub.agents.reinstall' : 'hub.agents.install')}
+							{agentText(hook === 'stale' ? 'hub.agents.reinstall' : 'hub.agents.install')}
 						</button>
 					{/if}
 					{#if canUninstall(status)}
@@ -195,31 +205,31 @@
 							onclick={() => void ask('uninstall')}
 							disabled={busy}
 						>
-							{$t('hub.agents.uninstall')}
+							{agentText('hub.agents.uninstall')}
 						</button>
 					{/if}
 				</div>
 			{/if}
 
 			{#if actionError}
-				<p class="he-sans error" role="alert">{$t(actionError)}</p>
+				<p class="he-sans error" role="alert">{agentText(actionError)}</p>
 			{/if}
 
 			{#if preview}
-				<div class="preview" role="region" aria-labelledby="agents-preview-title">
-					<h3 id="agents-preview-title" class="he-sans" tabindex="-1" bind:this={previewHeading}>
-						{$t(`hub.agents.preview.${preview.action}`)}
+				<div class="preview" role="region" aria-labelledby={`agents-preview-title-${agent}`}>
+					<h3 id={`agents-preview-title-${agent}`} class="he-sans" tabindex="-1" bind:this={previewHeading}>
+						{agentText(`hub.agents.preview.${preview.action}`)}
 					</h3>
 					{#if !preview.data.changes}
-						<p class="he-sans">{$t('hub.agents.preview.noChange')}</p>
+						<p class="he-sans">{agentText('hub.agents.preview.noChange')}</p>
 					{:else}
 						<p class="he-sans">
-							{$t('hub.agents.preview.file')}
+							{agentText('hub.agents.preview.file')}
 							<code class="mono path" dir="ltr">{@render text(preview.data.settings_path)}</code>
 						</p>
 						{#if preview.data.added !== null}
 							<p class="he-sans">
-								{$t('hub.agents.preview.where')}
+								{agentText('hub.agents.preview.where')}
 								<code class="mono" dir="ltr">hooks.PermissionRequest</code>:
 							</p>
 							<pre class="mono added" dir="ltr">{@render text(preview.data.added)}</pre>
@@ -227,7 +237,7 @@
 						{#if preview.data.removed > 0}
 							<p class="he-sans">
 								{fill(
-									$t(
+									agentText(
 										preview.action === 'install'
 											? 'hub.agents.preview.replaces'
 											: 'hub.agents.preview.removes'
@@ -237,9 +247,9 @@
 							</p>
 						{/if}
 						<p class="he-sans">
-							{$t(preview.data.exists ? 'hub.agents.preview.backup' : 'hub.agents.preview.newFile')}
+							{agentText(preview.data.exists ? 'hub.agents.preview.backup' : 'hub.agents.preview.newFile')}
 						</p>
-						<p class="he-sans">{$t('hub.agents.preview.nothingElse')}</p>
+						<p class="he-sans">{agentText('hub.agents.preview.nothingElse')}</p>
 					{/if}
 					<div class="actions">
 						{#if preview.data.changes}
@@ -250,8 +260,8 @@
 								disabled={busy}
 							>
 								{busy
-									? $t('hub.agents.preview.applying')
-									: $t(
+									? agentText('hub.agents.preview.applying')
+									: agentText(
 											preview.action === 'install'
 												? 'hub.agents.preview.confirmInstall'
 												: 'hub.agents.preview.confirmUninstall'
@@ -264,7 +274,7 @@
 							onclick={() => void cancel()}
 							disabled={busy}
 						>
-							{$t('hub.agents.preview.cancel')}
+							{agentText('hub.agents.preview.cancel')}
 						</button>
 					</div>
 				</div>

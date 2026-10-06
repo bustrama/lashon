@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use ottid_core::agent_bridge::{
-    claude_settings, endpoint, AgentAsk, AskFn, Bridge, Verdict, AGENT,
+    claude_settings, codex_settings, endpoint, Agent, AgentAsk, AskFn, Bridge, Verdict,
 };
 use ottid_core::approval::{Decision, Request};
 use serde::Serialize;
@@ -45,16 +45,41 @@ fn lock(state: &AgentBridge) -> MutexGuard<'_, Option<Bridge>> {
 
 /// Start the listener if the hook is installed. Run on the async runtime:
 /// the listener's tasks are spawned on it.
-pub fn start_if_installed(app: &AppHandle) {
-    let Some(path) = claude_settings::user_settings_path() else {
-        return;
-    };
-    let installed = claude_settings::read(&path)
+fn selected(value: Option<&str>) -> Result<Agent, String> {
+    match value {
+        None | Some("claude") => Ok(Agent::Claude),
+        Some("codex") => Ok(Agent::Codex),
+        _ => Err("bad-agent".into()),
+    }
+}
+fn settings_path_for(agent: Agent) -> Result<PathBuf, String> {
+    match agent {
+        Agent::Claude => claude_settings::user_settings_path(),
+        Agent::Codex => codex_settings::user_settings_path(),
+    }
+    .ok_or_else(|| "no-home".into())
+}
+fn find_for(
+    agent: Agent,
+    current: Option<&str>,
+) -> Result<claude_settings::Found, claude_settings::SettingsError> {
+    match agent {
+        Agent::Claude => claude_settings::find(current),
+        Agent::Codex => codex_settings::find(current),
+    }
+}
+fn installed(agent: Agent) -> bool {
+    settings_path_for(agent)
         .ok()
-        .and_then(|current| claude_settings::find(current.as_deref()).ok())
-        .is_some_and(|found| !found.commands.is_empty());
-    if installed {
+        .and_then(|path| claude_settings::read(&path).ok())
+        .and_then(|current| find_for(agent, current.as_deref()).ok())
+        .is_some_and(|found| !found.commands.is_empty())
+}
+pub fn start_if_installed(app: &AppHandle) {
+    if installed(Agent::Claude) || installed(Agent::Codex) {
         start(app);
+    } else {
+        stop(app);
     }
 }
 
@@ -87,7 +112,11 @@ fn asker(app: AppHandle) -> AskFn {
     Arc::new(move |ask: AgentAsk| {
         let app = app.clone();
         Box::pin(async move {
-            let request = Request::for_agent(AGENT, &ask.tool, &ask.input, ask.cwd.as_deref());
+            if !installed(ask.agent) {
+                return Verdict::Ask;
+            }
+            let request =
+                Request::for_agent(ask.agent.name(), &ask.tool, &ask.input, ask.cwd.as_deref());
             match approval::ask_agent(&app, request).await {
                 Some(Decision::Allow) => Verdict::Allow,
                 Some(Decision::Deny) => Verdict::Deny,
@@ -100,16 +129,24 @@ fn asker(app: AppHandle) -> AskFn {
 /// The `ottid-hook` binary: bundled next to the other binaries, or, in a
 /// development build, next to Ottid's own executable in Cargo's target
 /// folder (`cargo build -p ottid-core --bin ottid-hook`).
-fn hook_exe(app: &AppHandle) -> Option<PathBuf> {
-    let name = if cfg!(windows) {
-        "ottid-hook.exe"
-    } else {
-        "ottid-hook"
+fn hook_exe(app: &AppHandle, agent: Agent) -> Option<PathBuf> {
+    let name = match (agent, cfg!(windows)) {
+        (Agent::Claude, true) => "ottid-hook.exe",
+        (Agent::Claude, false) => "ottid-hook",
+        (Agent::Codex, true) => "ottid-codex-hook.exe",
+        (Agent::Codex, false) => "ottid-codex-hook",
     };
     let bundled = app
         .path()
         .resolve(
-            format!("binaries/ottid-hook/{name}"),
+            format!(
+                "binaries/{}/{name}",
+                if agent == Agent::Codex {
+                    "ottid-codex-hook"
+                } else {
+                    "ottid-hook"
+                }
+            ),
             tauri::path::BaseDirectory::Resource,
         )
         .ok();
@@ -141,8 +178,24 @@ fn from_hub(webview: &tauri::Webview) -> Result<(), String> {
     }
 }
 
-fn settings_path() -> Result<PathBuf, String> {
-    claude_settings::user_settings_path().ok_or_else(|| "no-home".to_string())
+fn install_plan(
+    agent: Agent,
+    current: Option<&str>,
+    exe: &str,
+) -> Result<claude_settings::Plan, claude_settings::SettingsError> {
+    match agent {
+        Agent::Claude => claude_settings::plan_install(current, exe),
+        Agent::Codex => codex_settings::plan_install(current, exe),
+    }
+}
+fn uninstall_plan(
+    agent: Agent,
+    current: Option<&str>,
+) -> Result<claude_settings::Plan, claude_settings::SettingsError> {
+    match agent {
+        Agent::Claude => claude_settings::plan_uninstall(current),
+        Agent::Codex => codex_settings::plan_uninstall(current),
+    }
 }
 
 /// What the Hub shows.
@@ -165,22 +218,30 @@ pub struct Status {
 }
 
 #[tauri::command]
-pub async fn agent_hooks_status(app: AppHandle) -> Result<Status, String> {
-    let path = settings_path()?;
-    let hook = hook_exe(&app).map(|exe| exe.to_string_lossy().into_owned());
+pub async fn agent_hooks_status(app: AppHandle, agent: Option<String>) -> Result<Status, String> {
+    let agent = selected(agent.as_deref())?;
+    let path = settings_path_for(agent)?;
+    let hook = hook_exe(&app, agent).map(|exe| exe.to_string_lossy().into_owned());
     let found = claude_settings::read(&path)
         .map_err(|err| err.code().to_string())
         .and_then(|current| {
-            claude_settings::find(current.as_deref()).map_err(|err| err.code().to_string())
+            find_for(agent, current.as_deref()).map_err(|err| err.code().to_string())
         });
     let listening = lock(&app.state::<AgentBridge>()).is_some();
     Ok(match found {
         Ok(found) => Status {
             settings_path: path.to_string_lossy().into_owned(),
             installed: !found.commands.is_empty(),
-            current: hook
-                .as_ref()
-                .is_some_and(|exe| found.commands.iter().any(|command| command == exe)),
+            current: hook.as_ref().is_some_and(|exe| {
+                found.commands.iter().any(|command| {
+                    command
+                        == &if agent == Agent::Codex {
+                            codex_settings::command(exe)
+                        } else {
+                            exe.clone()
+                        }
+                })
+            }),
             hooks_disabled: found.hooks_disabled,
             hook_exe: hook,
             listening,
@@ -211,28 +272,32 @@ pub struct Preview {
 }
 
 fn plan_for(
+    agent: Agent,
     action: &str,
     exe: Option<&str>,
     current: Option<&str>,
 ) -> Result<claude_settings::Plan, String> {
     match (action, exe) {
         ("install", Some(exe)) => {
-            claude_settings::plan_install(current, exe).map_err(|err| err.code().to_string())
+            install_plan(agent, current, exe).map_err(|err| err.code().to_string())
         }
         ("install", None) => Err("no-hook-binary".to_string()),
-        ("uninstall", _) => {
-            claude_settings::plan_uninstall(current).map_err(|err| err.code().to_string())
-        }
+        ("uninstall", _) => uninstall_plan(agent, current).map_err(|err| err.code().to_string()),
         _ => Err("bad-action".to_string()),
     }
 }
 
 #[tauri::command]
-pub async fn agent_hooks_preview(app: AppHandle, action: String) -> Result<Preview, String> {
-    let path = settings_path()?;
-    let exe = hook_exe(&app).map(|exe| exe.to_string_lossy().into_owned());
+pub async fn agent_hooks_preview(
+    app: AppHandle,
+    action: String,
+    agent: Option<String>,
+) -> Result<Preview, String> {
+    let agent = selected(agent.as_deref())?;
+    let path = settings_path_for(agent)?;
+    let exe = hook_exe(&app, agent).map(|exe| exe.to_string_lossy().into_owned());
     let current = claude_settings::read(&path).map_err(|err| err.code().to_string())?;
-    let plan = plan_for(&action, exe.as_deref(), current.as_deref())?;
+    let plan = plan_for(agent, &action, exe.as_deref(), current.as_deref())?;
     Ok(Preview {
         settings_path: path.to_string_lossy().into_owned(),
         fingerprint: claude_settings::fingerprint(current.as_deref().map(str::as_bytes)),
@@ -248,21 +313,23 @@ pub async fn agent_hooks_apply(
     webview: tauri::Webview,
     action: String,
     fingerprint: String,
+    agent: Option<String>,
 ) -> Result<claude_settings::Applied, String> {
     from_hub(&webview)?;
-    let path = settings_path()?;
+    let agent = selected(agent.as_deref())?;
+    let path = settings_path_for(agent)?;
     let install = match action.as_str() {
         "install" => true,
         "uninstall" => false,
         _ => return Err("bad-action".to_string()),
     };
-    let exe = hook_exe(&app).map(|exe| exe.to_string_lossy().into_owned());
+    let exe = hook_exe(&app, agent).map(|exe| exe.to_string_lossy().into_owned());
     if install && exe.is_none() {
         return Err("no-hook-binary".to_string());
     }
     let applied = claude_settings::apply(&path, &fingerprint, |current| match &exe {
-        Some(exe) if install => claude_settings::plan_install(current, exe),
-        _ => claude_settings::plan_uninstall(current),
+        Some(exe) if install => install_plan(agent, current, exe),
+        _ => uninstall_plan(agent, current),
     })
     .map_err(|err| err.code().to_string())?;
     tracing::info!(
@@ -270,12 +337,8 @@ pub async fn agent_hooks_apply(
         action = %action,
         changed = applied.changed,
         backed_up = applied.backup.is_some(),
-        "Claude Code settings updated"
+        "agent hook settings updated"
     );
-    if install {
-        start(&app);
-    } else {
-        stop(&app);
-    }
+    start_if_installed(&app);
     Ok(applied)
 }

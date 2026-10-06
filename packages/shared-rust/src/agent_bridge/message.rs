@@ -32,6 +32,8 @@ pub struct Challenge {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Ask {
+    #[serde(default, skip_serializing_if = "super::Agent::is_claude")]
+    pub agent: super::Agent,
     pub tool: String,
     pub input: Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -59,8 +61,25 @@ mod tests {
     }
 
     #[test]
+    fn agent_identity_defaults_to_claude_and_codex_is_explicit() {
+        let legacy = json!({"tool":"Bash", "input":{"command":"echo שלום"}});
+        assert_eq!(
+            serde_json::from_value::<Ask>(legacy.clone()).unwrap().agent,
+            super::super::Agent::Claude
+        );
+        let mut codex = legacy;
+        codex["agent"] = json!("Codex");
+        let parsed = serde_json::from_value::<Ask>(codex.clone()).unwrap();
+        assert_eq!(parsed.agent, super::super::Agent::Codex);
+        assert_eq!(serde_json::to_value(parsed).unwrap(), codex);
+        codex["agent"] = json!("unknown");
+        assert!(serde_json::from_value::<Ask>(codex).is_err());
+    }
+
+    #[test]
     fn an_ask_keeps_hebrew_and_mixed_input_whole() {
         let ask = Ask {
+            agent: super::super::Agent::Claude,
             tool: "Bash".into(),
             input: json!({ "command": "echo \"שָׁלוֹם\" > 'קובץ.txt' && git status" }),
             cwd: Some("C:\\פרויקטים\\ottid".into()),

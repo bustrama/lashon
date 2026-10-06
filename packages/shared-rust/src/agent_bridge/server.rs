@@ -36,6 +36,7 @@ const LOG: &str = "ottid::agent_bridge";
 /// A request for the approval card.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AgentAsk {
+    pub agent: super::Agent,
     pub tool: String,
     pub input: Value,
     pub cwd: Option<String>,
@@ -164,6 +165,7 @@ where
     tracing::info!(target: LOG, id, tool = %tool, "agent permission request");
 
     let asking = ask(AgentAsk {
+        agent: request.agent,
         tool: request.tool,
         input: request.input,
         cwd: request.cwd,
@@ -356,6 +358,7 @@ mod tests {
 
     fn options() -> Options {
         Options {
+            agent: super::super::Agent::Claude,
             bridge_file: PathBuf::from("unused"),
             connect_timeout: Duration::from_millis(200),
             handshake_timeout: Duration::from_millis(300),
@@ -372,6 +375,7 @@ mod tests {
 
     fn body() -> Vec<u8> {
         serde_json::to_vec(&Ask {
+            agent: super::super::Agent::Claude,
             tool: "Bash".into(),
             input: serde_json::json!({ "command": "echo שלום" }),
             cwd: None,
@@ -419,6 +423,26 @@ mod tests {
             assert_eq!(served, Served::Answered(verdict));
             assert_eq!(calls.load(Ordering::SeqCst), 1);
         }
+    }
+
+    #[test]
+    fn codex_identity_and_complete_patch_reach_the_card_authenticated() {
+        let input = serde_json::json!({"command":"*** Begin Patch\n*** Add File: שלום.txt\n+hello שלום\n*** End Patch", "description":"Write a file"});
+        let expected = input.clone();
+        let ask: AskFn = Arc::new(move |request| {
+            assert_eq!(request.agent, super::super::Agent::Codex);
+            assert_eq!(request.tool, "apply_patch");
+            assert_eq!(request.input, expected);
+            Box::pin(async { Verdict::Deny })
+        });
+        let body = serde_json::to_vec(&Ask {
+            agent: super::super::Agent::Codex,
+            tool: "apply_patch".into(), input, cwd: Some("C:\\פרויקט".into()),
+        }).unwrap();
+        let token = Token::from_bytes([1; 32]);
+        let (got, served) = exchange(token.clone(), token, ask, body);
+        assert_eq!(got, Ok(Verdict::Deny));
+        assert_eq!(served, Served::Answered(Verdict::Deny));
     }
 
     #[test]
@@ -516,6 +540,7 @@ mod tests {
         let calls = Arc::new(AtomicUsize::new(0));
         let token = Token::from_bytes([1; 32]);
         let body = serde_json::to_vec(&Ask {
+            agent: super::super::Agent::Claude,
             tool: "Bash\u{202E}".into(),
             input: serde_json::json!({}),
             cwd: None,

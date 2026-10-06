@@ -334,13 +334,16 @@ jobs:
       - name: Build and stage the hook client (command-mode edition)
         if: ${{ !contains(matrix.cargo_args, '--no-default-features') }}
         run: |
-          cargo build --release --locked -p ottid-core --bin ottid-hook
-          TARGET=apps/desktop/src-tauri/binaries/ottid-hook
-          case "${{ runner.os }}" in
-            Windows) cp target/release/ottid-hook.exe "$TARGET/" ;;
-            *) cp target/release/ottid-hook "$TARGET/" ;;
-          esac
-          ls -la "$TARGET/"
+          cargo build --release --locked -p ottid-core --bin ottid-hook --bin ottid-codex-hook
+          for NAME in ottid-hook ottid-codex-hook; do
+            TARGET="apps/desktop/src-tauri/binaries/$NAME"
+            mkdir -p "$TARGET"
+            case "${{ runner.os }}" in
+              Windows) cp "target/release/$NAME.exe" "$TARGET/" ;;
+              *) cp "target/release/$NAME" "$TARGET/" ;;
+            esac
+            ls -la "$TARGET/"
+          done
 
       # ── Frontend ─────────────────────────────────────────────────────────────
 

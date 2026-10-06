@@ -45,6 +45,11 @@ name = "ottid-hook"
 path = "src/bin/ottid_hook.rs"
 required-features = ["agent-hooks"]
 
+[[bin]]
+name = "ottid-codex-hook"
+path = "src/bin/ottid_codex_hook.rs"
+required-features = ["agent-hooks"]
+
 # Cargo features (docs/adr/0025).
 #
 # `local-llm` enables the `LocalLlmProvider` — a thin OpenAI-compat
@@ -86,6 +91,7 @@ tonic-build = "=0.12.3"
 protoc-bin-vendored = "=3.2.0"
 
 [dependencies]
+base64 = "=0.22.1"
 tonic = "=0.12.3"
 prost = "=0.13.5"
 tokio = { version = "=1.52.3", features = ["full"] }

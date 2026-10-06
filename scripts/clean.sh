@@ -162,6 +162,7 @@ if [[ "$level" == "medium" || "$level" == "aggressive" ]]; then
     for bin_dir in \
         "apps/desktop/src-tauri/binaries/ottid-stt:.gitkeep" \
         "apps/desktop/src-tauri/binaries/ottid-hook:.gitkeep" \
+        "apps/desktop/src-tauri/binaries/ottid-codex-hook:.gitkeep" \
         "apps/desktop/src-tauri/binaries/llama-server:.gitkeep,README.md" \
         "apps/desktop/src-tauri/binaries/ottid-mcp:.gitkeep"; do
         path="${bin_dir%%:*}"

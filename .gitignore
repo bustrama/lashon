@@ -128,3 +128,7 @@ apps/desktop/src-tauri/models/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Codex PermissionRequest client, staged at build time.
+apps/desktop/src-tauri/binaries/ottid-codex-hook/*
+!apps/desktop/src-tauri/binaries/ottid-codex-hook/.gitkeep

@@ -1577,6 +1577,7 @@
 					<VoiceCorrectionsSection />
 				{:else if section === 'agents'}
 					<ClaudeCodeSection />
+					<ClaudeCodeSection agent="codex" />
 				{:else}
 					<section aria-live="polite">
 						<h2 class="section-head">
