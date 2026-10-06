@@ -14,6 +14,7 @@ mod approval;
 #[cfg(feature = "command-mode")]
 mod command_mode;
 mod dictation;
+mod discord_mute;
 #[cfg(feature = "command-mode")]
 mod llm;
 mod overlay;
@@ -334,6 +335,9 @@ pub fn run() {
             validate_hotkey,
             detect_hardware,
             probe_microphone,
+            discord_mute::discord_mute_supported,
+            discord_mute::discord_setup_key,
+            discord_mute::discord_test_mute,
             list_wake_models,
             available_wake_models,
             install_wake_model,

@@ -100,6 +100,7 @@
 	let approval = $state<ApprovalCard | null>(null);
 	let agentActivity = $state<AgentActivity | null>(null);
 	let showAgentActivity = $state(true);
+	let discordError = $state(false);
 	const activity = $derived(showAgentActivity ? agentActivity : null);
 	const activityLabel = $derived(activity ? `${activity.agent} · ${$t(`hub.agents.activity.${activity.state}`)}${activity.tool ? ` · ${activity.tool}` : ''}${activity.count > 1 ? ` (+${activity.count - 1})` : ''}` : null);
 	// An early press of the Allow hotkey, for the card to explain.
@@ -342,6 +343,12 @@
 	}
 
 	onMount(() => {
+		let discordErrorTimer: ReturnType<typeof setTimeout> | undefined;
+		const discordErrorUnlisten = listen('discord:suppression-error', () => {
+			discordError = true;
+			clearTimeout(discordErrorTimer);
+			discordErrorTimer = setTimeout(() => (discordError = false), 8000);
+		});
 		void getSetting('ui.agentActivity').then((value) => (showAgentActivity = value));
 		const activityUnlisten = listen<AgentActivity | null>('agent:activity', (event) => (agentActivity = event.payload));
 		const refreshActivity = () => invoke<AgentActivity | null>('agent_activity_current').then((value) => (agentActivity = value)).catch(() => {});
@@ -473,6 +480,8 @@
 		});
 
 		return () => {
+			clearTimeout(discordErrorTimer);
+			void discordErrorUnlisten.then((stop) => stop());
 			if (activityTimer) clearInterval(activityTimer);
 			void activityUnlisten.then((stop) => stop());
 			clearTimeout(commandToolTimer);
@@ -519,7 +528,7 @@
 		commandTranscript,
 		commandCancellable,
 		commandFlash,
-		agentActivity: activityLabel,
+		agentActivity: discordError ? $t('hub.discord.captureBlocked') : activityLabel,
 		approval,
 		approvalNudge,
 		onApprovalArmed: armApproval,

@@ -362,6 +362,14 @@ fn run_worker(rx: Receiver<DictationCommand>, app: AppHandle, gates: crate::Gate
             Ok(DictationCommand::HotkeyPressed(mode)) => mode,
         };
 
+        let discord_lease = match crate::discord_mute::before_take(&app) {
+            Ok(lease) => lease,
+            Err(_) => {
+                crate::discord_mute::report_error(&app);
+                signal_error(&app);
+                continue; // Requested suppression unavailable: never start capture.
+            }
+        };
         if let Err(err) = capture.start() {
             tracing::error!("dictation: capture failed to start: {err:#}");
             emit_state(&app, "idle");
@@ -436,6 +444,7 @@ fn run_worker(rx: Receiver<DictationCommand>, app: AppHandle, gates: crate::Gate
                 signal_error(&app);
             }
         }
+        drop(discord_lease); // Normal completion; early returns/errors also release.
     }
 }
 
