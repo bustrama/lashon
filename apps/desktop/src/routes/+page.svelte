@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import type { AgentActivity } from '$lib/agent/activity';
 	import { register, unregister } from '@tauri-apps/plugin-global-shortcut';
 	import { invoke } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
@@ -97,6 +98,10 @@
 	// when none waits. The answer goes back to the broker, which also takes
 	// it from the hotkeys and denies the request when its time runs out.
 	let approval = $state<ApprovalCard | null>(null);
+	let agentActivity = $state<AgentActivity | null>(null);
+	let showAgentActivity = $state(true);
+	const activity = $derived(showAgentActivity ? agentActivity : null);
+	const activityLabel = $derived(activity ? `${activity.agent} · ${$t(`hub.agents.activity.${activity.state}`)}${activity.tool ? ` · ${activity.tool}` : ''}${activity.count > 1 ? ` (+${activity.count - 1})` : ''}` : null);
 	// An early press of the Allow hotkey, for the card to explain.
 	let approvalNudge = $state<ApprovalNudge | null>(null);
 
@@ -107,7 +112,7 @@
 		void invoke('approval_armed', { id }).catch(() => {});
 	}
 
-	const current = $derived(
+	const ownState = $derived(
 		creatureState({
 			dictation: dictationState,
 			takeMode,
@@ -116,6 +121,7 @@
 			woke
 		})
 	);
+	const current = $derived(ownState !== 'idle' || !activity ? ownState : activity.state === 'tool' ? 'tool' : activity.state === 'working' ? 'thinking' : activity.state === 'done' ? 'agent-done' : activity.state === 'error' ? 'error' : 'idle');
 
 	// Wake-word acknowledgment chime. Synthesised on the fly with Web Audio
 	// so we don't ship an asset (no licensing question, no install bloat).
@@ -336,6 +342,11 @@
 	}
 
 	onMount(() => {
+		void getSetting('ui.agentActivity').then((value) => (showAgentActivity = value));
+		const activityUnlisten = listen<AgentActivity | null>('agent:activity', (event) => (agentActivity = event.payload));
+		const refreshActivity = () => invoke<AgentActivity | null>('agent_activity_current').then((value) => (agentActivity = value)).catch(() => {});
+		void activityUnlisten.then(refreshActivity);
+		const activityTimer = FULL_EDITION ? setInterval(() => void refreshActivity(), 1000) : null;
 		// The Rust dictation worker drives the creature's listening states.
 		const stateUnlisten = listen<DictationState>('dictation:state', (event) => {
 			dictationState = event.payload;
@@ -447,6 +458,7 @@
 		// The Hub broadcasts `settings:changed` when a hotkey is rebound —
 		// reload it and re-register so the new chord takes effect at once.
 		const settingsUnlisten = listen<{ key: string }>('settings:changed', (event) => {
+			if (event.payload.key === 'ui.agentActivity') void getSetting('ui.agentActivity').then((value) => (showAgentActivity = value));
 			if (event.payload.key === 'hotkeys.dictation') {
 				void getSetting('hotkeys.dictation').then((chord) => {
 					dictationShortcut = chord;
@@ -461,6 +473,8 @@
 		});
 
 		return () => {
+			if (activityTimer) clearInterval(activityTimer);
+			void activityUnlisten.then((stop) => stop());
 			clearTimeout(commandToolTimer);
 			clearTimeout(wokeTimer);
 			flashHold.reset();
@@ -505,6 +519,7 @@
 		commandTranscript,
 		commandCancellable,
 		commandFlash,
+		agentActivity: activityLabel,
 		approval,
 		approvalNudge,
 		onApprovalArmed: armApproval,

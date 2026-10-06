@@ -150,7 +150,9 @@
 			"placements": {
 				"taskbar": "Taskbar",
 				"float": "Float",
-				"ceiling": "Ceiling"
+				"ceiling": "Ceiling",
+				"left": "Left edge",
+				"right": "Right edge"
 			}
 		},
 		"hardware": {
@@ -393,6 +395,8 @@
 			"count": "{n} active corrections"
 		},
 		"agents": {
+			"showActivity": "Show short agent activity",
+			"activity": {"working": "Working", "tool": "Running tool", "done": "Finished", "stopped": "Stopped", "error": "Error"},
 			"title": "Coding agents",
 			"intro": "When Claude Code needs permission to run a command or edit a file, Ottid can show the request on its approval card, where you allow or deny it without going back to the terminal. If Ottid is closed, or nobody answers in time, Claude Code asks in the terminal as usual.",
 			"loading": "Loading…",

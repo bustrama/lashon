@@ -55,10 +55,18 @@ pub enum Placement {
     Taskbar,
     Float,
     Ceiling,
+    Left,
+    Right,
 }
 
 impl Placement {
-    pub const ALL: [Placement; 3] = [Placement::Taskbar, Placement::Float, Placement::Ceiling];
+    pub const ALL: [Placement; 5] = [
+        Placement::Taskbar,
+        Placement::Float,
+        Placement::Ceiling,
+        Placement::Left,
+        Placement::Right,
+    ];
 
     /// The settings and wire code: `taskbar`, `float` or `ceiling`.
     pub fn code(self) -> &'static str {
@@ -66,6 +74,8 @@ impl Placement {
             Placement::Taskbar => "taskbar",
             Placement::Float => "float",
             Placement::Ceiling => "ceiling",
+            Placement::Left => "left",
+            Placement::Right => "right",
         }
     }
 
@@ -80,6 +90,8 @@ impl Placement {
             Placement::Taskbar => Point::new(cx, STAGE_H - TASKBAR_CENTER_UNITS * UNIT),
             Placement::Ceiling => Point::new(cx, CEILING_CENTER_UNITS * UNIT),
             Placement::Float => Point::new(cx, STAGE_H / 2.0),
+            Placement::Left => Point::new(29.0 * UNIT + 4.0, STAGE_H * 0.53),
+            Placement::Right => Point::new(STAGE_W - 29.0 * UNIT - 4.0, STAGE_H * 0.53),
         }
     }
 
@@ -196,15 +208,19 @@ pub fn layout(placement: Placement, anchor: Point, monitor: &Monitor, dragging: 
     };
 
     // Whole pixels, so the window rounded around the stage still holds it.
-    let stage_x = clamp(
-        (anchor.x - stage_w / 2.0).round(),
-        work.x.ceil(),
-        (work.right() - stage_w).floor(),
-    );
+    let stage_x = match effective {
+        Placement::Left => work.x.ceil(),
+        Placement::Right => (work.right() - stage_w).floor(),
+        _ => clamp(
+            (anchor.x - stage_w / 2.0).round(),
+            work.x.ceil(),
+            (work.right() - stage_w).floor(),
+        ),
+    };
     let stage_y = match effective {
         Placement::Taskbar => (work.bottom() - stage_h).floor(),
         Placement::Ceiling => work.y.ceil(),
-        Placement::Float => clamp(
+        Placement::Float | Placement::Left | Placement::Right => clamp(
             (anchor.y - stage_h / 2.0).round(),
             work.y.ceil(),
             (work.bottom() - stage_h).floor(),
@@ -219,7 +235,7 @@ pub fn layout(placement: Placement, anchor: Point, monitor: &Monitor, dragging: 
     let side = match effective {
         Placement::Taskbar => IslandSide::Above,
         Placement::Ceiling => IslandSide::Below,
-        Placement::Float => {
+        Placement::Float | Placement::Left | Placement::Right => {
             let room_above = stage.y - work.y;
             let room_below = work.bottom() - stage.bottom();
             if room_above >= island_h || room_above >= room_below {
@@ -279,6 +295,10 @@ pub fn snap(stage: &Rect, monitor: &Monitor) -> Placement {
         Placement::Taskbar
     } else if (stage.y - monitor.work.y).abs() <= reach {
         Placement::Ceiling
+    } else if (stage.x - monitor.work.x).abs() <= reach {
+        Placement::Left
+    } else if (monitor.work.right() - stage.right()).abs() <= reach {
+        Placement::Right
     } else {
         Placement::Float
     }
@@ -346,6 +366,8 @@ pub fn switch_anchor(from: &Layout, to: Placement) -> Point {
     match (from.frame.placement, to) {
         (Placement::Taskbar, Placement::Float) => Point::new(center.x, center.y - lift),
         (Placement::Ceiling, Placement::Float) => Point::new(center.x, center.y + lift),
+        (Placement::Left, Placement::Float) => Point::new(center.x + lift, center.y),
+        (Placement::Right, Placement::Float) => Point::new(center.x - lift, center.y),
         _ => center,
     }
 }
@@ -637,6 +659,32 @@ mod tests {
         assert_eq!(Placement::from_code("TASKBAR"), None);
         assert_eq!(Placement::from_code(""), None);
         assert_eq!(Placement::default(), Placement::Taskbar);
+    }
+
+    #[test]
+    fn side_docking_preserves_height_and_stays_inside_scaled_monitors() {
+        for scale in [1.0, 1.25, 2.0] {
+            let m = monitor(-1920.0, -100.0, scale);
+            for p in [Placement::Left, Placement::Right] {
+                let anchor = Point::new(m.work.center().x, m.work.center().y);
+                let l = layout(p, anchor, &m, false);
+                assert!(inside(&l.window, &m.work));
+                assert_eq!(l.stage.center().y, anchor.y);
+                assert_eq!(snap(&l.stage, &m), p);
+                if p == Placement::Left {
+                    assert_eq!(l.stage.x, m.work.x);
+                } else {
+                    assert_eq!(l.stage.right(), m.work.right());
+                }
+                let free = layout(
+                    Placement::Float,
+                    switch_anchor(&l, Placement::Float),
+                    &m,
+                    false,
+                );
+                assert_eq!(snap(&free.stage, &m), Placement::Float);
+            }
+        }
     }
 
     #[test]

@@ -41,7 +41,7 @@ pub fn entry(exe: &str) -> Value {
     }]})
 }
 
-fn is_ours(handler: &Value) -> bool {
+pub(super) fn is_ours(handler: &Value) -> bool {
     if handler.get("type").and_then(Value::as_str) != Some("command") {
         return false;
     }

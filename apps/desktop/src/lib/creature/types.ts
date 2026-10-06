@@ -34,9 +34,9 @@ export type CreatureState =
 	| 'agent-done';
 
 /** Where Ottid stands. Mirrors `ottid_core::overlay::Placement`. */
-export type Placement = 'taskbar' | 'float' | 'ceiling';
+export type Placement = 'taskbar' | 'float' | 'ceiling' | 'left' | 'right';
 
-export const PLACEMENTS: readonly Placement[] = ['taskbar', 'float', 'ceiling'];
+export const PLACEMENTS: readonly Placement[] = ['taskbar', 'float', 'ceiling', 'left', 'right'];
 
 /**
  * Where the cursor is, as a direction from the creature's eyes: each axis in

@@ -106,7 +106,7 @@ pub fn entry(hook_exe: &str) -> Value {
 }
 
 /// Whether a hook handler runs `ottid-hook`.
-fn is_ours(handler: &Value) -> bool {
+pub(super) fn is_ours(handler: &Value) -> bool {
     if handler.get("type").and_then(Value::as_str) != Some("command") {
         return false;
     }
@@ -283,11 +283,14 @@ struct Parsed {
 }
 
 fn parse(current: Option<&str>) -> Result<Parsed, SettingsError> {
+    parse_event(current, HOOK_EVENT)
+}
+fn parse_event(current: Option<&str>, event: &str) -> Result<Parsed, SettingsError> {
     let original = current.unwrap_or("{}");
     let bom = original.starts_with(UTF8_BOM);
     let text = original.strip_prefix(UTF8_BOM).unwrap_or(original);
     if text.trim().is_empty() {
-        return parse(Some("{}"));
+        return parse_event(Some("{}"), event);
     }
     serde_json::from_str::<&RawValue>(text).map_err(|_| SettingsError::NotJson)?;
     let top = Members::parse(text, SettingsError::NotObject)?;
@@ -303,7 +306,7 @@ fn parse(current: Option<&str>) -> Result<Parsed, SettingsError> {
         None => None,
     };
     let groups = match &hooks {
-        Some((_, members)) => match members.find(HOOK_EVENT)? {
+        Some((_, members)) => match members.find(event)? {
             Some(j) => {
                 let raw = members.0[j].1.get();
                 if !raw.trim_start().starts_with('[') {
@@ -391,7 +394,7 @@ fn without_ours(groups: Vec<Box<RawValue>>, owns: fn(&Value) -> bool) -> (Vec<Ou
     (kept, removed)
 }
 
-fn assemble(parsed: Parsed, groups: Vec<Out>) -> String {
+fn assemble(parsed: Parsed, groups: Vec<Out>, event: &str) -> String {
     let Parsed {
         bom,
         newline,
@@ -416,7 +419,7 @@ fn assemble(parsed: Parsed, groups: Vec<Out>) -> String {
         (Some(j), None) => {
             hook_members.remove(j);
         }
-        (None, Some(list)) => hook_members.push((HOOK_EVENT.to_string(), list)),
+        (None, Some(list)) => hook_members.push((event.to_string(), list)),
         (None, None) => {}
     }
 
@@ -458,7 +461,16 @@ pub(super) fn plan_install_with(
     entry_text: &str,
     owns: fn(&Value) -> bool,
 ) -> Result<Plan, SettingsError> {
-    let parsed = parse(current)?;
+    plan_install_event(current, wanted, entry_text, owns, HOOK_EVENT)
+}
+pub(super) fn plan_install_event(
+    current: Option<&str>,
+    wanted: Value,
+    entry_text: &str,
+    owns: fn(&Value) -> bool,
+    event: &str,
+) -> Result<Plan, SettingsError> {
+    let parsed = parse_event(current, event)?;
     let groups: Vec<Box<RawValue>> = parsed
         .groups
         .as_ref()
@@ -487,7 +499,7 @@ pub(super) fn plan_install_with(
 
     let (mut kept, removed) = without_ours(groups, owns);
     kept.push(Out::New(entry_text.replace('\n', "\n      ")));
-    let text = assemble(parsed, kept);
+    let text = assemble(parsed, kept, event);
     Ok(Plan {
         changes: current != Some(text.as_str()),
         text,
@@ -505,6 +517,13 @@ pub(super) fn plan_uninstall_with(
     current: Option<&str>,
     owns: fn(&Value) -> bool,
 ) -> Result<Plan, SettingsError> {
+    plan_uninstall_event(current, owns, HOOK_EVENT)
+}
+pub(super) fn plan_uninstall_event(
+    current: Option<&str>,
+    owns: fn(&Value) -> bool,
+    event: &str,
+) -> Result<Plan, SettingsError> {
     let Some(text) = current else {
         return Ok(Plan {
             text: String::new(),
@@ -513,7 +532,7 @@ pub(super) fn plan_uninstall_with(
             changes: false,
         });
     };
-    let parsed = parse(Some(text))?;
+    let parsed = parse_event(Some(text), event)?;
     let groups: Vec<Box<RawValue>> = parsed
         .groups
         .as_ref()
@@ -528,7 +547,7 @@ pub(super) fn plan_uninstall_with(
             changes: false,
         });
     }
-    let out = assemble(parsed, kept);
+    let out = assemble(parsed, kept, event);
     Ok(Plan {
         changes: out != text,
         text: out,

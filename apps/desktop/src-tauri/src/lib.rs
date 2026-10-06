@@ -412,6 +412,8 @@ pub fn run() {
             #[cfg(all(feature = "command-mode", feature = "agent-hooks"))]
             agent_hooks::agent_hooks_status,
             #[cfg(all(feature = "command-mode", feature = "agent-hooks"))]
+            agent_hooks::agent_activity_current,
+            #[cfg(all(feature = "command-mode", feature = "agent-hooks"))]
             agent_hooks::agent_hooks_preview,
             #[cfg(all(feature = "command-mode", feature = "agent-hooks"))]
             agent_hooks::agent_hooks_apply
@@ -647,6 +649,8 @@ fn build_app_menu(
             Placement::Taskbar => "על שורת המשימות · Taskbar",
             Placement::Float => "צף · Float",
             Placement::Ceiling => "מהתקרה · Ceiling",
+            Placement::Left => "צמוד לשמאל · Left",
+            Placement::Right => "צמוד לימין · Right",
         };
         let id = format!("{}{}", overlay::MENU_PREFIX, placement.code());
         let item = CheckMenuItem::with_id(app, id, label, true, false, None::<&str>)?;
