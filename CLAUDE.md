@@ -36,11 +36,25 @@ source, **Windows-first** for v1.0, never a subscription.
 - **Forward plan:** [`docs/roadmap.md`](docs/roadmap.md) - **decisions:** [`docs/adr/`](docs/adr/)
 
 Shipped: M0-M9, plus unsigned pre-releases v0.1.0-v0.6.0 and the open-core
-**v1.0.0** — the free, dictation-only, Windows, unsigned edition (in-app
-auto-update + cross-OS installers landed in v0.6.0). The next release is
-**v1.1.0** (Windows): single-instance enforcement and persistent diagnostic
-logging that harden the shipped build. Code signing is wired into the release
-workflow with Azure Artifact Signing
+**v1.0.0** and **v1.1.0**: the free, dictation-only, Windows, unsigned edition,
+released under the old name Lashon. Since then, main has gained:
+
+- the rename to **Ottid**, with a carry-over of an existing install's data
+  ([ADR-0042](docs/adr/0042-rename-the-product-to-ottid.md));
+- the overlay as a living creature: a click-through window, a WebGL engine,
+  and creatures as data
+  ([ADR-0040](docs/adr/0040-the-overlay-becomes-a-living-creature.md),
+  [0041](docs/adr/0041-user-authored-creatures-are-data.md),
+  [0044](docs/adr/0044-a-click-through-overlay-window.md),
+  [0045](docs/adr/0045-the-creature-engine.md));
+- the approval card ([ADR-0048](docs/adr/0048-the-approval-card.md));
+- the Claude Code hooks bridge
+  ([ADR-0050](docs/adr/0050-claude-code-hooks-bridge.md));
+- the full edition bundling `ottid-mcp` and the starter recipes
+  ([ADR-0049](docs/adr/0049-bundle-ottid-mcp-and-the-starters-in-the-full-edition.md)).
+
+The next release is the first under the name Ottid. Code signing is wired into
+the release workflow with Azure Artifact Signing
 ([ADR-0043](docs/adr/0043-sign-windows-releases-with-azure-artifact-signing.md));
 it goes live once the owner's identity validation completes. The full
 milestone-by-milestone dev narrative is kept off-repo.
@@ -79,7 +93,7 @@ A Cargo workspace at the repo root ties the two Rust crates together.
 ```sh
 # desktop app — run from apps/desktop
 npm install
-npm run tauri dev          # launches the tongue window
+npm run tauri dev          # launches the overlay (Ottid)
 npm run check              # svelte-check (type-check)
 npm test                   # frontend unit tests (Vitest)
 npm run build              # frontend production build
