@@ -50,6 +50,16 @@ pub fn agent_activity_current(
         .unwrap_or_else(|p| p.into_inner())
         .summary(std::time::Instant::now())
 }
+#[tauri::command]
+pub fn agent_activity_sessions(
+    app: AppHandle,
+) -> Vec<ottid_core::agent_bridge::activity::SessionSummary> {
+    app.state::<AgentBridge>()
+        .1
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .sessions(std::time::Instant::now())
+}
 
 fn lock(state: &AgentBridge) -> MutexGuard<'_, Option<Bridge>> {
     state
@@ -141,7 +151,7 @@ fn asker(app: AppHandle) -> AskFn {
                             .lock()
                             .unwrap_or_else(|p| p.into_inner())
                             .update(ask.agent, activity, std::time::Instant::now());
-                        let _ = app.emit("agent:activity", agent_activity_current(app.clone()));
+                        let _ = app.emit("agent:activity", agent_activity_sessions(app.clone()));
                     }
                 }
                 return Verdict::Ask;

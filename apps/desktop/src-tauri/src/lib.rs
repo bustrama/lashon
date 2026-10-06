@@ -417,6 +417,7 @@ pub fn run() {
             agent_hooks::agent_hooks_status,
             #[cfg(all(feature = "command-mode", feature = "agent-hooks"))]
             agent_hooks::agent_activity_current,
+            agent_hooks::agent_activity_sessions,
             #[cfg(all(feature = "command-mode", feature = "agent-hooks"))]
             agent_hooks::agent_hooks_preview,
             #[cfg(all(feature = "command-mode", feature = "agent-hooks"))]

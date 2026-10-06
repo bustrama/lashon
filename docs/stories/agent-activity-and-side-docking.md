@@ -24,12 +24,15 @@ The Hub explains that cards should stay off for Approve for me. Claude cards kee
 their existing behavior. The setting does not change any Codex configuration or
 automatically allow a request. Store read failure also leaves review with Codex.
 
-The core tracker keeps at most 64 sessions. It prefers active sessions over finished
-ones, shows a small count for concurrent sessions, expires terminal status after
+The core tracker keeps at most 64 sessions. Each session now gets its own compact
+card with an agent name and stable local number instead of a +N aggregate. Updates
+retain the card identity and order; raw session IDs do not leave the tracker.
+The stack fits the available island space and scrolls when needed, including
+side docking and ceiling placement. Terminal status expires after
 four seconds and drops silent sessions after ten minutes. A dropped session is not
 claimed to have completed. The Hub's single `ui.agentActivity` toggle hides both
 the bubble and activity pose immediately and persists across launches. Approval,
-dictation and command feedback have priority. No expanded activity list is added.
+dictation and command feedback have priority. Cards retain short status text only.
 
 Existing connections show as needing reinstall so the user previews all added hook
 definitions. Codex definitions require renewed native trust through `/hooks`.

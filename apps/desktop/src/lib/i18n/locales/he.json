@@ -417,6 +417,7 @@
 		},
 		"agents": {
 			"showActivity": "הצג חיווי קצר לפעילות סוכנים",
+			"sessions": "פעילות סשנים",
 			"codexIntro": "אוטיד מציג חיווי קצר לפעילות של Codex. כברירת מחדל, האישורים נשארים בקודקס ופועלים לפי המצב שבחרת, כולל Approve for me.",
 			"codexInfoConnected": "מחובר להצגת פעילות. בקשות אישור נשארות ב־Codex.",
 			"codexApprovalCards": "הצג בקשות אישור של Codex באוטיד",

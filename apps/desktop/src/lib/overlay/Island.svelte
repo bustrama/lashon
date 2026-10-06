@@ -21,6 +21,7 @@
 		type ApprovalNudge
 	} from './approval';
 	import type { IslandSide } from './frame';
+	import type { AgentActivity } from '$lib/agent/activity';
 
 	let {
 		side,
@@ -34,6 +35,7 @@
 		commandCancellable,
 		commandFlash,
 		agentActivity = null,
+		agentSessions = [],
 		approval,
 		approvalNudge,
 		onApprovalArmed,
@@ -53,6 +55,7 @@
 		commandCancellable: boolean;
 		commandFlash: string | null;
 		agentActivity?: string | null;
+		agentSessions?: AgentActivity[];
 		/** The request the approval broker shows (docs/adr/0048). */
 		approval: ApprovalCard | null;
 		/** The latest early press of the Allow hotkey. */
@@ -262,6 +265,18 @@
 			<span class="he-sans">{agentActivity}</span>
 		</div>
 	{/if}
+	{#if agentSessions.length && !approval && !showFlash && !showProgress && !showTranscript && !showPartial && !listening}
+		<!-- Scrollable region needs keyboard focus so every session remains reachable. -->
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+		<div class="session-stack" class:below={side === 'below'} data-interactive="island" role="region" aria-label={$t('hub.agents.sessions')} tabindex="0" aria-live="polite">
+			{#each agentSessions as session (session.id)}
+				<div class="bubble session-card" dir="auto">
+					<div class="session-heading" dir="ltr">{session.agent} · #{session.id}</div>
+					<div class="session-status he-sans">{$t(`hub.agents.activity.${session.state}`)}{#if session.tool} · <bdi>{session.tool}</bdi>{/if}</div>
+				</div>
+			{/each}
+		</div>
+	{/if}
 
 	{#if showTranscript}
 		<div
@@ -355,6 +370,12 @@
 	.card-extra {
 		pointer-events: auto;
 	}
+	.session-stack { display: flex; flex-direction: column; gap: 8px; width: min(360px, calc(100vw - 16px)); max-height: var(--island-max-h, 100%); box-sizing: border-box; padding: 4px; overflow-y: auto; overflow-x: hidden; pointer-events: auto; scrollbar-width: thin; }
+	.session-stack.below { flex-direction: column-reverse; }
+	.session-stack:focus-visible { outline: 2px solid var(--aqua); outline-offset: -2px; border-radius: 14px; }
+	.session-card { flex: 0 0 auto; box-sizing: border-box; padding: 8px 12px; }
+	.session-heading { font-size: 12px; font-weight: 600; color: var(--ink-mute); }
+	.session-status { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
 	/* ─── Bubbles ─── */
 	.bubble {

@@ -417,6 +417,7 @@
 		},
 		"agents": {
 			"showActivity": "Show short agent activity",
+			"sessions": "Session activity",
 			"codexIntro": "Ottid shows short Codex activity. By default, approvals stay in Codex and follow your selected mode, including Approve for me.",
 			"codexInfoConnected": "Connected for activity. Approval requests stay in Codex.",
 			"codexApprovalCards": "Show Codex approval requests in Ottid",
