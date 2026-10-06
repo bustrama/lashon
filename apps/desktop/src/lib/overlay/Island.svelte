@@ -271,7 +271,10 @@
 		<div class="session-stack" class:below={side === 'below'} data-interactive="island" role="region" aria-label={$t('hub.agents.sessions')} tabindex="0" aria-live="polite">
 			{#each agentSessions as session (session.id)}
 				<div class="bubble session-card" dir="auto">
-					<div class="session-heading" dir="ltr">{session.agent} · #{session.id}</div>
+					<div class="session-heading" dir="auto" title={session.title ?? undefined}>{session.title ?? `${session.agent} · #${session.id}`}</div>
+					{#if session.title || session.project}
+						<div class="session-context"><bdi>{session.agent}</bdi>{#if session.project} · <bdi>{session.project}</bdi>{/if}</div>
+					{/if}
 					<div class="session-status he-sans">{$t(`hub.agents.activity.${session.state}`)}{#if session.tool} · <bdi>{session.tool}</bdi>{/if}</div>
 				</div>
 			{/each}
@@ -374,7 +377,8 @@
 	.session-stack.below { flex-direction: column-reverse; }
 	.session-stack:focus-visible { outline: 2px solid var(--aqua); outline-offset: -2px; border-radius: 14px; }
 	.session-card { flex: 0 0 auto; box-sizing: border-box; padding: 8px 12px; }
-	.session-heading { font-size: 12px; font-weight: 600; color: var(--ink-mute); }
+	.session-context { font-size: 11px; color: var(--ink-mute); overflow-wrap: anywhere; }
+	.session-heading { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; color: var(--ink-mute); }
 	.session-status { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
 	/* ─── Bubbles ─── */
