@@ -27,10 +27,11 @@ use serde_json::Value;
 const STARTERS_RESOURCE: &str = "../../../recipes/starters/**/*";
 
 /// The entries only the full edition ships.
-const FULL_ONLY: [&str; 4] = [
+const FULL_ONLY: [&str; 5] = [
     "binaries/llama-server/**/*",
     "binaries/ottid-mcp/**/*",
     "binaries/ottid-hook/**/*",
+    "binaries/ottid-codex-hook/**/*",
     STARTERS_RESOURCE,
 ];
 
