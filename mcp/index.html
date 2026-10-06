@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Write Ottid recipes from Claude Desktop (MCP)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Connect Claude Desktop, or any MCP host, to ottid-mcp so it can list, validate and save Ottid recipes. Covers what ships in which edition, the five tools, the config entry and the move from lashon-mcp." />
+<meta name="theme-color" content="#22272f" />
+<link rel="stylesheet" href="../styles.css" />
+<link rel="icon" type="image/svg+xml" href="../ottid-mark.svg" />
+<style>
+/* Override the marketing page's single-screen layout for a scrollable article. */
+html, body {
+  height: auto;
+  overflow: visible;
+}
+body {
+  direction: ltr;
+  display: block;
+  padding: 0;
+}
+
+.article {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 56px 28px 96px;
+  font-family: var(--font-sans);
+  line-height: 1.65;
+  color: var(--text-soft);
+}
+
+.article-nav {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 32px;
+}
+.article-nav a {
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px dashed transparent;
+  transition: color .15s ease, border-color .15s ease;
+}
+.article-nav a:hover {
+  color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 60%, transparent);
+}
+
+.article h1 {
+  font-size: clamp(28px, 4vw, 38px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  margin: 0 0 16px;
+  line-height: 1.2;
+}
+.article .lede {
+  font-size: 17px;
+  color: var(--text-soft);
+  margin: 0 0 32px;
+}
+.article h2 {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 44px 0 14px;
+  letter-spacing: -0.005em;
+}
+.article p { margin: 0 0 14px; }
+
+/* Default article-link style. */
+.article a {
+  color: var(--accent);
+  border-bottom: 1px solid color-mix(in oklab, var(--accent) 40%, transparent);
+  transition: border-color .15s ease;
+}
+.article a:hover { border-color: var(--accent); }
+
+.article ol, .article ul {
+  margin: 0 0 18px;
+  padding-inline-start: 22px;
+}
+.article ol li, .article ul li { margin: 10px 0; }
+.article li::marker { color: var(--muted); }
+.article li strong { color: var(--text); font-weight: 600; }
+
+/* Inline code wraps instead of pushing the page sideways on phones. */
+.article code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+/* Code blocks scroll inside their own box; the page never scrolls sideways. */
+.article pre {
+  margin: 12px 0 18px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+}
+.article pre code {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: inherit;
+  overflow-wrap: normal;
+}
+
+.article table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0 16px;
+  font-size: 14px;
+}
+.article th, .article td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.article th {
+  color: var(--muted);
+  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+/* Long folder paths wrap instead of pushing the page sideways on phones. */
+.article td code { overflow-wrap: anywhere; }
+
+/* The tool list: one block per tool, so long names never fight a table column. */
+.tools { margin: 14px 0 20px; padding: 0; }
+.tools > div {
+  margin: 0 0 16px;
+  padding: 2px 0 2px 16px;
+  border-inline-start: 2px solid var(--line);
+}
+.tools dt { margin: 0 0 4px; }
+.tools dt code { font-size: 0.95em; }
+.tools dd { margin: 0; }
+.tools .args {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.callout {
+  margin: 18px 0 22px;
+  padding: 14px 18px;
+  background: color-mix(in oklab, var(--accent) 8%, var(--surface));
+  border: 1px solid color-mix(in oklab, var(--accent) 30%, var(--line));
+  border-radius: 12px;
+  color: var(--text-soft);
+}
+.callout strong { color: var(--text); }
+.callout p { margin: 0; }
+.callout p + p { margin-top: 8px; }
+
+.foot {
+  margin-top: 56px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+.foot a { color: var(--muted); border: none; }
+.foot a:hover { color: var(--accent); }
+
+@media (max-width: 720px) {
+  .article { padding: 40px 20px 64px; }
+  .article h1 { font-size: 26px; }
+  .article h2 { font-size: 19px; }
+}
+</style>
+</head>
+<body>
+
+<article class="article">
+
+  <nav class="article-nav" aria-label="Site navigation">
+    <a href="../">← Ottid home</a>
+  </nav>
+
+  <h1>Write Ottid recipes from Claude Desktop</h1>
+  <p class="lede">
+    <code>ottid-mcp</code> is a small program that lets Claude Desktop, or any
+    other MCP host, read, validate and save Ottid recipes. You describe the
+    workflow in chat; Claude drafts the recipe and checks it against Ottid's
+    own validator before it is written to disk.
+  </p>
+
+  <div class="callout">
+    <p>
+      <strong>Check your edition first.</strong>
+      Ottid is built in two editions from the same source. The <strong>free,
+      dictation-only edition</strong> is the one every public release so far
+      has shipped. It does <strong>not</strong> contain <code>ottid-mcp</code>
+      or the Recipes section: command mode, recipes and MCP are compiled out
+      of it, not just hidden.
+    </p>
+    <p>
+      They belong to the <strong>full edition</strong>, which for now you
+      build from source (GPL-3.0). No installer includes
+      <code>ottid-mcp</code> yet, so there is nothing to download. You build
+      the binary yourself, as shown below. A packaged full edition has not
+      been released.
+    </p>
+  </div>
+
+  <h2>What it is</h2>
+
+  <p>
+    A <em>recipe</em> is a <code>recipe.yaml</code> file: a named desktop
+    workflow with parameters and phrases, in Hebrew and English, that trigger
+    it. In the full edition you run one from the Hub or by voice in command
+    mode. Writing the YAML by hand is fiddly, so Ottid offers its recipe
+    handling over the
+    <a href="https://modelcontextprotocol.io/" target="_blank" rel="noopener">Model Context Protocol</a>
+    and lets an agent do the drafting.
+  </p>
+  <p>
+    The Hub has no MCP settings tab yet, so you wire it up by hand, as
+    described below. Claude Desktop starts <code>ottid-mcp</code> as a child
+    process and talks to it over stdin and stdout (the stdio transport).
+  </p>
+
+  <p>For reference, this is a real starter recipe, abridged:</p>
+
+<pre role="region" aria-label="Example recipe.yaml" tabindex="0"><code>id: lock-workstation
+name: Lock the workstation
+description: Lock the session immediately (Win+L on Windows).
+intents:
+  - "lock the screen"
+  - "lock my computer"
+  - "נעל את המחשב"
+parameters: []
+permissions:
+  - keyboard.type
+os_steps:
+  windows:
+    - type: key_chord
+      keys: [Meta, L]</code></pre>
+
+  <h2>The five tools</h2>
+
+  <p>
+    The tool names are plain snake_case, with no <code>ottid.</code> prefix.
+    MCP hosts normally show them grouped under the name you give the server
+    in the config.
+  </p>
+
+  <dl class="tools">
+    <div>
+      <dt><code>list_recipes</code></dt>
+      <dd>
+        Lists every installed recipe, both bundled starters and your own, as
+        a JSON array of <code>id</code>, <code>description</code>,
+        <code>source</code> (<code>starter</code> or <code>user</code>) and
+        <code>path</code>.
+        <span class="args">Arguments: none.</span>
+      </dd>
+    </div>
+    <div>
+      <dt><code>get_recipe</code></dt>
+      <dd>
+        Returns the full <code>recipe.yaml</code> for one recipe. If you have
+        saved a recipe with the same id as a starter, yours wins.
+        <span class="args">Arguments: <code>id</code> (string).</span>
+      </dd>
+    </div>
+    <div>
+      <dt><code>validate_recipe</code></dt>
+      <dd>
+        Checks a draft against the recipe schema and answers <code>ok</code>
+        or a list of every problem found, so Claude can fix them in one
+        round.
+        <span class="args">Arguments: <code>yaml</code> (string).</span>
+      </dd>
+    </div>
+    <div>
+      <dt><code>save_recipe</code></dt>
+      <dd>
+        Validates a draft and, only if it passes, writes it to your recipes
+        folder. The <code>id</code> must match the <code>id:</code> inside the
+        YAML. It refuses to replace an existing recipe unless
+        <code>overwrite</code> is true.
+        <span class="args">Arguments: <code>id</code> (string),
+        <code>yaml</code> (string), <code>overwrite</code> (optional
+        boolean, default false).</span>
+      </dd>
+    </div>
+    <div>
+      <dt><code>list_recipe_step_types</code></dt>
+      <dd>
+        Returns the JSON Schema of every step type the recipe runtime
+        supports, so Claude learns the vocabulary before drafting.
+        <span class="args">Arguments: none.</span>
+      </dd>
+    </div>
+  </dl>
+
+  <div class="callout">
+    <p>
+      <strong>All five only read or write <code>recipe.yaml</code> files.</strong>
+      None of them runs a recipe, presses a key, clicks, opens a file or
+      starts a program. A saved recipe does nothing until you trigger it from
+      the Hub or by voice.
+    </p>
+  </div>
+
+  <h2>Set it up</h2>
+
+  <ol>
+    <li>
+      <strong>Build the binary.</strong> Get the
+      <a href="https://github.com/bustrama/ottid" target="_blank" rel="noopener">source</a>
+      and, from the repository root, run:
+<pre role="region" aria-label="Build command" tabindex="0"><code>cargo build --release -p ottid-core --bin ottid-mcp</code></pre>
+      <p>
+        You need the Rust toolchain; the repository pins its version in
+        <code>rust-toolchain.toml</code>. Build with the default features: the
+        binary is part of command mode, so <code>--no-default-features</code>
+        leaves it out. The result is
+        <code>target/release/ottid-mcp.exe</code> on Windows, or
+        <code>target/release/ottid-mcp</code> elsewhere.
+      </p>
+    </li>
+
+    <li>
+      <strong>Open Claude Desktop's config file:</strong>
+      <table>
+        <thead><tr><th>OS</th><th>Path</th></tr></thead>
+        <tbody>
+          <tr><td>Windows</td><td><code>%APPDATA%\Claude\claude_desktop_config.json</code></td></tr>
+          <tr><td>macOS</td><td><code>~/Library/Application Support/Claude/claude_desktop_config.json</code></td></tr>
+        </tbody>
+      </table>
+    </li>
+
+    <li>
+      <strong>Add Ottid under <code>mcpServers</code>.</strong>
+      If you already have other servers there, add <code>ottid</code> next
+      to them. Use the real paths from your machine; forward slashes work on
+      Windows too.
+<pre role="region" aria-label="claude_desktop_config.json entry" tabindex="0"><code>{
+  "mcpServers": {
+    "ottid": {
+      "command": "C:/path/to/ottid/target/release/ottid-mcp.exe",
+      "env": {
+        "OTTID_BUNDLED_RECIPES_DIR": "C:/path/to/ottid/recipes/starters"
+      }
+    }
+  }
+}</code></pre>
+      <p>
+        <code>OTTID_BUNDLED_RECIPES_DIR</code> tells the server where the
+        starter recipes are. Without it the server falls back to the
+        <code>recipes/starters</code> folder of the checkout it was built in,
+        which only works while that checkout stays where it was.
+      </p>
+    </li>
+
+    <li>
+      <strong>Restart Claude Desktop</strong> completely, so it reads the new
+      config and starts the server.
+    </li>
+
+    <li>
+      <strong>Try it.</strong> Ask: <em>"List my Ottid recipes."</em> Claude
+      should call <code>list_recipes</code> and show the bundled starters.
+      Then ask for something new, for example <em>"Write me an Ottid recipe
+      that opens my notes app."</em> Claude can look up the step vocabulary
+      with <code>list_recipe_step_types</code>, draft the YAML, run it
+      through <code>validate_recipe</code> and finish with
+      <code>save_recipe</code>.
+    </li>
+  </ol>
+
+  <h2>Where your recipes are saved</h2>
+
+  <p>
+    <code>save_recipe</code> writes <code>&lt;id&gt;/recipe.yaml</code> inside
+    the per-user recipes folder:
+  </p>
+
+  <table>
+    <thead><tr><th>OS</th><th>Path</th></tr></thead>
+    <tbody>
+      <tr><td>Windows</td><td><code>%LOCALAPPDATA%\ottid\recipes\</code></td></tr>
+      <tr><td>macOS</td><td><code>~/Library/Application Support/ottid/recipes/</code></td></tr>
+      <tr><td>Linux</td><td><code>$XDG_DATA_HOME/ottid/recipes/</code> (or <code>~/.local/share/ottid/recipes/</code>)</td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    Set <code>OTTID_USER_RECIPES_DIR</code> in the same <code>env</code> block
+    to use another folder. The Hub's Recipes section in a full-edition build
+    reads the same folder.
+  </p>
+
+  <h2>Privacy and trust</h2>
+
+  <ul>
+    <li>
+      <strong>No network port.</strong> <code>ottid-mcp</code> listens for
+      nothing. It answers only over the pipes of the program that started it,
+      and only that program can talk to it.
+    </li>
+    <li>
+      <strong>No audio, no transcripts.</strong> The server never touches
+      your dictation. It handles recipe files and nothing else.
+    </li>
+    <li>
+      <strong>Claude Desktop is a cloud app.</strong> Whatever Claude reads
+      through these tools, such as recipe text or the on-disk
+      <code>path</code> that <code>list_recipes</code> reports, becomes part
+      of your conversation with Claude and is handled under its terms. Ottid
+      itself stays local.
+    </li>
+    <li>
+      <strong>Only point a host at a binary you built or trust.</strong> The
+      host runs whatever the <code>command</code> field names.
+    </li>
+  </ul>
+
+  <h2>Moving over from Lashon</h2>
+
+  <p>
+    Ottid used to be called Lashon. If you wired <code>lashon-mcp</code> into
+    an MCP host, change these:
+  </p>
+
+  <ul>
+    <li>
+      <strong>The binary.</strong> Point <code>command</code> at
+      <code>ottid-mcp</code> instead of <code>lashon-mcp</code>, rebuilt from
+      the current source.
+    </li>
+    <li>
+      <strong>The environment variables.</strong> <code>LASHON_*</code> became
+      <code>OTTID_*</code>, so <code>LASHON_BUNDLED_RECIPES_DIR</code> is now
+      <code>OTTID_BUNDLED_RECIPES_DIR</code>.
+    </li>
+    <li>
+      <strong>The server name.</strong> The key under <code>mcpServers</code>
+      is only a label you choose. Renaming <code>lashon</code> to
+      <code>ottid</code> is optional but keeps things readable.
+    </li>
+    <li>
+      <strong>The tool names stay the same.</strong> They were plain
+      snake_case before the rename and still are.
+    </li>
+    <li>
+      <strong>Your recipes move on their own.</strong> They used to live in a
+      <code>lashon/recipes</code> folder next to the new <code>ottid</code>
+      one. A release build, such as the one above, moves them across the
+      first time it needs the folder. Debug builds leave the old folder
+      alone unless <code>OTTID_ADOPT_LEGACY=1</code> is set.
+    </li>
+  </ul>
+
+  <h2>If it doesn't show up</h2>
+
+  <div class="callout">
+    <p>
+      <strong>No Ottid tools in Claude.</strong> Check that the config is
+      valid JSON, that <code>command</code> points at the real file, and that
+      you fully restarted Claude Desktop. You can also run
+      <code>ottid-mcp</code> by hand in a terminal: it starts, logs
+      <code>starting ottid-mcp</code> and then waits quietly for a host.
+    </p>
+    <p>
+      <strong>Claude lists no starters.</strong> Set
+      <code>OTTID_BUNDLED_RECIPES_DIR</code> to your checkout's
+      <code>recipes/starters</code> folder.
+    </p>
+    <p>
+      <strong>You want more detail.</strong> The server logs to stderr, never
+      stdout, because stdout carries the protocol. Add
+      <code>"RUST_LOG": "debug"</code> to the <code>env</code> block for more
+      output.
+    </p>
+  </div>
+
+  <h2>Learn more</h2>
+
+  <ul>
+    <li>
+      <a href="https://github.com/bustrama/ottid/blob/main/recipes/README.md" target="_blank" rel="noopener">Recipes README</a>:
+      how recipes are laid out and run.
+    </li>
+    <li>
+      <a href="https://github.com/bustrama/ottid/blob/main/recipes/schema/ottid-recipe.schema.json" target="_blank" rel="noopener">Recipe JSON Schema</a>:
+      the format Claude validates against.
+    </li>
+    <li>
+      <a href="https://github.com/bustrama/ottid/blob/main/docs/adr/0028-lashon-as-mcp-server.md" target="_blank" rel="noopener">ADR-0028</a>:
+      why the server is stdio-only and exposes only these tools. It predates
+      the rename, so it still says Lashon.
+    </li>
+  </ul>
+
+  <footer class="foot">
+    <p>
+      <a href="../">← Ottid · <span lang="he" dir="rtl">אוטיד</span></a>  ·  <a href="https://github.com/bustrama/ottid">Source on GitHub</a>
+    </p>
+  </footer>
+
+</article>
+
+</body>
+</html>
