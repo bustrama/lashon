@@ -105,12 +105,6 @@ pub fn entry(hook_exe: &str) -> Value {
     serde_json::to_value(group(hook_exe)).unwrap_or(Value::Null)
 }
 
-/// The matcher group as it is written, at `depth`.
-fn entry_text(hook_exe: &str, depth: usize) -> String {
-    let text = serde_json::to_string_pretty(&group(hook_exe)).unwrap_or_default();
-    text.replace('\n', &format!("\n{}", "  ".repeat(depth)))
-}
-
 /// Whether a hook handler runs `ottid-hook`.
 fn is_ours(handler: &Value) -> bool {
     if handler.get("type").and_then(Value::as_str) != Some("command") {
@@ -335,6 +329,13 @@ fn parse(current: Option<&str>) -> Result<Parsed, SettingsError> {
 
 /// What the file says about Ottid's hook.
 pub fn find(current: Option<&str>) -> Result<Found, SettingsError> {
+    find_with(current, is_ours)
+}
+
+pub(super) fn find_with(
+    current: Option<&str>,
+    owns: fn(&Value) -> bool,
+) -> Result<Found, SettingsError> {
     let parsed = parse(current)?;
     let mut commands = Vec::new();
     for group in parsed.groups.iter().flat_map(|(_, groups)| groups) {
@@ -347,7 +348,7 @@ pub fn find(current: Option<&str>) -> Result<Found, SettingsError> {
             .into_iter()
             .flatten()
         {
-            if is_ours(handler) {
+            if owns(handler) {
                 if let Some(command) = handler.get("command").and_then(Value::as_str) {
                     commands.push(command.to_string());
                 }
@@ -361,7 +362,7 @@ pub fn find(current: Option<&str>) -> Result<Found, SettingsError> {
 }
 
 /// The groups with Ottid's handlers taken out, and how many were.
-fn without_ours(groups: Vec<Box<RawValue>>) -> (Vec<Out>, usize) {
+fn without_ours(groups: Vec<Box<RawValue>>, owns: fn(&Value) -> bool) -> (Vec<Out>, usize) {
     let mut kept = Vec::new();
     let mut removed = 0;
     for raw in groups {
@@ -370,7 +371,7 @@ fn without_ours(groups: Vec<Box<RawValue>>) -> (Vec<Out>, usize) {
             .as_ref()
             .and_then(|group| group.get("hooks"))
             .and_then(Value::as_array)
-            .map(|handlers| handlers.iter().filter(|h| is_ours(h)).count())
+            .map(|handlers| handlers.iter().filter(|h| owns(h)).count())
             .unwrap_or(0);
         if ours == 0 {
             kept.push(Out::Raw(raw));
@@ -379,7 +380,7 @@ fn without_ours(groups: Vec<Box<RawValue>>) -> (Vec<Out>, usize) {
         removed += ours;
         let Some(mut group) = parsed else { continue };
         if let Some(handlers) = group.get_mut("hooks").and_then(Value::as_array_mut) {
-            handlers.retain(|h| !is_ours(h));
+            handlers.retain(|h| !owns(h));
             if handlers.is_empty() {
                 continue;
             }
@@ -447,8 +448,17 @@ fn assemble(parsed: Parsed, groups: Vec<Out>) -> String {
 
 /// Add Ottid's hook for `hook_exe`, replacing any earlier one.
 pub fn plan_install(current: Option<&str>, hook_exe: &str) -> Result<Plan, SettingsError> {
+    let text = serde_json::to_string_pretty(&group(hook_exe)).unwrap_or_default();
+    plan_install_with(current, entry(hook_exe), &text, is_ours)
+}
+
+pub(super) fn plan_install_with(
+    current: Option<&str>,
+    wanted: Value,
+    entry_text: &str,
+    owns: fn(&Value) -> bool,
+) -> Result<Plan, SettingsError> {
     let parsed = parse(current)?;
-    let wanted = entry(hook_exe);
     let groups: Vec<Box<RawValue>> = parsed
         .groups
         .as_ref()
@@ -463,7 +473,7 @@ pub fn plan_install(current: Option<&str>, hook_exe: &str) -> Result<Plan, Setti
             group
                 .get("hooks")
                 .and_then(Value::as_array)
-                .is_some_and(|handlers| handlers.iter().any(is_ours))
+                .is_some_and(|handlers| handlers.iter().any(owns))
         })
         .collect();
     if ours.len() == 1 && ours[0] == wanted {
@@ -475,19 +485,26 @@ pub fn plan_install(current: Option<&str>, hook_exe: &str) -> Result<Plan, Setti
         });
     }
 
-    let (mut kept, removed) = without_ours(groups);
-    kept.push(Out::New(entry_text(hook_exe, 3)));
+    let (mut kept, removed) = without_ours(groups, owns);
+    kept.push(Out::New(entry_text.replace('\n', "\n      ")));
     let text = assemble(parsed, kept);
     Ok(Plan {
         changes: current != Some(text.as_str()),
         text,
-        added: Some(entry_text(hook_exe, 0)),
+        added: Some(entry_text.to_string()),
         removed,
     })
 }
 
 /// Take every Ottid handler out.
 pub fn plan_uninstall(current: Option<&str>) -> Result<Plan, SettingsError> {
+    plan_uninstall_with(current, is_ours)
+}
+
+pub(super) fn plan_uninstall_with(
+    current: Option<&str>,
+    owns: fn(&Value) -> bool,
+) -> Result<Plan, SettingsError> {
     let Some(text) = current else {
         return Ok(Plan {
             text: String::new(),
@@ -502,7 +519,7 @@ pub fn plan_uninstall(current: Option<&str>) -> Result<Plan, SettingsError> {
         .as_ref()
         .map(|(_, g)| g.clone())
         .unwrap_or_default();
-    let (kept, removed) = without_ours(groups);
+    let (kept, removed) = without_ours(groups, owns);
     if removed == 0 {
         return Ok(Plan {
             text: text.to_string(),

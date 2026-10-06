@@ -38,6 +38,8 @@
 
 pub mod auth;
 pub mod claude_settings;
+pub mod codex_settings;
+pub mod runner;
 pub mod client;
 pub mod endpoint;
 pub mod hook;
@@ -58,6 +60,20 @@ pub const VERSION: u32 = 1;
 
 /// The asking agent, as the approval card names it.
 pub const AGENT: &str = "Claude Code";
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum Agent {
+    #[default]
+    Claude,
+    Codex,
+}
+
+impl Agent {
+    pub fn name(self) -> &'static str {
+        match self { Self::Claude => "Claude Code", Self::Codex => "Codex" }
+    }
+    pub fn is_claude(&self) -> bool { *self == Self::Claude }
+}
 
 /// The only hook event the bridge answers. Wired to any other, `ottid-hook`
 /// stays silent.
